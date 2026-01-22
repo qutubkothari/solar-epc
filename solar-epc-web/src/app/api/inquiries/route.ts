@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const { db } = await import("@/lib/db");
     const inquiries = await db.inquiry.findMany({
       include: {
         client: true,
@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { clientId, title, notes, siteAddress } = body;
+
+    const { db } = await import("@/lib/db");
 
     const inquiry = await db.inquiry.create({
       data: {

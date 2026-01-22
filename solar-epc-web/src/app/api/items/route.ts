@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const { db } = await import("@/lib/db");
     const items = await db.item.findMany({
       orderBy: {
         name: "asc",
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
+
+    const { db } = await import("@/lib/db");
 
     const item = await db.item.create({
       data: {
