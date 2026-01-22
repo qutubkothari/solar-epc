@@ -15,6 +15,7 @@ type ExecutionFormProps = {
 export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     inquiryId: "",
     assetType: "PANEL",
@@ -31,6 +32,7 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch("/api/execution-assets", {
@@ -43,11 +45,11 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
         onSuccess();
         onClose();
       } else {
-        alert("Failed to capture serial");
+        setErrorMessage("Unable to capture serial. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error capturing serial");
+      setErrorMessage("Something went wrong while capturing the serial.");
     } finally {
       setLoading(false);
     }
@@ -102,6 +104,12 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
               />
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button

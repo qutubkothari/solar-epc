@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { InquiryForm } from "@/components/inquiry-form";
 import { ClientForm } from "@/components/client-form";
+import { MediaForm } from "@/components/media-form";
 
 type Inquiry = {
   id: string;
@@ -19,6 +20,7 @@ export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false);
+  const [showMediaForm, setShowMediaForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchInquiries = async () => {
@@ -36,6 +38,26 @@ export default function InquiriesPage() {
   useEffect(() => {
     fetchInquiries();
   }, []);
+
+  const handleExport = () => {
+    const headers = ["Title", "Client", "Site", "Status"];
+    const rows = inquiries.map((inquiry) => [
+      inquiry.title,
+      inquiry.client.name,
+      inquiry.siteAddress || "",
+      inquiry.status,
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "inquiries-export.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
   return (
     <div className="space-y-6">
@@ -68,13 +90,13 @@ export default function InquiriesPage() {
           />
           <div className="flex gap-2">
             <button
-              onClick={() => alert("PDF export will be available after template upload.")}
+              onClick={handleExport}
               className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
             >
-              Export PDF
+              Export List
             </button>
             <button
-              onClick={() => alert("Media upload will be enabled in the next phase.")}
+              onClick={() => setShowMediaForm(true)}
               className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
             >
               Upload Media
@@ -134,6 +156,13 @@ export default function InquiriesPage() {
         <ClientForm
           onClose={() => setShowClientForm(false)}
           onSuccess={() => setShowClientForm(false)}
+        />
+      )}
+
+      {showMediaForm && (
+        <MediaForm
+          onClose={() => setShowMediaForm(false)}
+          onSuccess={() => setShowMediaForm(false)}
         />
       )}
     </div>

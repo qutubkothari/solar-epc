@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ItemForm } from "@/components/item-form";
 
@@ -16,7 +16,9 @@ type Item = {
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchItems = async () => {
     try {
@@ -34,6 +36,52 @@ export default function ItemsPage() {
     fetchItems();
   }, []);
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const rows = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (rows.length < 2) return;
+
+    const headers = rows[0].split(",").map((header) => header.trim().toLowerCase());
+    const itemsToCreate = rows.slice(1).map((row) => {
+      const values = row.split(",");
+      const entry: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        entry[header] = values[index]?.trim() || "";
+      });
+      return {
+        name: entry.name || "",
+        description: entry.description || "",
+        unitPrice: Number(entry.unitprice || entry.unit_price || 0),
+        taxPercent: Number(entry.taxpercent || entry.tax_percent || 0),
+        marginPercent: Number(entry.marginpercent || entry.margin_percent || 0),
+        uom: entry.uom || "Unit",
+        category: entry.category || "",
+      };
+    });
+
+    await Promise.all(
+      itemsToCreate
+        .filter((item) => item.name)
+        .map((item) =>
+          fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          })
+        )
+    );
+
+    fetchItems();
+    event.target.value = "";
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -41,7 +89,10 @@ export default function ItemsPage() {
         subtitle="Manage standardized pricing, margin defaults, and tax rules."
         action={
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setEditingItem(null);
+              setShowForm(true);
+            }}
             className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
           >
             Add Item
@@ -56,11 +107,18 @@ export default function ItemsPage() {
             placeholder="Search items"
           />
           <button
-            onClick={() => alert("CSV import will be enabled in the next phase.")}
+            onClick={handleImportClick}
             className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
           >
             Import CSV
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
         </div>
 
         {loading ? (
@@ -84,7 +142,10 @@ export default function ItemsPage() {
                   <p>UOM: {item.uom || "—"}</p>
                 </div>
                 <button
-                  onClick={() => alert("Item editing will be available in the next phase.")}
+                  onClick={() => {
+                    setEditingItem(item);
+                    setShowForm(true);
+                  }}
                   className="mt-4 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
                 >
                   Edit Item
@@ -102,6 +163,8 @@ export default function ItemsPage() {
             fetchItems();
             setShowForm(false);
           }}
+          itemId={editingItem?.id}
+          initialData={editingItem ?? undefined}
         />
       )}
     </div>

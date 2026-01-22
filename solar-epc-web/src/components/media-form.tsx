@@ -2,39 +2,28 @@
 
 import { useEffect, useState } from "react";
 
-type Client = {
-  id: string;
-  name: string;
-};
-
 type Inquiry = {
   id: string;
   title: string;
 };
 
-type TokenFormProps = {
+type MediaFormProps = {
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
-  const [clients, setClients] = useState<Client[]>([]);
+export function MediaForm({ onClose, onSuccess }: MediaFormProps) {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    clientId: "",
     inquiryId: "",
-    expiresAt: "",
-    allowDownload: true,
+    fileName: "",
+    fileType: "Photo",
+    fileUrl: "",
   });
 
   useEffect(() => {
-    fetch("/api/clients")
-      .then((res) => res.json())
-      .then((data) => setClients(data))
-      .catch(() => setClients([]));
-
     fetch("/api/inquiries")
       .then((res) => res.json())
       .then((data) => setInquiries(data))
@@ -47,7 +36,7 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/tokens", {
+      const res = await fetch("/api/inquiry-media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -57,11 +46,11 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to create token. Please try again.");
+        setErrorMessage("Unable to save media. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while creating the token.");
+      setErrorMessage("Something went wrong while saving the media.");
     } finally {
       setLoading(false);
     }
@@ -70,29 +59,12 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Generate Token</h2>
+        <h2 className="text-xl font-semibold text-solar-ink">Upload Site Media</h2>
         <p className="mt-1 text-sm text-solar-muted">
-          Create secure access link for client documents.
+          Register photos, videos, or documents for a project site.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-solar-ink">Client</label>
-            <select
-              required
-              value={formData.clientId}
-              onChange={(event) => setFormData({ ...formData, clientId: event.target.value })}
-              className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-            >
-              <option value="">Select client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Inquiry</label>
             <select
@@ -112,25 +84,38 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold text-solar-ink">Expiry Date</label>
+              <label className="block text-sm font-semibold text-solar-ink">File Name</label>
               <input
-                type="date"
-                value={formData.expiresAt}
-                onChange={(event) => setFormData({ ...formData, expiresAt: event.target.value })}
+                required
+                value={formData.fileName}
+                onChange={(event) => setFormData({ ...formData, fileName: event.target.value })}
                 className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+                placeholder="e.g., Roof Layout"
               />
             </div>
-            <div className="flex items-center gap-2 pt-6">
-              <input
-                id="allowDownload"
-                type="checkbox"
-                checked={formData.allowDownload}
-                onChange={(event) => setFormData({ ...formData, allowDownload: event.target.checked })}
-              />
-              <label htmlFor="allowDownload" className="text-sm text-solar-ink">
-                Allow download
-              </label>
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">File Type</label>
+              <select
+                value={formData.fileType}
+                onChange={(event) => setFormData({ ...formData, fileType: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              >
+                <option>Photo</option>
+                <option>Video</option>
+                <option>Document</option>
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-solar-ink">File URL</label>
+            <input
+              required
+              value={formData.fileUrl}
+              onChange={(event) => setFormData({ ...formData, fileUrl: event.target.value })}
+              className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              placeholder="https://..."
+            />
           </div>
 
           {errorMessage && (
@@ -152,7 +137,7 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Generate Token"}
+              {loading ? "Saving..." : "Save Media"}
             </button>
           </div>
         </form>

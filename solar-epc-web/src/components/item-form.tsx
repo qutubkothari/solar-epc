@@ -5,27 +5,39 @@ import { useState } from "react";
 type ItemFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  itemId?: string;
+  initialData?: {
+    name: string;
+    description?: string | null;
+    unitPrice?: number;
+    taxPercent?: number;
+    marginPercent?: number;
+    uom?: string | null;
+    category?: string | null;
+  };
 };
 
-export function ItemForm({ onClose, onSuccess }: ItemFormProps) {
+export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormProps) {
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    unitPrice: "",
-    taxPercent: "5",
-    marginPercent: "10",
-    uom: "Unit",
-    category: "",
+    name: initialData?.name || "",
+    description: initialData?.description || "",
+    unitPrice: initialData?.unitPrice?.toString() || "",
+    taxPercent: initialData?.taxPercent?.toString() || "5",
+    marginPercent: initialData?.marginPercent?.toString() || "10",
+    uom: initialData?.uom || "Unit",
+    category: initialData?.category || "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/items", {
-        method: "POST",
+      const res = await fetch(itemId ? `/api/items/${itemId}` : "/api/items", {
+        method: itemId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
@@ -39,11 +51,11 @@ export function ItemForm({ onClose, onSuccess }: ItemFormProps) {
         onSuccess();
         onClose();
       } else {
-        alert("Failed to create item");
+        setErrorMessage("Unable to save item. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error creating item");
+      setErrorMessage("Something went wrong while saving the item.");
     } finally {
       setLoading(false);
     }
@@ -52,7 +64,9 @@ export function ItemForm({ onClose, onSuccess }: ItemFormProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Add New Item</h2>
+        <h2 className="text-xl font-semibold text-solar-ink">
+          {itemId ? "Edit Item" : "Add New Item"}
+        </h2>
         <p className="mt-1 text-sm text-solar-muted">
           Define product pricing, margins, and tax rules.
         </p>
@@ -139,6 +153,12 @@ export function ItemForm({ onClose, onSuccess }: ItemFormProps) {
             </div>
           </div>
 
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-2">
             <button
               type="button"
@@ -152,7 +172,7 @@ export function ItemForm({ onClose, onSuccess }: ItemFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Item"}
+              {loading ? "Saving..." : itemId ? "Save Item" : "Create Item"}
             </button>
           </div>
         </form>

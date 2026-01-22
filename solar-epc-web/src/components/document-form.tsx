@@ -17,6 +17,7 @@ type DocumentFormProps = {
 export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFormProps) {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     inquiryId: "",
     name: "",
@@ -33,6 +34,7 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch(endpoint, {
@@ -45,11 +47,11 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
         onSuccess();
         onClose();
       } else {
-        alert("Failed to create document");
+        setErrorMessage("Unable to save document. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error creating document");
+      setErrorMessage("Something went wrong while saving the document.");
     } finally {
       setLoading(false);
     }
@@ -102,6 +104,12 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
               placeholder="https://..."
             />
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button

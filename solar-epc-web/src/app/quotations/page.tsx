@@ -10,6 +10,17 @@ type QuotationVersion = {
   version: string;
   grandTotal: number;
   isFinal: boolean;
+  subtotal: number;
+  taxTotal: number;
+  marginTotal: number;
+  items: {
+    id: string;
+    quantity: number;
+    lineTotal: number;
+    item: {
+      name: string;
+    };
+  }[];
 };
 
 type Quotation = {
@@ -26,6 +37,8 @@ export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
 
   const fetchQuotes = async () => {
     try {
@@ -42,6 +55,15 @@ export default function QuotationsPage() {
   useEffect(() => {
     fetchQuotes();
   }, []);
+
+  useEffect(() => {
+    if (!selectedQuoteId && quotes.length > 0) {
+      setSelectedQuoteId(quotes[0].id);
+    }
+  }, [quotes, selectedQuoteId]);
+
+  const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
+  const latestVersion = selectedQuote?.versions?.[0];
 
   return (
     <div className="space-y-6">
@@ -65,25 +87,51 @@ export default function QuotationsPage() {
             <p className="text-xs text-solar-muted mt-1">
               Select items, adjust margin, and generate the internal PDF.
             </p>
+            {quotes.length > 0 && (
+              <div className="mt-4">
+                <label className="text-xs font-semibold text-solar-muted">Select Quotation</label>
+                <select
+                  value={selectedQuoteId || ""}
+                  onChange={(event) => setSelectedQuoteId(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm"
+                >
+                  {quotes.map((quote) => (
+                    <option key={quote.id} value={quote.id}>
+                      {quote.title} • {quote.client.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="mt-4 space-y-2 text-xs text-solar-muted">
-              <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
-                <span>550W Mono Panel x 2100</span>
-                <span>AED 1,420,000</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
-                <span>10kW Inverter x 120</span>
-                <span>AED 456,000</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
-                <span>Balance of System</span>
-                <span>AED 304,000</span>
-              </div>
+              {latestVersion?.items?.length ? (
+                latestVersion.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2"
+                  >
+                    <span>
+                      {item.item.name} x {item.quantity}
+                    </span>
+                    <span>{formatCurrency(Number(item.lineTotal))}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg bg-white px-3 py-2 text-solar-muted">
+                  No line items yet. Add items when creating a quotation.
+                </div>
+              )}
             </div>
             <button
-              onClick={() => alert("PDF generation will be enabled when templates are uploaded.")}
+              onClick={() => {
+                if (selectedQuote) {
+                  window.open(`/api/quotations/${selectedQuote.id}/pdf`, "_blank");
+                }
+              }}
+              disabled={!selectedQuote}
               className="mt-4 w-full rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
             >
-              Generate PDF
+              Download PDF
             </button>
           </div>
 
@@ -108,7 +156,7 @@ export default function QuotationsPage() {
                         {version.version} {version.isFinal ? "(Final)" : ""}
                       </span>
                       <button
-                        onClick={() => alert("Version comparison coming next.")}
+                        onClick={() => setCompareVersion(version)}
                         className="text-solar-forest"
                       >
                         Compare
@@ -181,6 +229,43 @@ export default function QuotationsPage() {
             setShowForm(false);
           }}
         />
+      )}
+
+      {compareVersion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+            <h3 className="text-lg font-semibold text-solar-ink">Version Comparison</h3>
+            <p className="mt-1 text-sm text-solar-muted">
+              Version {compareVersion.version} summary
+            </p>
+            <div className="mt-4 space-y-2 text-sm text-solar-ink">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Margin</span>
+                <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Grand Total</span>
+                <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => setCompareVersion(null)}
+                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

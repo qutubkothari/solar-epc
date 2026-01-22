@@ -9,6 +9,7 @@ type ClientFormProps = {
 
 export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     contactName: "",
@@ -21,6 +22,7 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch("/api/clients", {
@@ -33,11 +35,11 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
         onSuccess();
         onClose();
       } else {
-        alert("Failed to create client");
+        setErrorMessage("Unable to create client. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error creating client");
+      setErrorMessage("Something went wrong while creating the client.");
     } finally {
       setLoading(false);
     }
@@ -114,6 +116,12 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
               className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             />
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button

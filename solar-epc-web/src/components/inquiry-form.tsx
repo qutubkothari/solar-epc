@@ -15,6 +15,7 @@ type InquiryFormProps = {
 export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     clientId: "",
     title: "",
@@ -32,6 +33,7 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch("/api/inquiries", {
@@ -44,11 +46,11 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
         onSuccess();
         onClose();
       } else {
-        alert("Failed to create inquiry");
+        setErrorMessage("Unable to create inquiry. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error creating inquiry");
+      setErrorMessage("Something went wrong while creating the inquiry.");
     } finally {
       setLoading(false);
     }
@@ -113,6 +115,12 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
               placeholder="Additional remarks..."
             />
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button

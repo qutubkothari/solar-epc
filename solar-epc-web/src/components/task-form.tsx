@@ -15,6 +15,7 @@ type TaskFormProps = {
 export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -32,6 +33,7 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const res = await fetch("/api/tasks", {
@@ -47,11 +49,11 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
         onSuccess();
         onClose();
       } else {
-        alert("Failed to create task");
+        setErrorMessage("Unable to create task. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error creating task");
+      setErrorMessage("Something went wrong while creating the task.");
     } finally {
       setLoading(false);
     }
@@ -113,6 +115,12 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
               </select>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button

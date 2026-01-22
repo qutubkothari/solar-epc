@@ -12,7 +12,18 @@ export async function GET() {
       },
       include: {
         client: true,
-        versions: true,
+        versions: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            items: {
+              include: {
+                item: true,
+              },
+            },
+          },
+        },
       },
     });
     return NextResponse.json(quotations);
@@ -25,9 +36,56 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, title } = body;
+    const { clientId, title, items = [] } = body;
 
     const { db } = await import("@/lib/db");
+    const itemIds = items.map((item: { itemId: string }) => item.itemId).filter(Boolean);
+    const itemRecords = await db.item.findMany({
+      where: { id: { in: itemIds } },
+    });
+
+    const lineItems: Array<{
+      itemId: string;
+      description: string | null;
+      quantity: number;
+      rate: number;
+      marginPercent: number;
+      taxPercent: number;
+      lineTotal: number;
+    }> = items
+      .filter((line: { itemId: string }) => line.itemId)
+      .map((line: { itemId: string; quantity: number; marginPercent?: number; taxPercent?: number }) => {
+        const item = itemRecords.find((record) => record.id === line.itemId);
+        const quantity = Number(line.quantity || 1);
+        const rate = Number(item?.unitPrice || 0);
+        const marginPercent = Number(line.marginPercent ?? item?.marginPercent ?? 0);
+        const taxPercent = Number(line.taxPercent ?? item?.taxPercent ?? 0);
+        const marginAmount = rate * (marginPercent / 100);
+        const taxAmount = rate * (taxPercent / 100);
+        const lineTotal = (rate + marginAmount + taxAmount) * quantity;
+
+        return {
+          itemId: line.itemId,
+          description: item?.description || null,
+          quantity,
+          rate,
+          marginPercent,
+          taxPercent,
+          lineTotal,
+        };
+      });
+
+    const subtotal = lineItems.reduce((sum: number, line) => sum + Number(line.rate) * Number(line.quantity), 0);
+    const marginTotal = lineItems.reduce(
+      (sum: number, line) => sum + Number(line.rate) * (Number(line.marginPercent) / 100) * Number(line.quantity),
+      0
+    );
+    const taxTotal = lineItems.reduce(
+      (sum: number, line) => sum + Number(line.rate) * (Number(line.taxPercent) / 100) * Number(line.quantity),
+      0
+    );
+    const grandTotal = subtotal + marginTotal + taxTotal;
+
     const quotation = await db.quotation.create({
       data: {
         clientId,
@@ -37,12 +95,27 @@ export async function POST(request: Request) {
           create: {
             version: "1.0",
             isFinal: false,
+            subtotal,
+            marginTotal,
+            taxTotal,
+            grandTotal,
+            items: {
+              create: lineItems,
+            },
           },
         },
       },
       include: {
         client: true,
-        versions: true,
+        versions: {
+          include: {
+            items: {
+              include: {
+                item: true,
+              },
+            },
+          },
+        },
       },
     });
 

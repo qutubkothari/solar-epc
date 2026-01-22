@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
@@ -13,10 +13,19 @@ type Asset = {
   };
 };
 
+type Inquiry = {
+  id: string;
+  title: string;
+};
+
 export default function ExecutionPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [quickSerial, setQuickSerial] = useState("");
+  const [quickType, setQuickType] = useState("PANEL");
+  const [quickInquiryId, setQuickInquiryId] = useState("");
 
   const fetchAssets = async () => {
     try {
@@ -32,7 +41,29 @@ export default function ExecutionPage() {
 
   useEffect(() => {
     fetchAssets();
+    fetch("/api/inquiries")
+      .then((res) => res.json())
+      .then((data) => setInquiries(data))
+      .catch(() => setInquiries([]));
   }, []);
+
+  const handleQuickSave = async () => {
+    if (!quickSerial || !quickInquiryId) return;
+    const res = await fetch("/api/execution-assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inquiryId: quickInquiryId,
+        assetType: quickType,
+        serialNo: quickSerial,
+      }),
+    });
+    if (res.ok) {
+      setQuickSerial("");
+      setQuickInquiryId("");
+      fetchAssets();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -56,26 +87,45 @@ export default function ExecutionPage() {
             Use barcode scanners or manual entry to store assets.
           </p>
           <div className="mt-4 space-y-3">
+            <select
+              value={quickInquiryId}
+              onChange={(event) => setQuickInquiryId(event.target.value)}
+              className="w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+            >
+              <option value="">Select inquiry</option>
+              {inquiries.map((inquiry) => (
+                <option key={inquiry.id} value={inquiry.id}>
+                  {inquiry.title}
+                </option>
+              ))}
+            </select>
             <input
+              value={quickSerial}
+              onChange={(event) => setQuickSerial(event.target.value)}
               className="w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
               placeholder="Scan or enter serial number"
             />
             <div className="flex gap-2">
               {[
-                "Panel",
-                "Inverter",
-                "Other",
+                { label: "Panel", value: "PANEL" },
+                { label: "Inverter", value: "INVERTER" },
+                { label: "Other", value: "OTHER" },
               ].map((type) => (
                 <button
-                  key={type}
-                  className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
+                  key={type.value}
+                  onClick={() => setQuickType(type.value)}
+                  className={`flex-1 rounded-xl border border-solar-border py-2 text-xs font-semibold ${
+                    quickType === type.value
+                      ? "bg-solar-amber text-white"
+                      : "bg-white text-solar-ink"
+                  }`}
                 >
-                  {type}
+                  {type.label}
                 </button>
               ))}
             </div>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={handleQuickSave}
               className="w-full rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
             >
               Save Serial
@@ -103,7 +153,7 @@ export default function ExecutionPage() {
                       {asset.serialNo}
                     </p>
                     <p className="text-xs text-solar-muted">
-                      {asset.assetType} • {asset.inquiry?.title || "Unassigned"}
+                      {asset.assetType}  {asset.inquiry?.title || "Unassigned"}
                     </p>
                   </div>
                   <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
