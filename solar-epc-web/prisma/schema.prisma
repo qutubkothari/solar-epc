@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  OPERATIONS
+  VIEWER
+}
+
+enum InquiryStatus {
+  NEW
+  QUOTED
+  APPROVED
+  IN_PROGRESS
+  CLOSED
+}
+
+enum QuotationStatus {
+  DRAFT
+  FINAL
+  APPROVED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum AssetType {
+  PANEL
+  INVERTER
+  OTHER
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasksAssigned Task[] @relation("AssignedTasks")
+  tasksCreated  Task[] @relation("CreatedTasks")
+}
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  inquiries       Inquiry[]
+  quotations      Quotation[]
+  tokens          TokenAccess[]
+  applicationData ApplicationData[]
+}
+
+model Inquiry {
+  id          String        @id @default(cuid())
+  clientId    String
+  title       String
+  notes       String?
+  siteAddress String?
+  status      InquiryStatus @default(NEW)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  client            Client                @relation(fields: [clientId], references: [id])
+  media             InquiryMedia[]
+  quotations        Quotation[]
+  applicationData   ApplicationData[]
+  statutoryDocs     StatutoryDocument[]
+  executionAssets   ExecutionAsset[]
+  completionDocs    CompletionDocument[]
+  tasks             Task[]
+  tokenAccess       TokenAccess[]
+}
+
+model InquiryMedia {
+  id        String   @id @default(cuid())
+  inquiryId String
+  fileName  String
+  fileType  String
+  fileUrl   String
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
+
+model Item {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  unitPrice     Decimal  @default(0)
+  taxPercent    Decimal  @default(0)
+  marginPercent Decimal  @default(0)
+  uom           String?
+  category      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  quotationItems QuotationItem[]
+}
+
+model Quotation {
+  id             String          @id @default(cuid())
+  clientId       String
+  inquiryId      String?
+  title          String
+  status         QuotationStatus @default(DRAFT)
+  finalVersionId String?         @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  client    Client             @relation(fields: [clientId], references: [id])
+  inquiry   Inquiry?           @relation(fields: [inquiryId], references: [id])
+  versions     QuotationVersion[]
+  finalVersion QuotationVersion? @relation("FinalVersion", fields: [finalVersionId], references: [id])
+}
+
+model QuotationVersion {
+  id            String   @id @default(cuid())
+  quotationId   String
+  version       String
+  isFinal       Boolean  @default(false)
+  subtotal      Decimal  @default(0)
+  taxTotal      Decimal  @default(0)
+  marginTotal   Decimal  @default(0)
+  grandTotal    Decimal  @default(0)
+  createdAt     DateTime @default(now())
+
+  quotation Quotation      @relation(fields: [quotationId], references: [id])
+  items     QuotationItem[]
+  finalFor  Quotation?      @relation("FinalVersion")
+}
+
+model QuotationItem {
+  id                 String   @id @default(cuid())
+  quotationVersionId String
+  itemId             String
+  description        String?
+  quantity           Decimal  @default(1)
+  rate               Decimal  @default(0)
+  marginPercent      Decimal  @default(0)
+  taxPercent         Decimal  @default(0)
+  lineTotal          Decimal  @default(0)
+
+  quotationVersion QuotationVersion @relation(fields: [quotationVersionId], references: [id])
+  item            Item             @relation(fields: [itemId], references: [id])
+}
+
+model ApplicationData {
+  id        String   @id @default(cuid())
+  clientId  String
+  inquiryId String?
+  data      Json
+  createdAt DateTime @default(now())
+
+  client  Client   @relation(fields: [clientId], references: [id])
+  inquiry Inquiry? @relation(fields: [inquiryId], references: [id])
+}
+
+model StatutoryDocument {
+  id        String   @id @default(cuid())
+  inquiryId String
+  name      String
+  fileUrl   String
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
+
+model ExecutionAsset {
+  id        String   @id @default(cuid())
+  inquiryId String
+  assetType AssetType
+  serialNo  String
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
+
+model CompletionDocument {
+  id        String   @id @default(cuid())
+  inquiryId String
+  name      String
+  fileUrl   String
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(OPEN)
+  dueDate     DateTime?
+  createdById String
+  assignedToId String?
+  inquiryId   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  createdBy  User   @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignedTo User?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  inquiry    Inquiry? @relation(fields: [inquiryId], references: [id])
+}
+
+model Notification {
+  id        String               @id @default(cuid())
+  channel   NotificationChannel
+  title     String
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model TokenAccess {
+  id            String   @id @default(cuid())
+  clientId      String
+  inquiryId     String
+  token         String   @unique
+  allowDownload Boolean  @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
