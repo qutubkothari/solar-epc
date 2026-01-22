@@ -90,6 +90,7 @@ cd "{0}"
 if [ ! -f .env ]; then
   echo "DATABASE_URL=file:./prisma/dev.db" > .env
 fi
+export PRISMA_CLIENT_ENGINE_TYPE=binary
 npx prisma generate
 npx prisma migrate deploy || npx prisma db push
 '@ -f $APP_PATH
@@ -99,12 +100,13 @@ Write-Host "Prisma updated" -ForegroundColor Green
 Write-Host "`n[7/7] Build and Restart" -ForegroundColor Yellow
 $restartCmd = @'
 cd "{0}"
-npm run build
+export PRISMA_CLIENT_ENGINE_TYPE=binary
+PRISMA_CLIENT_ENGINE_TYPE=binary npm run build
 if [ ! -f .next/BUILD_ID ]; then
     echo "ERROR: Build output missing in {0}/.next"; exit 1;
 fi
 pm2 delete {2} || true
-PORT={1} NODE_ENV=production pm2 start npm --name {2} --cwd "{0}" -- start -- -p {1}
+PRISMA_CLIENT_ENGINE_TYPE=binary PORT={1} NODE_ENV=production pm2 start npm --name {2} --cwd "{0}" -- start -- -p {1}
 pm2 save
 pm2 list
 '@ -f $APP_PATH, $APP_PORT, $PM2_PROCESS
