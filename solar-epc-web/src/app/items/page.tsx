@@ -55,7 +55,10 @@ export default function ItemsPage() {
             className="w-full max-w-xs rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             placeholder="Search items"
           />
-          <button className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink">
+          <button
+            onClick={() => alert("CSV import will be enabled in the next phase.")}
+            className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
+          >
             Import CSV
           </button>
         </div>
@@ -80,7 +83,10 @@ export default function ItemsPage() {
                   <p>Tax: {Number(item.taxPercent).toFixed(1)}%</p>
                   <p>UOM: {item.uom || "—"}</p>
                 </div>
-                <button className="mt-4 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink">
+                <button
+                  onClick={() => alert("Item editing will be available in the next phase.")}
+                  className="mt-4 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
+                >
                   Edit Item
                 </button>
               </div>

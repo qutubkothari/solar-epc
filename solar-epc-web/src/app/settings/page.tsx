@@ -1,3 +1,5 @@
+"use client";
+
 import { SectionHeader } from "@/components/section-header";
 
 export default function SettingsPage() {
@@ -26,9 +28,14 @@ export default function SettingsPage() {
                 className="flex items-center justify-between rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
               >
                 <p className="text-sm font-semibold text-solar-ink">{template}</p>
-                <button className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink">
+                <label className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink cursor-pointer">
                   Upload
-                </button>
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={() => alert("Template uploaded. Mapping will be configured next.")}
+                  />
+                </label>
               </div>
             ))}
           </div>

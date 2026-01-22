@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUpRight, CalendarCheck, FileCheck, PackageCheck } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { StatCard } from "@/components/stat-card";
@@ -9,9 +10,12 @@ export default function Home() {
         title="Performance Workspace"
         subtitle="Monitor the full project lifecycle from inquiry to closure."
         action={
-          <button className="rounded-xl bg-solar-forest px-4 py-2 text-sm font-semibold text-white">
+          <Link
+            href="/inquiries"
+            className="rounded-xl bg-solar-forest px-4 py-2 text-sm font-semibold text-white"
+          >
             Create Inquiry
-          </button>
+          </Link>
         }
       />
 

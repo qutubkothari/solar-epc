@@ -67,10 +67,16 @@ export default function InquiriesPage() {
             placeholder="Search inquiries"
           />
           <div className="flex gap-2">
-            <button className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink">
+            <button
+              onClick={() => alert("PDF export will be available after template upload.")}
+              className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
+            >
               Export PDF
             </button>
-            <button className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink">
+            <button
+              onClick={() => alert("Media upload will be enabled in the next phase.")}
+              className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
+            >
               Upload Media
             </button>
           </div>

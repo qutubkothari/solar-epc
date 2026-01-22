@@ -1,29 +1,47 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
+import { QuotationForm } from "@/components/quotation-form";
+import { formatCurrency } from "@/lib/format";
+
+type QuotationVersion = {
+  id: string;
+  version: string;
+  grandTotal: number;
+  isFinal: boolean;
+};
+
+type Quotation = {
+  id: string;
+  title: string;
+  status: string;
+  client: {
+    name: string;
+  };
+  versions: QuotationVersion[];
+};
 
 export default function QuotationsPage() {
-  const quotes = [
-    {
-      id: "Q-2211",
-      client: "Meraas Holdings",
-      version: "1.2",
-      total: "AED 2,180,000",
-      status: "Final",
-    },
-    {
-      id: "Q-2208",
-      client: "Sunline Retail",
-      version: "1.0",
-      total: "AED 730,000",
-      status: "Draft",
-    },
-    {
-      id: "Q-2204",
-      client: "Portside Logistics",
-      version: "1.1",
-      total: "AED 1,140,000",
-      status: "Approved",
-    },
-  ];
+  const [quotes, setQuotes] = useState<Quotation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetchQuotes = async () => {
+    try {
+      const res = await fetch("/api/quotations");
+      const data = await res.json();
+      setQuotes(data);
+    } catch (error) {
+      console.error("Failed to fetch quotations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -31,7 +49,10 @@ export default function QuotationsPage() {
         title="Quotation Engine"
         subtitle="Create, version, and compare quotations with real-time pricing."
         action={
-          <button className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white">
+          <button
+            onClick={() => setShowForm(true)}
+            className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
+          >
             New Quotation
           </button>
         }
@@ -58,7 +79,10 @@ export default function QuotationsPage() {
                 <span>AED 304,000</span>
               </div>
             </div>
-            <button className="mt-4 w-full rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white">
+            <button
+              onClick={() => alert("PDF generation will be enabled when templates are uploaded.")}
+              className="mt-4 w-full rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
+            >
               Generate PDF
             </button>
           </div>
@@ -69,15 +93,29 @@ export default function QuotationsPage() {
               Preserve every iteration with final approval flag.
             </p>
             <div className="mt-4 space-y-2 text-xs">
-              {["1.2 (Final)", "1.1", "1.0"].map((version) => (
-                <div
-                  key={version}
-                  className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
-                >
-                  <span className="font-semibold text-solar-ink">{version}</span>
-                  <button className="text-solar-forest">Compare</button>
-                </div>
-              ))}
+              {quotes.length === 0 ? (
+                <div className="text-solar-muted">No versions yet.</div>
+              ) : (
+                quotes
+                  .flatMap((quote) => quote.versions)
+                  .slice(0, 3)
+                  .map((version) => (
+                    <div
+                      key={version.id}
+                      className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
+                    >
+                      <span className="font-semibold text-solar-ink">
+                        {version.version} {version.isFinal ? "(Final)" : ""}
+                      </span>
+                      <button
+                        onClick={() => alert("Version comparison coming next.")}
+                        className="text-solar-forest"
+                      >
+                        Compare
+                      </button>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
         </div>
@@ -94,25 +132,56 @@ export default function QuotationsPage() {
               </tr>
             </thead>
             <tbody>
-              {quotes.map((quote) => (
-                <tr key={quote.id} className="border-t border-solar-border">
-                  <td className="px-4 py-3 font-medium text-solar-ink">
-                    {quote.id}
-                  </td>
-                  <td className="px-4 py-3 text-solar-muted">{quote.client}</td>
-                  <td className="px-4 py-3 text-solar-muted">{quote.version}</td>
-                  <td className="px-4 py-3 text-solar-muted">{quote.total}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                      {quote.status}
-                    </span>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-solar-muted">
+                    Loading...
                   </td>
                 </tr>
-              ))}
+              ) : quotes.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-solar-muted">
+                    No quotations yet.
+                  </td>
+                </tr>
+              ) : (
+                quotes.map((quote) => {
+                  const latestVersion = quote.versions[0];
+                  return (
+                    <tr key={quote.id} className="border-t border-solar-border">
+                      <td className="px-4 py-3 font-medium text-solar-ink">
+                        {quote.title}
+                      </td>
+                      <td className="px-4 py-3 text-solar-muted">{quote.client.name}</td>
+                      <td className="px-4 py-3 text-solar-muted">
+                        {latestVersion?.version || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-solar-muted">
+                        {formatCurrency(Number(latestVersion?.grandTotal || 0))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
+                          {quote.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {showForm && (
+        <QuotationForm
+          onClose={() => setShowForm(false)}
+          onSuccess={() => {
+            fetchQuotes();
+            setShowForm(false);
+          }}
+        />
+      )}
     </div>
   );
 }
