@@ -3,20 +3,19 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Params = {
-  params: {
-    id: string;
-  };
-};
-
-export async function PUT(request: Request, { params }: Params) {
+export async function PUT(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const body = await request.json();
     const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
 
+    const { id } = await context.params;
+
     const { db } = await import("@/lib/db");
     const item = await db.item.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description,
