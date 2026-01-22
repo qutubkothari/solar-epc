@@ -100,8 +100,11 @@ Write-Host "`n[7/7] Build and Restart" -ForegroundColor Yellow
 $restartCmd = @'
 cd "{0}"
 npm run build
+if [ ! -f .next/BUILD_ID ]; then
+    echo "ERROR: Build output missing in {0}/.next"; exit 1;
+fi
 pm2 delete {2} || true
-PORT={1} NODE_ENV=production pm2 start npm --name {2} -- start
+PORT={1} NODE_ENV=production pm2 start npm --name {2} --cwd "{0}" -- start -- -p {1}
 pm2 save
 pm2 list
 '@ -f $APP_PATH, $APP_PORT, $PM2_PROCESS
