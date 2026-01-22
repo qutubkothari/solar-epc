@@ -15,7 +15,7 @@ $KEY_PATH = "$env:USERPROFILE\.ssh\hostinger_ed25519"
 $REMOTE_PATH = "/var/www/solar-epc"
 $APP_PATH = "/var/www/solar-epc/solar-epc-web"
 $PM2_PROCESS = "solar-epc"
-$REPO_URL = "https://github.com/qutubkothari/solar-epc.git"
+$REPO_URL = "git@github.com:qutubkothari/solar-epc.git"
 $BRANCH = "main"
 $APP_PORT = "8061"
 
