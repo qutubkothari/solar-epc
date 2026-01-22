@@ -15,7 +15,7 @@ $KEY_PATH = "$env:USERPROFILE\.ssh\hostinger_ed25519"
 $REMOTE_PATH = "/var/www/solar-epc"
 $APP_PATH = "/var/www/solar-epc/solar-epc-web"
 $PM2_PROCESS = "solar-epc"
-$REPO_URL = "git@github.com:qutubkothari/solar-epc.git"
+$REPO_URL = "https://github.com/qutubkothari/solar-epc.git"
 $BRANCH = "main"
 $APP_PORT = "8061"
 
@@ -66,12 +66,12 @@ if [ ! -d "{0}/.git" ]; then
     echo "ERROR: {0} exists and is not empty."; exit 1;
   fi
   mkdir -p "{0}";
-  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git clone {1} "{0}";
+  git clone {1} "{0}";
 fi
 cd "{0}"
-GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git fetch origin {2}
+git fetch origin {2}
 git checkout {2}
-GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git pull origin {2}
+git pull origin {2}
 '@ -f $REMOTE_PATH, $REPO_URL, $BRANCH
 Invoke-RemoteCommand $prepCmd
 Write-Host "Code updated on server" -ForegroundColor Green
