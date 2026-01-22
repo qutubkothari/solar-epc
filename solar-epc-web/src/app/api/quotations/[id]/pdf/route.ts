@@ -4,17 +4,15 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Params = {
-  params: {
-    id: string;
-  };
-};
-
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const { db } = await import("@/lib/db");
+    const { id } = await context.params;
     const quotation = await db.quotation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         client: true,
         versions: {
