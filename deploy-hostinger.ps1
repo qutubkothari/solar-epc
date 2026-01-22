@@ -66,12 +66,12 @@ if [ ! -d "{0}/.git" ]; then
     echo "ERROR: {0} exists and is not empty."; exit 1;
   fi
   mkdir -p "{0}";
-  git clone {1} "{0}";
+  GIT_TERMINAL_PROMPT=0 git clone {1} "{0}";
 fi
 cd "{0}"
-git fetch origin {2}
+GIT_TERMINAL_PROMPT=0 git fetch origin {2}
 git checkout {2}
-git pull origin {2}
+GIT_TERMINAL_PROMPT=0 git pull origin {2}
 '@ -f $REMOTE_PATH, $REPO_URL, $BRANCH
 Invoke-RemoteCommand $prepCmd
 Write-Host "Code updated on server" -ForegroundColor Green
