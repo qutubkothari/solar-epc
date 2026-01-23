@@ -91,10 +91,11 @@ model Client {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  inquiries       Inquiry[]
-  quotations      Quotation[]
-  tokens          TokenAccess[]
-  applicationData ApplicationData[]
+  inquiries          Inquiry[]
+  quotations         Quotation[]
+  tokens             TokenAccess[]
+  applicationData    ApplicationData[]
+  technicalProposals TechnicalProposal[]
 }
 
 model Inquiry {
@@ -107,15 +108,16 @@ model Inquiry {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  client            Client                @relation(fields: [clientId], references: [id])
-  media             InquiryMedia[]
-  quotations        Quotation[]
-  applicationData   ApplicationData[]
-  statutoryDocs     StatutoryDocument[]
-  executionAssets   ExecutionAsset[]
-  completionDocs    CompletionDocument[]
-  tasks             Task[]
-  tokenAccess       TokenAccess[]
+  client             Client                @relation(fields: [clientId], references: [id])
+  media              InquiryMedia[]
+  quotations         Quotation[]
+  applicationData    ApplicationData[]
+  statutoryDocs      StatutoryDocument[]
+  executionAssets    ExecutionAsset[]
+  completionDocs     CompletionDocument[]
+  tasks              Task[]
+  tokenAccess        TokenAccess[]
+  technicalProposals TechnicalProposal[]
 }
 
 model InquiryMedia {
@@ -141,7 +143,8 @@ model Item {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  quotationItems QuotationItem[]
+  quotationItems         QuotationItem[]
+  technicalProposalItems TechnicalProposalItem[]
 }
 
 model Quotation {
@@ -154,10 +157,11 @@ model Quotation {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  client    Client             @relation(fields: [clientId], references: [id])
-  inquiry   Inquiry?           @relation(fields: [inquiryId], references: [id])
-  versions     QuotationVersion[]
-  finalVersion QuotationVersion? @relation("FinalVersion", fields: [finalVersionId], references: [id])
+  client             Client              @relation(fields: [clientId], references: [id])
+  inquiry            Inquiry?            @relation(fields: [inquiryId], references: [id])
+  versions           QuotationVersion[]
+  finalVersion       QuotationVersion?   @relation("FinalVersion", fields: [finalVersionId], references: [id])
+  technicalProposals TechnicalProposal[]
 }
 
 model QuotationVersion {
@@ -285,4 +289,95 @@ model TokenAccess {
 
   client  Client  @relation(fields: [clientId], references: [id])
   inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model TechnicalProposal {
+  id              String         @id @default(cuid())
+  proposalNumber  String         @unique
+  clientId        String
+  inquiryId       String?
+  quotationId     String?
+  
+  // Proposal Status & Validity
+  status          ProposalStatus @default(DRAFT)
+  validFrom       DateTime       @default(now())
+  validUntil      DateTime?
+  
+  // Company Details (preparer info)
+  preparedBy      String?
+  contactPerson   String?
+  contactPhone    String?
+  contactEmail    String?
+  
+  // Client/Site Details
+  siteAddress     String?
+  consumerNumber  String?
+  consumerType    String?        // Residential, Commercial, Industrial HT/LT
+  
+  // Existing Consumption Data
+  sanctionedLoad  Decimal?
+  contractDemand  Decimal?
+  avgMonthlyUnits Decimal?
+  avgMonthlyBill  Decimal?
+  currentTariff   Decimal?
+  
+  // Proposed System Specifications
+  systemCapacity  Decimal?       // kWp
+  annualGeneration Decimal?      // kWh/year
+  performanceRatio Decimal?      // %
+  degradationRate Decimal?       // % per year
+  systemLifespan  Int?           // years
+  
+  // Equipment Summary (JSON for flexibility)
+  panelSpec       Json?          // { brand, model, wattage, quantity, warranty }
+  inverterSpec    Json?          // { brand, model, capacity, quantity, warranty }
+  structureSpec   Json?          // { type, material, warranty }
+  
+  // Financial Summary
+  systemCost      Decimal?
+  subsidyAmount   Decimal?
+  netCost         Decimal?
+  paybackPeriod   Decimal?       // years
+  roi             Decimal?       // %
+  savingsYear1    Decimal?
+  savings25Year   Decimal?
+  
+  // Terms & Notes
+  executiveNote   String?
+  termsConditions String?
+  specialNotes    String?
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  client          Client         @relation(fields: [clientId], references: [id])
+  inquiry         Inquiry?       @relation(fields: [inquiryId], references: [id])
+  quotation       Quotation?     @relation(fields: [quotationId], references: [id])
+  items           TechnicalProposalItem[]
+}
+
+model TechnicalProposalItem {
+  id                  String            @id @default(cuid())
+  technicalProposalId String
+  itemId              String
+  category            String?           // Panel, Inverter, Structure, Wiring, etc.
+  description         String?
+  specifications      String?
+  quantity            Decimal           @default(1)
+  unitPrice           Decimal           @default(0)
+  totalPrice          Decimal           @default(0)
+  warranty            String?
+  brand               String?
+  model               String?
+  sortOrder           Int               @default(0)
+
+  proposal            TechnicalProposal @relation(fields: [technicalProposalId], references: [id], onDelete: Cascade)
+  item                Item              @relation(fields: [itemId], references: [id])
 }
