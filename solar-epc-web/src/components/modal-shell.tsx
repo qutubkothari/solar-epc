@@ -24,13 +24,15 @@ export function ModalShell({ title, subtitle, onClose, size = "xl", children }: 
   const [isMinimized, setIsMinimized] = useState(false);
 
   const baseSizeClass = sizeClasses[size];
-  const widthClass = isMaximized ? "w-[95vw] h-[90vh]" : `w-full ${baseSizeClass}`;
-  const bodyClass = isMaximized ? "max-h-[75vh]" : "max-h-[70vh]";
+  const widthClass = isMaximized ? "w-screen h-screen" : `w-full ${baseSizeClass}`;
+  const bodyClass = isMaximized ? "max-h-[calc(100vh-120px)]" : "max-h-[70vh]";
+  const containerClass = isMaximized ? "items-start justify-start" : "items-center justify-center";
+  const borderClass = isMaximized ? "rounded-none" : "rounded-2xl";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div className={`fixed inset-0 z-50 flex bg-black/30 backdrop-blur-sm ${containerClass}`}>
       <div
-        className={`rounded-2xl border border-solar-border bg-white p-6 shadow-solar ${widthClass} ${
+        className={`${borderClass} border border-solar-border bg-white p-6 shadow-solar ${widthClass} ${
           isMinimized ? "h-14 overflow-hidden" : ""
         }`}
       >
