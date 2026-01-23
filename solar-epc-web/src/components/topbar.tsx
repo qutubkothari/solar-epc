@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Plus, Search } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 
 export function TopBar() {
   return (
@@ -21,10 +21,6 @@ export function TopBar() {
         </label>
         <button className="rounded-xl border border-solar-border bg-white px-3 py-2 text-solar-ink hover:bg-solar-sand">
           <Bell className="h-5 w-5" />
-        </button>
-        <button className="flex items-center gap-2 rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white shadow-solar hover:bg-solar-amber-dark">
-          <Plus className="h-4 w-4" />
-          New Project
         </button>
       </div>
     </header>
