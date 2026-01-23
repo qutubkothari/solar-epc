@@ -21,6 +21,37 @@ type Inquiry = {
   clientId: string;
 };
 
+type Quotation = {
+  id: string;
+  title: string;
+  clientId: string;
+  versions: {
+    id: string;
+    version: string;
+    brand?: string | null;
+    isFinal: boolean;
+    grandTotal: number;
+    items: {
+      id: string;
+      itemId: string;
+      description?: string | null;
+      quantity: number;
+      rate: number;
+      marginPercent: number;
+      taxPercent: number;
+      lineTotal: number;
+      item: {
+        id: string;
+        name: string;
+        description?: string | null;
+        category?: string | null;
+        brand?: string | null;
+        uom?: string | null;
+      };
+    }[];
+  }[];
+};
+
 type Item = {
   id: string;
   name: string;
@@ -90,9 +121,12 @@ export function TechnicalProposalForm({
   const [step, setStep] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
+  const [selectedVersionId, setSelectedVersionId] = useState<string>("");
 
   // Step 1: Client & Site Info
   const [clientId, setClientId] = useState((initialData?.clientId as string) || "");
@@ -163,21 +197,97 @@ export function TechnicalProposalForm({
     Promise.all([
       fetch("/api/clients").then((r) => r.json()),
       fetch("/api/inquiries").then((r) => r.json()),
+      fetch("/api/quotations").then((r) => r.json()),
       fetch("/api/items").then((r) => r.json()),
     ])
-      .then(([clientsData, inquiriesData, itemsData]) => {
+      .then(([clientsData, inquiriesData, quotationsData, itemsData]) => {
         setClients(clientsData || []);
         setInquiries(inquiriesData || []);
+        setQuotations(quotationsData || []);
         setItems(itemsData || []);
       })
       .catch(console.error);
   }, []);
 
-  // Filter inquiries by selected client
+  // Filter inquiries and quotations by selected client
   const filteredInquiries = useMemo(() => {
     if (!clientId) return inquiries;
     return inquiries.filter((inq) => inq.clientId === clientId);
   }, [clientId, inquiries]);
+
+  const filteredQuotations = useMemo(() => {
+    if (!clientId) return quotations;
+    return quotations.filter((q) => q.clientId === clientId);
+  }, [clientId, quotations]);
+
+  const selectedQuotation = useMemo(() => {
+    return quotations.find((q) => q.id === selectedQuotationId);
+  }, [selectedQuotationId, quotations]);
+
+  const quotationVersions = useMemo(() => {
+    if (!selectedQuotation) return [];
+    return selectedQuotation.versions || [];
+  }, [selectedQuotation]);
+
+  // Import quotation data when version is selected
+  useEffect(() => {
+    if (!selectedVersionId || !selectedQuotation) return;
+
+    const version = selectedQuotation.versions.find((v) => v.id === selectedVersionId);
+    if (!version) return;
+
+    // Import items from quotation
+    const importedItems: ProposalItem[] = version.items.map((qItem) => ({
+      itemId: qItem.itemId,
+      category: qItem.item.category || "Other",
+      description: qItem.description || qItem.item.description || qItem.item.name,
+      specifications: "",
+      quantity: Number(qItem.quantity),
+      unitPrice: Number(qItem.rate),
+      warranty: "",
+      brand: qItem.item.brand || version.brand || "",
+      model: "",
+    }));
+
+    setProposalItems(importedItems);
+
+    // Set system cost from quotation grand total
+    setSystemCost(Number(version.grandTotal).toString());
+
+    // Try to extract panel and inverter details
+    const panelItem = version.items.find((item) => 
+      item.item.category?.toLowerCase().includes("panel") ||
+      item.item.name.toLowerCase().includes("panel")
+    );
+
+    const inverterItem = version.items.find((item) => 
+      item.item.category?.toLowerCase().includes("inverter") ||
+      item.item.name.toLowerCase().includes("inverter")
+    );
+
+    if (panelItem) {
+      setPanelBrand(panelItem.item.brand || version.brand || "");
+      setPanelQuantity(Number(panelItem.quantity).toString());
+      // Try to extract wattage from description or name
+      const wattageMatch = (panelItem.item.description || panelItem.item.name).match(/(\d+)\s*w/i);
+      if (wattageMatch) {
+        setPanelWattage(wattageMatch[1]);
+        // Calculate system capacity
+        const totalWp = Number(panelItem.quantity) * Number(wattageMatch[1]);
+        setSystemCapacity((totalWp / 1000).toFixed(2));
+      }
+    }
+
+    if (inverterItem) {
+      setInverterBrand(inverterItem.item.brand || version.brand || "");
+      setInverterQuantity(Number(inverterItem.quantity).toString());
+      // Try to extract capacity from description or name
+      const capacityMatch = (inverterItem.item.description || inverterItem.item.name).match(/(\d+)\s*kw/i);
+      if (capacityMatch) {
+        setInverterCapacity(capacityMatch[1]);
+      }
+    }
+  }, [selectedVersionId, selectedQuotation]);
 
   // Auto-fill site address from inquiry
   useEffect(() => {
@@ -291,6 +401,7 @@ export function TechnicalProposalForm({
       const payload = {
         clientId,
         inquiryId: inquiryId || null,
+        quotationId: selectedQuotationId || null,
         validUntil: validUntil || null,
         preparedBy,
         contactPerson,
@@ -414,6 +525,54 @@ export function TechnicalProposalForm({
                   searchPlaceholder="Search inquiries"
                 />
               </div>
+            </div>
+
+            {/* Import from Quotation */}
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+              <h4 className="text-sm font-semibold text-amber-900 mb-3">📋 Import from Quotation (Optional)</h4>
+              <p className="text-xs text-amber-700 mb-3">
+                Select a quotation to auto-fill equipment, costs, and specifications
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-amber-900 mb-1">Quotation</label>
+                  <SearchableSelect
+                    value={selectedQuotationId}
+                    options={filteredQuotations.map((q) => ({
+                      value: q.id,
+                      label: q.title,
+                      subtitle: `${q.versions.length} version(s)`,
+                    }))}
+                    onChange={(value) => {
+                      setSelectedQuotationId(value);
+                      setSelectedVersionId("");
+                    }}
+                    placeholder="Select quotation"
+                    searchPlaceholder="Search quotations"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-amber-900 mb-1">Version</label>
+                  <SearchableSelect
+                    value={selectedVersionId}
+                    options={quotationVersions.map((v) => ({
+                      value: v.id,
+                      label: `${v.version}${v.brand ? ` - ${v.brand}` : ""}${v.isFinal ? " (Final)" : ""}`,
+                      subtitle: formatCurrency(Number(v.grandTotal)),
+                    }))}
+                    onChange={setSelectedVersionId}
+                    placeholder={selectedQuotationId ? "Select version" : "Select quotation first"}
+                    searchPlaceholder="Search versions"
+                    disabled={!selectedQuotationId}
+                  />
+                </div>
+              </div>
+              {selectedVersionId && (
+                <div className="mt-3 text-xs text-green-700 flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Quotation imported! Equipment and costs have been auto-filled.</span>
+                </div>
+              )}
             </div>
 
             <div>
