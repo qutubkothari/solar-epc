@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Playwright artifacts
+solar-epc-web/test-results/
+solar-epc-web/playwright-report/
+
+# Local Prisma database
+solar-epc-web/prisma/dev.db
+
+# Local Prisma config backup
+solar-epc-web/prisma.config.ts.bak
