@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
-import { QuotationForm } from "@/components/quotation-form";
+import { SolarQuotationForm } from "@/components/solar-quotation-form";
 import { QuotationVersionForm } from "@/components/quotation-version-form";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -474,7 +474,7 @@ export default function QuotationsPage() {
       </div>
 
       {showForm && (
-        <QuotationForm
+        <SolarQuotationForm
           onClose={() => setShowForm(false)}
           onSuccess={() => {
             fetchQuotes();
