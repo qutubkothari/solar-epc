@@ -111,6 +111,50 @@ export default function QuotationsPage() {
   const compareDiff = compareReady
     ? Number(compareA?.grandTotal || 0) - Number(compareB?.grandTotal || 0)
     : 0;
+  const compareLines = compareReady
+    ? (() => {
+        const map = new Map<
+          string,
+          {
+            name: string;
+            qtyA: number;
+            totalA: number;
+            qtyB: number;
+            totalB: number;
+          }
+        >();
+
+        (compareA?.items || []).forEach((line) => {
+          const key = line.item.name;
+          const entry = map.get(key) || {
+            name: key,
+            qtyA: 0,
+            totalA: 0,
+            qtyB: 0,
+            totalB: 0,
+          };
+          entry.qtyA += Number(line.quantity || 0);
+          entry.totalA += Number(line.lineTotal || 0);
+          map.set(key, entry);
+        });
+
+        (compareB?.items || []).forEach((line) => {
+          const key = line.item.name;
+          const entry = map.get(key) || {
+            name: key,
+            qtyA: 0,
+            totalA: 0,
+            qtyB: 0,
+            totalB: 0,
+          };
+          entry.qtyB += Number(line.quantity || 0);
+          entry.totalB += Number(line.lineTotal || 0);
+          map.set(key, entry);
+        });
+
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+      })()
+    : [];
 
   const handleComparePick = (version: QuotationVersion) => {
     if (!compareA || (compareA && compareB)) {
@@ -347,30 +391,84 @@ export default function QuotationsPage() {
           title="Version Comparison"
           subtitle={compareReady ? "Compare two options" : `Version ${compareVersion.version} summary`}
           onClose={() => setCompareVersion(null)}
-          size="md"
+          size="2xl"
         >
           {compareReady ? (
             <div className="space-y-4 text-sm text-solar-ink">
-              <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
-                <p className="text-xs text-solar-muted">Option A</p>
-                <p className="text-sm font-semibold">
-                  {compareA?.version} {compareA?.brand ? `• ${compareA.brand}` : ""}
-                </p>
-                <div className="mt-2 flex justify-between">
-                  <span>Total</span>
-                  <span className="font-semibold">{formatCurrency(Number(compareA?.grandTotal || 0))}</span>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
+                  <p className="text-xs text-solar-muted">Option A</p>
+                  <p className="text-sm font-semibold">
+                    {compareA?.version} {compareA?.brand ? `• ${compareA.brand}` : ""}
+                  </p>
+                  <div className="mt-2 flex justify-between">
+                    <span>Total</span>
+                    <span className="font-semibold">{formatCurrency(Number(compareA?.grandTotal || 0))}</span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
+                  <p className="text-xs text-solar-muted">Option B</p>
+                  <p className="text-sm font-semibold">
+                    {compareB?.version} {compareB?.brand ? `• ${compareB.brand}` : ""}
+                  </p>
+                  <div className="mt-2 flex justify-between">
+                    <span>Total</span>
+                    <span className="font-semibold">{formatCurrency(Number(compareB?.grandTotal || 0))}</span>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
-                <p className="text-xs text-solar-muted">Option B</p>
-                <p className="text-sm font-semibold">
-                  {compareB?.version} {compareB?.brand ? `• ${compareB.brand}` : ""}
-                </p>
-                <div className="mt-2 flex justify-between">
-                  <span>Total</span>
-                  <span className="font-semibold">{formatCurrency(Number(compareB?.grandTotal || 0))}</span>
-                </div>
+
+              <div className="overflow-hidden rounded-xl border border-solar-border">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-solar-sand text-[11px] uppercase tracking-wider text-solar-muted">
+                    <tr>
+                      <th className="px-3 py-2">Item</th>
+                      <th className="px-3 py-2">Qty A</th>
+                      <th className="px-3 py-2">Total A</th>
+                      <th className="px-3 py-2">Qty B</th>
+                      <th className="px-3 py-2">Total B</th>
+                      <th className="px-3 py-2">Delta (A-B)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compareLines.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-3 py-3 text-center text-solar-muted"
+                        >
+                          No line items to compare.
+                        </td>
+                      </tr>
+                    ) : (
+                      compareLines.map((line) => {
+                        const delta = line.totalA - line.totalB;
+                        return (
+                          <tr key={line.name} className="border-t border-solar-border">
+                            <td className="px-3 py-2 font-medium text-solar-ink">{line.name}</td>
+                            <td className="px-3 py-2 text-solar-muted">{line.qtyA || "—"}</td>
+                            <td className="px-3 py-2 text-solar-muted">
+                              {line.totalA ? formatCurrency(line.totalA) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-solar-muted">{line.qtyB || "—"}</td>
+                            <td className="px-3 py-2 text-solar-muted">
+                              {line.totalB ? formatCurrency(line.totalB) : "—"}
+                            </td>
+                            <td
+                              className={`px-3 py-2 font-semibold ${
+                                delta >= 0 ? "text-solar-forest" : "text-red-600"
+                              }`}
+                            >
+                              {formatCurrency(delta)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
+
               <div className="flex justify-between rounded-xl border border-solar-border bg-white px-4 py-3">
                 <span className="font-semibold">Difference (A - B)</span>
                 <span className={`font-semibold ${compareDiff >= 0 ? "text-solar-forest" : "text-red-600"}`}>
