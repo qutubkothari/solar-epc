@@ -318,11 +318,14 @@ model TechnicalProposal {
   contactPerson   String?
   contactPhone    String?
   contactEmail    String?
+  companyName     String?        // Company preparing the proposal
+  companyLogo     String?        // Path/URL to company logo for PDF
   
   // Client/Site Details
   siteAddress     String?
   consumerNumber  String?
   consumerType    String?        // Residential, Commercial, Industrial HT/LT
+  clientLogo      String?        // Path/URL to client logo for PDF
   
   // Existing Consumption Data
   sanctionedLoad  Decimal?
@@ -356,6 +359,8 @@ model TechnicalProposal {
   executiveNote   String?
   termsConditions String?
   specialNotes    String?
+  introText       String?        // Introduction/Executive Summary
+  scopeOfWork     String?        // Scope of work description
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

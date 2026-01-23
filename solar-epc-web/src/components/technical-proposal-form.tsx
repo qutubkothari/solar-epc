@@ -101,10 +101,15 @@ export function TechnicalProposalForm({
   const [consumerNumber, setConsumerNumber] = useState((initialData?.consumerNumber as string) || "");
   const [consumerType, setConsumerType] = useState((initialData?.consumerType as string) || "Industrial HT");
   const [validUntil, setValidUntil] = useState((initialData?.validUntil as string) || "");
-  const [preparedBy, setPreparedBy] = useState((initialData?.preparedBy as string) || "");
-  const [contactPerson, setContactPerson] = useState((initialData?.contactPerson as string) || "");
-  const [contactPhone, setContactPhone] = useState((initialData?.contactPhone as string) || "");
-  const [contactEmail, setContactEmail] = useState((initialData?.contactEmail as string) || "");
+  const [preparedBy, setPreparedBy] = useState((initialData?.preparedBy as string) || "Technical Team");
+  const [contactPerson, setContactPerson] = useState((initialData?.contactPerson as string) || "Sales Manager");
+  const [contactPhone, setContactPhone] = useState((initialData?.contactPhone as string) || "+91 ");
+  const [contactEmail, setContactEmail] = useState((initialData?.contactEmail as string) || "sales@solarepc.com");
+  const [companyName, setCompanyName] = useState((initialData?.companyName as string) || "Solar EPC Solutions");
+  const [companyLogo, setCompanyLogo] = useState((initialData?.companyLogo as string) || "");
+  const [clientLogo, setClientLogo] = useState((initialData?.clientLogo as string) || "");
+  const [introText, setIntroText] = useState((initialData?.introText as string) || "We are pleased to present this comprehensive technical proposal for the installation of a Solar Photovoltaic (PV) system. This proposal outlines the complete system design, equipment specifications, financial analysis, and expected performance of the proposed solar power plant.");
+  const [scopeOfWork, setScopeOfWork] = useState((initialData?.scopeOfWork as string) || "1. Site Survey and Technical Assessment\n2. System Design and Engineering\n3. Procurement of Equipment and Materials\n4. Civil and Structural Works\n5. Electrical Installation and Wiring\n6. Grid Synchronization and Net Metering\n7. Testing and Commissioning\n8. Training and Documentation\n9. Handover to Client\n10. Warranty and AMC Support");
 
   // Step 2: Existing Usage Data
   const [sanctionedLoad, setSanctionedLoad] = useState((initialData?.sanctionedLoad as string) || "");
@@ -149,8 +154,8 @@ export function TechnicalProposalForm({
   const [savings25Year, setSavings25Year] = useState((initialData?.savings25Year as string) || "");
 
   // Step 6: Summary & Notes
-  const [executiveNote, setExecutiveNote] = useState((initialData?.executiveNote as string) || "");
-  const [termsConditions, setTermsConditions] = useState((initialData?.termsConditions as string) || "");
+  const [executiveNote, setExecutiveNote] = useState((initialData?.executiveNote as string) || "This solar PV system is designed to provide reliable, sustainable, and cost-effective power generation for your facility, ensuring significant savings on electricity bills while contributing to environmental conservation.");
+  const [termsConditions, setTermsConditions] = useState((initialData?.termsConditions as string) || "1. Prices are valid for 30 days from the date of proposal\n2. Payment Terms: 30% advance, 60% on material delivery, 10% on commissioning\n3. Installation timeline: 4-6 weeks from advance payment\n4. Client to provide necessary approvals and permits\n5. Warranty: Solar Panels 25 years, Inverters 5 years, Structure 5 years\n6. AMC available post-warranty at mutually agreed terms\n7. Force majeure clause applicable\n8. Dispute resolution: Arbitration as per Indian law");
   const [specialNotes, setSpecialNotes] = useState((initialData?.specialNotes as string) || "");
 
   // Fetch data
@@ -291,6 +296,11 @@ export function TechnicalProposalForm({
         contactPerson,
         contactPhone,
         contactEmail,
+        companyName,
+        companyLogo: companyLogo || null,
+        clientLogo: clientLogo || null,
+        introText: introText || null,
+        scopeOfWork: scopeOfWork || null,
         siteAddress,
         consumerNumber,
         consumerType,

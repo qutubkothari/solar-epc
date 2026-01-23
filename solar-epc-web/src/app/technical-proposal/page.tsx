@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { TechnicalProposalForm } from "@/components/technical-proposal-form";
+import { ProposalCharts } from "@/components/proposal-charts";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 type Client = {
@@ -416,6 +417,23 @@ export default function TechnicalProposalPage() {
             </div>
           )}
 
+          {/* Performance Charts */}
+          {p.systemCapacity && p.annualGeneration && p.avgMonthlyUnits && p.currentTariff && p.systemCost && (
+            <div>
+              <h3 className="text-sm font-semibold text-solar-ink mb-3">Performance Analysis & Projections</h3>
+              <ProposalCharts
+                systemCapacity={Number(p.systemCapacity)}
+                annualGeneration={Number(p.annualGeneration)}
+                avgMonthlyUnits={Number(p.avgMonthlyUnits)}
+                avgMonthlyBill={Number(p.avgMonthlyBill || 0)}
+                currentTariff={Number(p.currentTariff)}
+                systemCost={Number(p.systemCost)}
+                subsidyAmount={Number(p.subsidyAmount || 0)}
+                degradationRate={Number(p.degradationRate || 0.5)}
+              />
+            </div>
+          )}
+
           {/* Financial Summary */}
           {(p.systemCost || p.netCost) && (
             <div>
@@ -491,14 +509,22 @@ export default function TechnicalProposalPage() {
         {/* Action Buttons */}
         <div className="flex gap-3 print:hidden">
           <button
+            onClick={() => {
+              window.open(`/api/technical-proposals/${p.id}/pdf`, "_blank");
+            }}
+            className="rounded-xl border border-solar-border bg-white px-4 py-2 text-sm font-semibold text-solar-ink hover:bg-solar-sand"
+          >
+            📄 Download PDF
+          </button>
+          <button
             onClick={() => window.print()}
-            className="rounded-xl border border-solar-border bg-white px-4 py-2 text-sm font-semibold text-solar-ink"
+            className="rounded-xl border border-solar-border bg-white px-4 py-2 text-sm font-semibold text-solar-ink hover:bg-solar-sand"
           >
             🖨️ Print Proposal
           </button>
           <button
             onClick={() => handleEdit(p)}
-            className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
+            className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white hover:bg-solar-amber/90"
           >
             ✏️ Edit Proposal
           </button>
