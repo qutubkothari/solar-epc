@@ -121,7 +121,12 @@ const importInventory = async (rows) => {
 
 const importPriceList = async (rows) => {
   const headerIndex = findHeaderRow(rows, ["sr no", "item name", "unit", "rate", "gst"]);
+  
+  console.log(`PRICE LIST: Found header at row ${headerIndex + 1}`);
+  
   const { items } = rowsToObjects(rows, headerIndex);
+  
+  console.log(`PRICE LIST: Extracted ${items.length} total rows after header`);
   
   // Helper function to categorize solar EPC items
   const getCategory = (name) => {
@@ -154,7 +159,29 @@ const importPriceList = async (rows) => {
       rate: safeNumber(record["RATE"]),
       gst: safeNumber(record["GST"]),
     }))
-    .filter((item) => item.name);
+    .filter((item) => {
+      // Skip if no name
+      if (!item.name) return false;
+      
+      const name = String(item.name).trim();
+      
+      // Skip if name is empty after trimming
+      if (!name) return false;
+      
+      // Skip if name is just a number (like "12", "100", "102")
+      if (/^\d+\.?\d*$/.test(name)) return false;
+      
+      // Skip if name is very short (less than 3 characters)
+      if (name.length < 3) return false;
+      
+      // Skip common placeholder/junk values
+      const upperName = name.toUpperCase();
+      if (upperName === 'N/A' || upperName === 'NA' || upperName === '-' || upperName === 'NULL') return false;
+      
+      return true;
+    });
+  
+  console.log(`PRICE LIST: Filtered to ${priceItems.length} valid items`);
 
   if (priceItems.length === 0) return { created: 0, updated: 0 };
 
