@@ -54,32 +54,52 @@ const importInventory = async (rows) => {
   const getCategory = (name) => {
     if (!name) return 'Other';
     const n = String(name).toUpperCase();
-    if (n.includes('SOLAR') && (n.includes('MODULE') || n.includes('PANEL') || n.includes('BIFACIAL') || n.includes('TOPCON') || n.includes('MONO'))) return 'Solar Modules';
-    if (n.includes('INVERTER') || n.includes('SG') && /\d+K/.test(n)) return 'Inverters';
-    if (n.includes('STRUCTURE') || n.includes('STR-') || n.includes('MONO RAIL') || n.includes('ELEVATED')) return 'Mounting Structure';
+    if (n.includes('FACIAL') || n.includes('MODULE') || n.includes('PANEL') || n.includes('TOPCON') || n.includes('MONO')) return 'Solar Modules';
+    if (n.includes('INVERTER') || n.includes('INV -') || n.includes('INV-') || n.includes('SG')) return 'Inverters';
+    if (n.includes('STRUCTURE') || n.includes('STR -') || n.includes('STR-') || n.includes('MONO RAIL') || n.includes('ELEVATED')) return 'Mounting Structure';
     if (n.includes('ACDB')) return 'ACDB';
     if (n.includes('DCDB')) return 'DCDB';
     if (n.includes('EARTHING') || n.includes('ERTH') || n.includes('GI STRIP')) return 'Earthing';
     if (n.includes('LIGHTNING') || n.includes('LA ') || n.includes('ESE ')) return 'Lightning Arrestor';
-    if (n.includes('CABLE') || n.includes('DC 1C') || n.includes('AC ') && n.includes('SQMM')) return 'Cables';
+    if (n.includes('CABLE') || n.includes('DC 1C') || n.includes('AC ') && n.includes('SQMM') || n.includes('WIRE')) return 'Cables';
     if (n.includes('MC4') || n.includes('CONNECTOR')) return 'Connectors';
     if (n.includes('CABLE TRAY') || n.includes('FRP') && n.includes('TRAY')) return 'Cable Trays';
-    if (n.includes('CONDUIT') || n.includes('CONDUITE')) return 'Conduits';
-    if (n.includes('WALKWAY')) return 'Walkway';
-    if (n.includes('BASE PLATE') || n.includes('BOLT') || n.includes('CLAMP')) return 'Fasteners';
+    if (n.includes('CONDUIT') || n.includes('CONDUITE') || n.includes('PVC PIPE')) return 'Conduits';
+    if (n.includes('WALKWAY') || n.includes('WALK WAY')) return 'Walkway';
+    if (n.includes('BASE PLATE') || n.includes('BOLT') || n.includes('CLAMP') || n.includes('FASTENER')) return 'Fasteners';
     if (n.includes('LA POLE')) return 'LA Poles';
+    if (n.includes('NET METER')) return 'Net Meter';
     return 'Other';
+  };
+  
+  // Determine pricing unit based on item unit
+  const getPricingUnit = (unit) => {
+    if (!unit) return 'PER_UNIT';
+    const u = String(unit).toUpperCase().trim();
+    if (u.includes('WP') || u.includes('WATT')) return 'RS_PER_WATT';
+    if (u.includes('KW') || u.includes('Kw')) return 'RS_PER_KW';
+    return 'PER_UNIT';
   };
   
   const inventory = items
     .map(({ record }) => ({
+      srNo: record["SR NO"] || record["Sr No"] || null,
       name: record["ITEM NAME"],
       make: record["MAKE"],
       description: record["DESCRIPTION"],
       unit: record["UNIT"],
       rate: safeNumber(record["RATE"]),
     }))
-    .filter((item) => item.name);
+    .filter((item) => {
+      if (!item.name) return false;
+      const name = String(item.name).trim();
+      if (!name) return false;
+      // Skip number-only names
+      if (/^\d+\.?\d*$/.test(name)) return false;
+      // Skip short names
+      if (name.length < 3) return false;
+      return true;
+    });
 
   if (inventory.length === 0) return { created: 0, updated: 0 };
 
@@ -95,14 +115,18 @@ const importInventory = async (rows) => {
 
   for (const item of inventory) {
     const name = String(item.name).trim();
+    const unitStr = item.unit ? String(item.unit).trim() : null;
+    
     const data = {
       name,
       description: item.description ? String(item.description).trim() : null,
       brand: item.make ? String(item.make).trim() : null,
+      srNo: item.srNo ? parseInt(String(item.srNo).trim()) : null,
       unitPrice: item.rate ?? 0,
-      taxPercent: 0,
+      taxPercent: 0.18, // Default 18% GST for inventory items
       marginPercent: 0,
-      uom: item.unit ? String(item.unit).trim() : null,
+      uom: unitStr,
+      pricingUnit: getPricingUnit(unitStr),
       category: getCategory(name),
       isActive: true,
     };
@@ -408,17 +432,18 @@ const run = async () => {
   const sheet1 = workbook.Sheets["Sheet1"];
   const sheet2 = workbook.Sheets["Sheet2"];
 
-  // SKIP INVENTORY - Only use PRICE LIST for items
-  // if (inventorySheet) {
-  //   const rows = XLSX.utils.sheet_to_json(inventorySheet, { header: 1, defval: null });
-  //   const result = await importInventory(rows);
-  //   console.log("Inventory import:", result);
-  // }
+  // Import from Inventory first (detailed product catalog with makes/descriptions)
+  if (inventorySheet) {
+    const rows = XLSX.utils.sheet_to_json(inventorySheet, { header: 1, defval: null });
+    const result = await importInventory(rows);
+    console.log("Inventory import (detailed product catalog):", result);
+  }
 
+  // Then import from PRICE LIST (to update/add pricing for base items)
   if (priceSheet) {
     const rows = XLSX.utils.sheet_to_json(priceSheet, { header: 1, defval: null });
     const result = await importPriceList(rows);
-    console.log("Price list import:", result);
+    console.log("Price list import (base pricing):", result);
   }
 
   if (dataSheet) {
