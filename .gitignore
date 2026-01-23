@@ -148,3 +148,6 @@ solar-epc-web/dev.db
 
 # Local Prisma config backup
 solar-epc-web/prisma.config.ts.bak
+
+# Excel temp files
+~$*.xlsx

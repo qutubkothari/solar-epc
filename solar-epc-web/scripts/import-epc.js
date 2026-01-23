@@ -192,10 +192,10 @@ const importQuotationTemplate = async (rows, sheetName, templateName) => {
   return "created";
 };
 
-const importRawSheetTemplate = async (rows, sheetName) => {
+const importRawSheetTemplate = async (rows, sheetName, templateName) => {
   const data = rows.filter((row) => row.some((cell) => cell !== null && cell !== ""));
-  const templateName = `Imported ${sheetName}`;
-  const existing = await prisma.quotationTemplate.findFirst({ where: { name: templateName } });
+  const resolvedName = templateName || `Imported ${sheetName}`;
+  const existing = await prisma.quotationTemplate.findFirst({ where: { name: resolvedName } });
   if (existing) {
     await prisma.quotationTemplate.update({
       where: { id: existing.id },
@@ -205,7 +205,7 @@ const importRawSheetTemplate = async (rows, sheetName) => {
   }
   await prisma.quotationTemplate.create({
     data: {
-      name: templateName,
+      name: resolvedName,
       sourceSheet: sheetName,
       data: { rows: data },
     },
@@ -220,6 +220,7 @@ const run = async () => {
   const inventorySheet = workbook.Sheets["Inventry"];
   const dataSheet = workbook.Sheets["DATA"];
   const priceSheet = workbook.Sheets["PRICE LIST"];
+  const proposalSheet = workbook.Sheets["QUOTATION"];
   const sheet1 = workbook.Sheets["Sheet1"];
   const sheet2 = workbook.Sheets["Sheet2"];
 
@@ -239,6 +240,12 @@ const run = async () => {
     const rows = XLSX.utils.sheet_to_json(dataSheet, { header: 1, defval: null });
     const count = await importTechnicalData(rows, "DATA");
     console.log("Technical data rows imported:", count);
+  }
+
+  if (proposalSheet) {
+    const rows = XLSX.utils.sheet_to_json(proposalSheet, { header: 1, defval: null });
+    const status = await importRawSheetTemplate(rows, "QUOTATION", "Technical Proposal");
+    console.log("Technical proposal template:", status);
   }
 
   if (sheet1) {

@@ -14,6 +14,7 @@ import {
   ListChecks,
   Package,
   BookOpen,
+  ScrollText,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/inquiries", label: "Inquiries", icon: ClipboardList },
   { href: "/items", label: "Item Master", icon: Package },
+  { href: "/technical-proposal", label: "Technical Proposal", icon: ScrollText },
   { href: "/quotations", label: "Quotations", icon: FileSpreadsheet },
   { href: "/applications", label: "Applications", icon: FileText },
   { href: "/execution", label: "Execution", icon: BadgeCheck },
