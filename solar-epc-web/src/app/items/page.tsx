@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ItemForm } from "@/components/item-form";
 import { ModalShell } from "@/components/modal-shell";
@@ -8,10 +8,12 @@ import { ModalShell } from "@/components/modal-shell";
 type Item = {
   id: string;
   name: string;
+  description?: string | null;
   unitPrice: number;
   marginPercent: number;
   taxPercent: number;
   uom: string | null;
+  category?: string | null;
 };
 
 export default function ItemsPage() {
@@ -20,6 +22,8 @@ export default function ItemsPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [viewItem, setViewItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchItems = async () => {
@@ -37,6 +41,26 @@ export default function ItemsPage() {
   useEffect(() => {
     fetchItems();
   }, []);
+
+  const categories = useMemo(() => {
+    const values = items
+      .map((item) => item.category)
+      .filter((value): value is string => Boolean(value && value.trim()));
+    return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesSearch =
+        !search ||
+        item.name.toLowerCase().includes(search) ||
+        (item.description || "").toLowerCase().includes(search) ||
+        (item.category || "").toLowerCase().includes(search);
+      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [items, searchTerm, categoryFilter]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -117,7 +141,21 @@ export default function ItemsPage() {
           <input
             className="w-full max-w-xs rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             placeholder="Search items"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
           />
+          <select
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+            className="rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm text-solar-ink"
+          >
+            <option value="all">All Categories</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleImportClick}
             className="rounded-xl border border-solar-border px-3 py-2 text-sm text-solar-ink"
@@ -135,18 +173,28 @@ export default function ItemsPage() {
 
         {loading ? (
           <div className="mt-6 text-center text-sm text-solar-muted">Loading...</div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="mt-6 text-center text-sm text-solar-muted">
-            No items yet. Add your first item to build the pricing master.
+            No items match your filters.
           </div>
         ) : (
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <div
                 key={item.id}
                 className="rounded-xl border border-solar-border bg-solar-sand p-4"
               >
-                <p className="text-sm font-semibold text-solar-ink">{item.name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-solar-ink">{item.name}</p>
+                  {item.category && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-solar-muted">
+                      {item.category}
+                    </span>
+                  )}
+                </div>
+                {item.description && (
+                  <p className="mt-1 text-xs text-solar-muted">{item.description}</p>
+                )}
                 <div className="mt-3 space-y-1 text-xs text-solar-muted">
                   <p>Unit Price: AED {Number(item.unitPrice).toFixed(2)}</p>
                   <p>Margin: {Number(item.marginPercent).toFixed(1)}%</p>
@@ -202,6 +250,18 @@ export default function ItemsPage() {
           size="md"
         >
           <div className="space-y-2 text-sm text-solar-ink">
+            {viewItem.category && (
+              <div className="flex justify-between">
+                <span className="text-solar-muted">Category</span>
+                <span className="font-semibold">{viewItem.category}</span>
+              </div>
+            )}
+            {viewItem.description && (
+              <div className="flex justify-between gap-4">
+                <span className="text-solar-muted">Description</span>
+                <span className="font-semibold text-right">{viewItem.description}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-solar-muted">Unit Price</span>
               <span className="font-semibold">AED {Number(viewItem.unitPrice).toFixed(2)}</span>
