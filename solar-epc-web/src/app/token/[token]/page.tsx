@@ -25,17 +25,41 @@ type CompletionDoc = {
   };
 };
 
-export default function TokenAccessPage({ params }: { params: { token: string } }) {
+export default function TokenAccessPage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const [tokenParam, setTokenParam] = useState<string | null>(null);
   const [tokenRecord, setTokenRecord] = useState<TokenRecord | null>(null);
   const [docs, setDocs] = useState<CompletionDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isActive = true;
+    params
+      .then((resolved) => {
+        if (isActive) {
+          setTokenParam(resolved.token);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setTokenParam(null);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [params]);
+
+  useEffect(() => {
+    if (!tokenParam) return;
     const fetchData = async () => {
       try {
         const tokenRes = await fetch("/api/tokens");
         const tokenData: TokenRecord[] = await tokenRes.json();
-        const match = tokenData.find((item) => item.token === params.token);
+        const match = tokenData.find((item) => item.token === tokenParam);
         setTokenRecord(match || null);
 
         const docsRes = await fetch("/api/completion-docs");
@@ -53,7 +77,7 @@ export default function TokenAccessPage({ params }: { params: { token: string } 
     };
 
     fetchData();
-  }, [params.token]);
+  }, [tokenParam]);
 
   if (loading) {
     return <div className="p-10 text-center text-sm text-solar-muted">Loading...</div>;

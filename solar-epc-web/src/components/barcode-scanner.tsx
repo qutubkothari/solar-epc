@@ -86,6 +86,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   }, [scanning, lastScanned, onScan]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);

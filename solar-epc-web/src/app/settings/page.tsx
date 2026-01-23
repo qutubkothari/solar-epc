@@ -1,31 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 
 const TEMPLATE_KEYS = ["Quotation Template", "DG NOC", "Agreement", "Completion Pack"] as const;
 
 type TemplateState = Record<(typeof TEMPLATE_KEYS)[number], string>;
+const DEFAULT_TEMPLATES = TEMPLATE_KEYS.reduce(
+  (acc, key) => ({ ...acc, [key]: "" }),
+  {} as TemplateState
+);
+const DEFAULT_NOTIFICATIONS = { email: true, whatsapp: false };
 
 export default function SettingsPage() {
-  const [templates, setTemplates] = useState<TemplateState>(() =>
-    TEMPLATE_KEYS.reduce((acc, key) => ({ ...acc, [key]: "" }), {} as TemplateState)
-  );
-  const [notifications, setNotifications] = useState({
-    email: true,
-    whatsapp: false,
-  });
-
-  useEffect(() => {
+  const [templates, setTemplates] = useState<TemplateState>(() => {
+    if (typeof window === "undefined") return DEFAULT_TEMPLATES;
     const storedTemplates = window.localStorage.getItem("solar.epc.templates");
-    if (storedTemplates) {
-      setTemplates(JSON.parse(storedTemplates));
+    if (!storedTemplates) return DEFAULT_TEMPLATES;
+    try {
+      return { ...DEFAULT_TEMPLATES, ...JSON.parse(storedTemplates) } as TemplateState;
+    } catch {
+      return DEFAULT_TEMPLATES;
     }
+  });
+  const [notifications, setNotifications] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_NOTIFICATIONS;
     const storedNotifications = window.localStorage.getItem("solar.epc.notifications");
-    if (storedNotifications) {
-      setNotifications(JSON.parse(storedNotifications));
+    if (!storedNotifications) return DEFAULT_NOTIFICATIONS;
+    try {
+      return { ...DEFAULT_NOTIFICATIONS, ...JSON.parse(storedNotifications) };
+    } catch {
+      return DEFAULT_NOTIFICATIONS;
     }
-  }, []);
+  });
 
   const handleTemplateUpload = (key: (typeof TEMPLATE_KEYS)[number], file: File | null) => {
     if (!file) return;

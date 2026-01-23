@@ -30,7 +30,6 @@ export default function ExecutionPage() {
   const [quickSerial, setQuickSerial] = useState("");
   const [quickType, setQuickType] = useState("PANEL");
   const [quickInquiryId, setQuickInquiryId] = useState("");
-  const [scanCount, setScanCount] = useState(0);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewAsset, setViewAsset] = useState<Asset | null>(null);
 
@@ -86,7 +85,6 @@ export default function ExecutionPage() {
       }),
     });
     if (res.ok) {
-      setScanCount((prev) => prev + 1);
       fetchAssets();
     }
   };
@@ -281,7 +279,6 @@ export default function ExecutionPage() {
           onScan={handleBarcodeScan}
           onClose={() => {
             setShowScanner(false);
-            setScanCount(0);
           }}
         />
       )}

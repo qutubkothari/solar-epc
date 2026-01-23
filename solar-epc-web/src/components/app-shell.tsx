@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import clsx from "clsx";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/topbar";
@@ -10,14 +10,11 @@ type AppShellProps = {
 };
 
 export function AppShell({ children }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
     const stored = window.localStorage.getItem("solar.epc.sidebar");
-    if (stored) {
-      setCollapsed(stored === "collapsed");
-    }
-  }, []);
+    return stored === "collapsed";
+  });
 
   const handleToggle = () => {
     setCollapsed((prev) => {
