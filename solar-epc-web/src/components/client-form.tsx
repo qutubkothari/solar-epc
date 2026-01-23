@@ -37,6 +37,7 @@ type ClientFormProps = {
 
 export function ClientForm({ onClose, onSuccess, clientId, initialData }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
+  const [gstLoading, setGstLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
@@ -147,13 +148,51 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-solar-ink">Tax/VAT ID</label>
-                <input
-                  type="text"
-                  value={formData.taxId}
-                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm outline-none"
-                />
+                <label className="block text-sm font-semibold text-solar-ink">GST Number</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.taxId}
+                    onChange={(e) => setFormData({ ...formData, taxId: e.target.value.toUpperCase() })}
+                    onBlur={async (e) => {
+                      const gst = e.target.value.trim();
+                      if (gst && gst.length === 15 && !clientId) {
+                        setGstLoading(true);
+                        try {
+                          // GST number format: 22AAAAA0000A1Z5
+                          const panMatch = gst.match(/^\d{2}([A-Z]{5}\d{4}[A-Z]{1})/);
+                          if (panMatch) {
+                            const response = await fetch(`https://sheet.gstincheck.co.in/check/${gst}`);
+                            const data = await response.json();
+                            if (data.flag && data.data?.tradeNam) {
+                              setFormData(prev => ({
+                                ...prev,
+                                name: prev.name || data.data.tradeNam,
+                                address: prev.address || data.data.pradr?.addr?.st || '',
+                                city: prev.city || data.data.pradr?.addr?.dst || '',
+                                state: prev.state || data.data.pradr?.addr?.stcd || '',
+                                postalCode: prev.postalCode || data.data.pradr?.addr?.pncd || '',
+                              }));
+                            }
+                          }
+                        } catch (err) {
+                          console.log('GST lookup failed:', err);
+                        } finally {
+                          setGstLoading(false);
+                        }
+                      }
+                    }}
+                    className="mt-1 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm outline-none pr-10"
+                    placeholder="22AAAAA0000A1Z5"
+                    maxLength={15}
+                  />
+                  {gstLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-solar-amber border-t-transparent"></div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-solar-muted mt-1">Auto-fills company details on blur</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-solar-ink">Registration No.</label>

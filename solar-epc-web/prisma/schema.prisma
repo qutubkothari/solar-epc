@@ -73,7 +73,7 @@ model Client {
   website     String?
   industry    String?
   companyType String?
-  taxId       String?
+  taxId       String? // GST Number for Indian clients
   registrationNo String?
   address     String?
   billingAddress String?

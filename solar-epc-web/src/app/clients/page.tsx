@@ -230,7 +230,7 @@ export default function ClientsPage() {
               <span className="font-semibold">{viewClient.website || "—"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-solar-muted">Tax/VAT ID</span>
+              <span className="text-solar-muted">GST Number</span>
               <span className="font-semibold">{viewClient.taxId || "—"}</span>
             </div>
             <div className="flex justify-between">
