@@ -223,6 +223,22 @@ model ExecutionAsset {
   inquiry Inquiry @relation(fields: [inquiryId], references: [id])
 }
 
+model TechnicalDataset {
+  id          String   @id @default(cuid())
+  sourceSheet String
+  rowIndex    Int
+  data        Json
+  createdAt   DateTime @default(now())
+}
+
+model QuotationTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  sourceSheet String
+  data        Json
+  createdAt   DateTime @default(now())
+}
+
 model CompletionDocument {
   id        String   @id @default(cuid())
   inquiryId String
