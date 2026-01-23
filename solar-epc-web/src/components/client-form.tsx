@@ -159,21 +159,20 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
                       if (gst && gst.length === 15 && !clientId) {
                         setGstLoading(true);
                         try {
-                          // GST number format: 22AAAAA0000A1Z5
-                          const panMatch = gst.match(/^\d{2}([A-Z]{5}\d{4}[A-Z]{1})/);
-                          if (panMatch) {
-                            const response = await fetch(`https://sheet.gstincheck.co.in/check/${gst}`);
-                            const data = await response.json();
-                            if (data.flag && data.data?.tradeNam) {
-                              setFormData(prev => ({
-                                ...prev,
-                                name: prev.name || data.data.tradeNam,
-                                address: prev.address || data.data.pradr?.addr?.st || '',
-                                city: prev.city || data.data.pradr?.addr?.dst || '',
-                                state: prev.state || data.data.pradr?.addr?.stcd || '',
-                                postalCode: prev.postalCode || data.data.pradr?.addr?.pncd || '',
-                              }));
-                            }
+                          const response = await fetch(`/api/gst-lookup?gst=${encodeURIComponent(gst)}`);
+                          const result = await response.json();
+                          
+                          if (result.success && result.data) {
+                            setFormData(prev => ({
+                              ...prev,
+                              name: prev.name || result.data.name || '',
+                              address: prev.address || result.data.address || '',
+                              city: prev.city || result.data.city || '',
+                              state: prev.state || result.data.state || '',
+                              postalCode: prev.postalCode || result.data.postalCode || '',
+                            }));
+                          } else {
+                            console.log('GST lookup returned no data:', result.error);
                           }
                         } catch (err) {
                           console.log('GST lookup failed:', err);
