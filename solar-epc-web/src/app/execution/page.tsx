@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ExecutionForm } from "@/components/execution-form";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 type Asset = {
   id: string;
@@ -23,9 +24,11 @@ export default function ExecutionPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [quickSerial, setQuickSerial] = useState("");
   const [quickType, setQuickType] = useState("PANEL");
   const [quickInquiryId, setQuickInquiryId] = useState("");
+  const [scanCount, setScanCount] = useState(0);
 
   const fetchAssets = async () => {
     try {
@@ -60,7 +63,26 @@ export default function ExecutionPage() {
     });
     if (res.ok) {
       setQuickSerial("");
-      setQuickInquiryId("");
+      fetchAssets();
+    }
+  };
+
+  const handleBarcodeScan = async (serialNumber: string) => {
+    if (!quickInquiryId) {
+      alert("Please select an inquiry first");
+      return;
+    }
+    const res = await fetch("/api/execution-assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inquiryId: quickInquiryId,
+        assetType: quickType,
+        serialNo: serialNumber,
+      }),
+    });
+    if (res.ok) {
+      setScanCount((prev) => prev + 1);
       fetchAssets();
     }
   };
@@ -71,12 +93,20 @@ export default function ExecutionPage() {
         title="Execution & Serial Capture"
         subtitle="Capture panel and inverter serials via barcode scan or manual entry."
         action={
-          <button
-            onClick={() => setShowForm(true)}
-            className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
-          >
-            Add Serial
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowScanner(true)}
+              className="rounded-xl border border-solar-amber bg-white px-4 py-2 text-sm font-semibold text-solar-amber"
+            >
+              📷 Scan Barcode
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
+            >
+              Add Serial
+            </button>
+          </div>
         }
       />
 
@@ -172,6 +202,16 @@ export default function ExecutionPage() {
           onSuccess={() => {
             fetchAssets();
             setShowForm(false);
+          }}
+        />
+      )}
+
+      {showScanner && (
+        <BarcodeScanner
+          onScan={handleBarcodeScan}
+          onClose={() => {
+            setShowScanner(false);
+            setScanCount(0);
           }}
         />
       )}

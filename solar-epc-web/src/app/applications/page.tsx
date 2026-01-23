@@ -2,96 +2,276 @@
 
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
-import { DocumentForm } from "@/components/document-form";
+import { ApplicationForm } from "@/components/application-form";
 
-type StatutoryDoc = {
+type ApplicationData = {
   id: string;
-  name: string;
-  fileUrl: string;
+  data: {
+    applicantName?: string;
+    applicantEmail?: string;
+    applicantPhone?: string;
+    applicantAddress?: string;
+    consumerNumber?: string;
+    meterNumber?: string;
+    sanctionedLoad?: string;
+    connectionType?: string;
+    roofType?: string;
+    roofArea?: string;
+    systemCapacity?: string;
+    panelCount?: string;
+    inverterCapacity?: string;
+  };
+  client?: {
+    name: string;
+  };
   inquiry?: {
+    id: string;
     title: string;
   };
+  createdAt: string;
+};
+
+type Inquiry = {
+  id: string;
+  title: string;
+};
+
+type Template = {
+  id: string;
+  title: string;
 };
 
 export default function ApplicationsPage() {
-  const [docs, setDocs] = useState<StatutoryDoc[]>([]);
+  const [applications, setApplications] = useState<ApplicationData[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [statutoryTemplates, setStatutoryTemplates] = useState<Template[]>([]);
+  const [completionTemplates, setCompletionTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [selectedInquiryId, setSelectedInquiryId] = useState("");
+  const [generating, setGenerating] = useState<string | null>(null);
 
-  const fetchDocs = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch("/api/statutory-docs");
-      const data = await res.json();
-      setDocs(data);
+      const [appRes, inqRes, statRes, compRes] = await Promise.all([
+        fetch("/api/application-data"),
+        fetch("/api/inquiries"),
+        fetch("/api/statutory-docs/generate"),
+        fetch("/api/completion-docs/generate"),
+      ]);
+      const [appData, inqData, statData, compData] = await Promise.all([
+        appRes.json(),
+        inqRes.json(),
+        statRes.json(),
+        compRes.json(),
+      ]);
+      setApplications(appData);
+      setInquiries(inqData);
+      setStatutoryTemplates(statData.templates || []);
+      setCompletionTemplates(compData.templates || []);
     } catch (error) {
-      console.error("Failed to fetch statutory docs:", error);
+      console.error("Failed to fetch data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDocs();
+    fetchData();
   }, []);
+
+  const generateStatutoryDoc = async (templateType: string) => {
+    if (!selectedInquiryId) return;
+    setGenerating(templateType);
+    try {
+      const res = await fetch("/api/statutory-docs/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inquiryId: selectedInquiryId, templateType }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${templateType}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Failed to generate document:", error);
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const generateCompletionDoc = async (templateType: string) => {
+    if (!selectedInquiryId) return;
+    setGenerating(templateType);
+    try {
+      const res = await fetch("/api/completion-docs/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inquiryId: selectedInquiryId, templateType }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${templateType}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Failed to generate document:", error);
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const downloadClosurePack = async () => {
+    if (!selectedInquiryId) return;
+    setGenerating("closure-pack");
+    try {
+      const res = await fetch(`/api/closure-pack/${selectedInquiryId}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Closure_Pack.zip`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        // Send notification
+        await fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trigger: "CLOSURE_PACK_READY", inquiryId: selectedInquiryId }),
+        });
+      }
+    } catch (error) {
+      console.error("Failed to download closure pack:", error);
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const selectedApp = applications.find((a) => a.inquiry?.id === selectedInquiryId);
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Applications & Statutory Docs"
-        subtitle="Auto-fill client templates and generate compliant PDFs."
+        title="Applications & Document Generation"
+        subtitle="Enter application data and generate statutory/completion documents."
         action={
           <button
             onClick={() => setShowForm(true)}
             className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
           >
-            Generate Pack
+            New Application
           </button>
         }
       />
 
-      <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        {loading ? (
-          <div className="text-center text-sm text-solar-muted">Loading...</div>
-        ) : docs.length === 0 ? (
-          <div className="text-center text-sm text-solar-muted">
-            No statutory documents yet.
+      <div className="grid gap-6 lg:grid-cols-[1fr,1.5fr]">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+            <h3 className="text-lg font-semibold text-solar-ink">Select Project</h3>
+            <select
+              value={selectedInquiryId}
+              onChange={(e) => setSelectedInquiryId(e.target.value)}
+              className="mt-3 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+            >
+              <option value="">Choose a project...</option>
+              {inquiries.map((inq) => (
+                <option key={inq.id} value={inq.id}>{inq.title}</option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {docs.map((doc) => (
-              <div
-                key={doc.id}
-                className="rounded-xl border border-solar-border bg-solar-sand p-4"
-              >
-                <p className="text-sm font-semibold text-solar-ink">{doc.name}</p>
-                <p className="text-xs text-solar-muted mt-2">
-                  Project: {doc.inquiry?.title || "Unassigned"}
-                </p>
-                <span className="mt-3 inline-flex rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                  Generated
-                </span>
-                <button
-                  onClick={() => window.open(doc.fileUrl, "_blank")}
-                  className="mt-4 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
-                >
-                  View PDF
-                </button>
+
+          {selectedApp && (
+            <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+              <h3 className="text-lg font-semibold text-solar-ink">Application Data</h3>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-solar-muted">Applicant:</span><span className="font-semibold">{selectedApp.data.applicantName || "N/A"}</span></div>
+                <div className="flex justify-between"><span className="text-solar-muted">Consumer No:</span><span className="font-semibold">{selectedApp.data.consumerNumber || "N/A"}</span></div>
+                <div className="flex justify-between"><span className="text-solar-muted">System:</span><span className="font-semibold">{selectedApp.data.systemCapacity || "N/A"} kW</span></div>
+                <div className="flex justify-between"><span className="text-solar-muted">Panels:</span><span className="font-semibold">{selectedApp.data.panelCount || "N/A"}</span></div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {!selectedApp && selectedInquiryId && (
+            <div className="rounded-2xl border border-solar-border bg-solar-sand p-6">
+              <p className="text-sm text-solar-muted">No application data for this project.</p>
+              <button onClick={() => setShowForm(true)} className="mt-3 rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white">Add Application Data</button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+            <h3 className="text-lg font-semibold text-solar-ink">Statutory Documents</h3>
+            <p className="text-sm text-solar-muted mt-1">Generate compliant documents from templates.</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {statutoryTemplates.map((t) => (
+                <button key={t.id} onClick={() => generateStatutoryDoc(t.id)} disabled={!selectedInquiryId || generating === t.id} className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3 text-left text-sm font-semibold text-solar-ink transition hover:bg-solar-sky disabled:opacity-50">
+                  {generating === t.id ? "Generating..." : t.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+            <h3 className="text-lg font-semibold text-solar-ink">Completion Documents</h3>
+            <p className="text-sm text-solar-muted mt-1">Generate certificates and warranties.</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {completionTemplates.map((t) => (
+                <button key={t.id} onClick={() => generateCompletionDoc(t.id)} disabled={!selectedInquiryId || generating === t.id} className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3 text-left text-sm font-semibold text-solar-ink transition hover:bg-solar-sky disabled:opacity-50">
+                  {generating === t.id ? "Generating..." : t.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-solar-forest bg-solar-forest/10 p-6">
+            <h3 className="text-lg font-semibold text-solar-forest">Closure Pack</h3>
+            <p className="text-sm text-solar-forest/80 mt-1">Download all documents as ZIP for client handover.</p>
+            <button onClick={downloadClosurePack} disabled={!selectedInquiryId || generating === "closure-pack"} className="mt-4 w-full rounded-xl bg-solar-forest py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {generating === "closure-pack" ? "Preparing..." : "Download Closure Pack (ZIP)"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+        <h3 className="text-lg font-semibold text-solar-ink">Recent Applications</h3>
+        {loading ? (
+          <div className="mt-4 text-center text-sm text-solar-muted">Loading...</div>
+        ) : applications.length === 0 ? (
+          <div className="mt-4 text-center text-sm text-solar-muted">No applications yet.</div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-solar-border text-left text-solar-muted"><th className="pb-2 font-semibold">Project</th><th className="pb-2 font-semibold">Applicant</th><th className="pb-2 font-semibold">System</th><th className="pb-2 font-semibold">Created</th></tr></thead>
+              <tbody>
+                {applications.map((app) => (
+                  <tr key={app.id} className="border-b border-solar-border/50">
+                    <td className="py-3">{app.inquiry?.title || "Unassigned"}</td>
+                    <td className="py-3">{app.data.applicantName || "N/A"}</td>
+                    <td className="py-3">{app.data.systemCapacity || "N/A"} kW</td>
+                    <td className="py-3 text-solar-muted">{new Date(app.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {showForm && (
-        <DocumentForm
-          title="Add Statutory Document"
-          endpoint="/api/statutory-docs"
-          onClose={() => setShowForm(false)}
-          onSuccess={() => {
-            fetchDocs();
-            setShowForm(false);
-          }}
-        />
+        <ApplicationForm onClose={() => setShowForm(false)} onSuccess={() => { fetchData(); setShowForm(false); }} />
       )}
     </div>
   );
