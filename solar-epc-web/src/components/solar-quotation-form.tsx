@@ -334,7 +334,6 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
 
   return (
     <ModalShell
-      isOpen={true}
       onClose={onClose}
       title="New Solar EPC Quotation"
       size="xl"
