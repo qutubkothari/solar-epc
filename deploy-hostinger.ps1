@@ -87,6 +87,7 @@ Write-Host "Dependencies updated" -ForegroundColor Green
 Write-Host "`n[6/7] Prisma Setup" -ForegroundColor Yellow
 $prismaCmd = @'
 cd "{0}"
+rm -f prisma.config.ts
 if [ ! -f .env ]; then
   echo "DATABASE_URL=file:./prisma/dev.db" > .env
 fi
