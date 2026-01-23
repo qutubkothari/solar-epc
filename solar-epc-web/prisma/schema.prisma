@@ -135,11 +135,14 @@ model Item {
   id            String   @id @default(cuid())
   name          String
   description   String?
+  brand         String?  // Make/Brand from inventory
   unitPrice     Decimal  @default(0)
   taxPercent    Decimal  @default(0)
   marginPercent Decimal  @default(0)
   uom           String?
   category      String?
+  sku           String?  // Item code/SKU for quick lookup
+  isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

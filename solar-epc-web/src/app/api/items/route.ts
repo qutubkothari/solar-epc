@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
+    const { name, description, brand, unitPrice, taxPercent, marginPercent, uom, category, sku, isActive } = body;
 
     const { db } = await import("@/lib/db");
 
@@ -29,11 +29,14 @@ export async function POST(request: Request) {
       data: {
         name,
         description,
+        brand,
         unitPrice,
         taxPercent,
         marginPercent,
         uom,
         category,
+        sku,
+        isActive: isActive ?? true,
       },
     });
 

@@ -10,6 +10,7 @@ type ItemFormProps = {
   initialData?: {
     name: string;
     description?: string | null;
+    brand?: string | null;
     unitPrice?: number;
     taxPercent?: number;
     marginPercent?: number;
@@ -24,6 +25,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     description: initialData?.description || "",
+    brand: initialData?.brand || "",
     unitPrice: initialData?.unitPrice?.toString() || "",
     taxPercent: initialData?.taxPercent?.toString() || "5",
     marginPercent: initialData?.marginPercent?.toString() || "10",
@@ -45,6 +47,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
           unitPrice: parseFloat(formData.unitPrice),
           taxPercent: parseFloat(formData.taxPercent),
           marginPercent: parseFloat(formData.marginPercent),
+          brand: formData.brand || null,
         }),
       });
 
@@ -89,6 +92,17 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-solar-ink">Brand / Make</label>
+            <input
+              type="text"
+              value={formData.brand}
+              onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+              className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              placeholder="e.g., Adani, Sungrow, Polycab"
             />
           </div>
 

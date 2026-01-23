@@ -9,7 +9,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
+    const { name, description, brand, unitPrice, taxPercent, marginPercent, uom, category, sku, isActive } = body;
 
     const { id } = await context.params;
 
@@ -19,11 +19,14 @@ export async function PUT(
       data: {
         name,
         description,
+        brand,
         unitPrice,
         taxPercent,
         marginPercent,
         uom,
         category,
+        sku,
+        isActive,
       },
     });
 

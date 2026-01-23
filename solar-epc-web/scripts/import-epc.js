@@ -49,6 +49,28 @@ const safeNumber = (value) => {
 const importInventory = async (rows) => {
   const headerIndex = findHeaderRow(rows, ["sr no", "item name", "make", "description", "unit", "rate"]);
   const { items } = rowsToObjects(rows, headerIndex);
+  
+  // Helper function to determine category based on item name
+  const getCategory = (name) => {
+    if (!name) return 'Other';
+    const n = String(name).toUpperCase();
+    if (n.includes('SOLAR') && (n.includes('MODULE') || n.includes('PANEL') || n.includes('BIFACIAL') || n.includes('TOPCON') || n.includes('MONO'))) return 'Solar Modules';
+    if (n.includes('INVERTER') || n.includes('SG') && /\d+K/.test(n)) return 'Inverters';
+    if (n.includes('STRUCTURE') || n.includes('STR-') || n.includes('MONO RAIL') || n.includes('ELEVATED')) return 'Mounting Structure';
+    if (n.includes('ACDB')) return 'ACDB';
+    if (n.includes('DCDB')) return 'DCDB';
+    if (n.includes('EARTHING') || n.includes('ERTH') || n.includes('GI STRIP')) return 'Earthing';
+    if (n.includes('LIGHTNING') || n.includes('LA ') || n.includes('ESE ')) return 'Lightning Arrestor';
+    if (n.includes('CABLE') || n.includes('DC 1C') || n.includes('AC ') && n.includes('SQMM')) return 'Cables';
+    if (n.includes('MC4') || n.includes('CONNECTOR')) return 'Connectors';
+    if (n.includes('CABLE TRAY') || n.includes('FRP') && n.includes('TRAY')) return 'Cable Trays';
+    if (n.includes('CONDUIT') || n.includes('CONDUITE')) return 'Conduits';
+    if (n.includes('WALKWAY')) return 'Walkway';
+    if (n.includes('BASE PLATE') || n.includes('BOLT') || n.includes('CLAMP')) return 'Fasteners';
+    if (n.includes('LA POLE')) return 'LA Poles';
+    return 'Other';
+  };
+  
   const inventory = items
     .map(({ record }) => ({
       name: record["ITEM NAME"],
@@ -76,11 +98,13 @@ const importInventory = async (rows) => {
     const data = {
       name,
       description: item.description ? String(item.description).trim() : null,
+      brand: item.make ? String(item.make).trim() : null,
       unitPrice: item.rate ?? 0,
       taxPercent: 0,
       marginPercent: 0,
       uom: item.unit ? String(item.unit).trim() : null,
-      category: "Inventory",
+      category: getCategory(name),
+      isActive: true,
     };
     const existingId = existingMap.get(name);
     if (existingId) {

@@ -10,11 +10,14 @@ type Item = {
   id: string;
   name: string;
   description?: string | null;
+  brand?: string | null;
   unitPrice: number;
   marginPercent: number;
   taxPercent: number;
   uom: string | null;
   category?: string | null;
+  sku?: string | null;
+  isActive?: boolean;
 };
 
 export default function ItemsPage() {
@@ -57,7 +60,8 @@ export default function ItemsPage() {
         !search ||
         item.name.toLowerCase().includes(search) ||
         (item.description || "").toLowerCase().includes(search) ||
-        (item.category || "").toLowerCase().includes(search);
+        (item.category || "").toLowerCase().includes(search) ||
+        (item.brand || "").toLowerCase().includes(search);
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
@@ -193,8 +197,11 @@ export default function ItemsPage() {
                     </span>
                   )}
                 </div>
+                {item.brand && (
+                  <p className="mt-1 text-xs font-medium text-solar-amber">{item.brand}</p>
+                )}
                 {item.description && (
-                  <p className="mt-1 text-xs text-solar-muted">{item.description}</p>
+                  <p className="mt-1 text-xs text-solar-muted line-clamp-2">{item.description}</p>
                 )}
                 <div className="mt-3 space-y-1 text-xs text-solar-muted">
                   <p>Unit Price: {formatCurrency(Number(item.unitPrice))}</p>
@@ -255,6 +262,12 @@ export default function ItemsPage() {
               <div className="flex justify-between">
                 <span className="text-solar-muted">Category</span>
                 <span className="font-semibold">{viewItem.category}</span>
+              </div>
+            )}
+            {viewItem.brand && (
+              <div className="flex justify-between">
+                <span className="text-solar-muted">Brand / Make</span>
+                <span className="font-semibold">{viewItem.brand}</span>
               </div>
             )}
             {viewItem.description && (
