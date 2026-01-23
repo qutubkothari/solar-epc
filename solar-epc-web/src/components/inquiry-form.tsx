@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Client = {
   id: string;
@@ -10,17 +11,24 @@ type Client = {
 type InquiryFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  inquiryId?: string;
+  initialData?: {
+    clientId: string;
+    title: string;
+    notes?: string | null;
+    siteAddress?: string | null;
+  };
 };
 
-export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
+export function InquiryForm({ onClose, onSuccess, inquiryId, initialData }: InquiryFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    clientId: "",
-    title: "",
-    notes: "",
-    siteAddress: "",
+    clientId: initialData?.clientId || "",
+    title: initialData?.title || "",
+    notes: initialData?.notes || "",
+    siteAddress: initialData?.siteAddress || "",
   });
 
   useEffect(() => {
@@ -36,8 +44,8 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/inquiries", {
-        method: "POST",
+      const res = await fetch(inquiryId ? `/api/inquiries/${inquiryId}` : "/api/inquiries", {
+        method: inquiryId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -46,25 +54,24 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to create inquiry. Please try again.");
+        setErrorMessage("Unable to save inquiry. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while creating the inquiry.");
+      setErrorMessage("Something went wrong while saving the inquiry.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Create New Inquiry</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Capture client request and site details.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={inquiryId ? "Edit Inquiry" : "Create New Inquiry"}
+      subtitle="Capture client request and site details."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Client</label>
             <select
@@ -135,11 +142,10 @@ export function InquiryForm({ onClose, onSuccess }: InquiryFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Inquiry"}
+              {loading ? "Saving..." : inquiryId ? "Save Inquiry" : "Create Inquiry"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

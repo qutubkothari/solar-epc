@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ItemForm } from "@/components/item-form";
+import { ModalShell } from "@/components/modal-shell";
 
 type Item = {
   id: string;
@@ -17,6 +18,7 @@ export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [viewItem, setViewItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -82,6 +84,16 @@ export default function ItemsPage() {
     event.target.value = "";
   };
 
+  const handleDeleteItem = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this item?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchItems();
+      if (viewItem?.id === id) setViewItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -141,15 +153,29 @@ export default function ItemsPage() {
                   <p>Tax: {Number(item.taxPercent).toFixed(1)}%</p>
                   <p>UOM: {item.uom || "—"}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setEditingItem(item);
-                    setShowForm(true);
-                  }}
-                  className="mt-4 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
-                >
-                  Edit Item
-                </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setViewItem(item)}
+                    className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingItem(item);
+                      setShowForm(true);
+                    }}
+                    className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(item.id)}
+                    className="flex-1 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-semibold text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -166,6 +192,34 @@ export default function ItemsPage() {
           itemId={editingItem?.id}
           initialData={editingItem ?? undefined}
         />
+      )}
+
+      {viewItem && (
+        <ModalShell
+          title="Item Details"
+          subtitle={viewItem.name}
+          onClose={() => setViewItem(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Unit Price</span>
+              <span className="font-semibold">AED {Number(viewItem.unitPrice).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Margin</span>
+              <span className="font-semibold">{Number(viewItem.marginPercent).toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Tax</span>
+              <span className="font-semibold">{Number(viewItem.taxPercent).toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">UOM</span>
+              <span className="font-semibold">{viewItem.uom || "—"}</span>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

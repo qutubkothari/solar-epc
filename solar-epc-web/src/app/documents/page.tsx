@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 
 type CompletionDoc = {
   id: string;
+  inquiryId: string;
   name: string;
   fileUrl: string;
   createdAt: string;
@@ -19,6 +20,7 @@ export default function DocumentsPage() {
   const [packs, setPacks] = useState<CompletionDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingPack, setEditingPack] = useState<CompletionDoc | null>(null);
 
   const fetchDocs = async () => {
     try {
@@ -35,6 +37,15 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetchDocs();
   }, []);
+
+  const handleDeleteDoc = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this completion document?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/completion-docs/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchDocs();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -81,6 +92,18 @@ export default function DocumentsPage() {
                   >
                     View Pack
                   </button>
+                  <button
+                    onClick={() => setEditingPack(pack)}
+                    className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteDoc(pack.id)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
@@ -96,6 +119,24 @@ export default function DocumentsPage() {
           onSuccess={() => {
             fetchDocs();
             setShowForm(false);
+          }}
+        />
+      )}
+
+      {editingPack && (
+        <DocumentForm
+          title="Edit Completion Document"
+          endpoint="/api/completion-docs"
+          docId={editingPack.id}
+          initialData={{
+            inquiryId: editingPack.inquiryId,
+            name: editingPack.name,
+            fileUrl: editingPack.fileUrl,
+          }}
+          onClose={() => setEditingPack(null)}
+          onSuccess={() => {
+            fetchDocs();
+            setEditingPack(null);
           }}
         />
       )}

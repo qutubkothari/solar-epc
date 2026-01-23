@@ -5,12 +5,15 @@ import { SectionHeader } from "@/components/section-header";
 import { InquiryForm } from "@/components/inquiry-form";
 import { ClientForm } from "@/components/client-form";
 import { MediaForm } from "@/components/media-form";
+import { ModalShell } from "@/components/modal-shell";
 
 type Inquiry = {
   id: string;
   title: string;
   siteAddress: string | null;
   status: string;
+  notes?: string | null;
+  clientId?: string;
   client: {
     name: string;
   };
@@ -22,6 +25,8 @@ export default function InquiriesPage() {
   const [showClientForm, setShowClientForm] = useState(false);
   const [showMediaForm, setShowMediaForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [viewInquiry, setViewInquiry] = useState<Inquiry | null>(null);
+  const [editingInquiry, setEditingInquiry] = useState<Inquiry | null>(null);
 
   const fetchInquiries = async () => {
     try {
@@ -57,6 +62,16 @@ export default function InquiriesPage() {
     link.download = "inquiries-export.csv";
     link.click();
     URL.revokeObjectURL(link.href);
+  };
+
+  const handleDeleteInquiry = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this inquiry and all related data?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/inquiries/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchInquiries();
+      if (viewInquiry?.id === id) setViewInquiry(null);
+    }
   };
 
   return (
@@ -119,6 +134,7 @@ export default function InquiriesPage() {
                   <th className="px-4 py-3">Client</th>
                   <th className="px-4 py-3">Site</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,6 +149,28 @@ export default function InquiriesPage() {
                       <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
                         {inquiry.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setViewInquiry(inquiry)}
+                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => setEditingInquiry(inquiry)}
+                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteInquiry(inquiry.id)}
+                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -152,6 +190,23 @@ export default function InquiriesPage() {
         />
       )}
 
+      {editingInquiry && (
+        <InquiryForm
+          inquiryId={editingInquiry.id}
+          initialData={{
+            clientId: editingInquiry.clientId || "",
+            title: editingInquiry.title,
+            notes: editingInquiry.notes || "",
+            siteAddress: editingInquiry.siteAddress || "",
+          }}
+          onClose={() => setEditingInquiry(null)}
+          onSuccess={() => {
+            fetchInquiries();
+            setEditingInquiry(null);
+          }}
+        />
+      )}
+
       {showClientForm && (
         <ClientForm
           onClose={() => setShowClientForm(false)}
@@ -164,6 +219,34 @@ export default function InquiriesPage() {
           onClose={() => setShowMediaForm(false)}
           onSuccess={() => setShowMediaForm(false)}
         />
+      )}
+
+      {viewInquiry && (
+        <ModalShell
+          title="Inquiry Details"
+          subtitle={viewInquiry.title}
+          onClose={() => setViewInquiry(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Client</span>
+              <span className="font-semibold">{viewInquiry.client.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Site</span>
+              <span className="font-semibold">{viewInquiry.siteAddress || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Status</span>
+              <span className="font-semibold">{viewInquiry.status}</span>
+            </div>
+            <div className="pt-2">
+              <p className="text-xs text-solar-muted">Notes</p>
+              <p className="text-sm text-solar-ink">{viewInquiry.notes || "—"}</p>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

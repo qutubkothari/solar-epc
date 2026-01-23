@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Inquiry = {
   id: string;
@@ -10,16 +11,22 @@ type Inquiry = {
 type ExecutionFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  assetId?: string;
+  initialData?: {
+    inquiryId: string;
+    assetType: string;
+    serialNo: string;
+  };
 };
 
-export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
+export function ExecutionForm({ onClose, onSuccess, assetId, initialData }: ExecutionFormProps) {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    inquiryId: "",
-    assetType: "PANEL",
-    serialNo: "",
+    inquiryId: initialData?.inquiryId || "",
+    assetType: initialData?.assetType || "PANEL",
+    serialNo: initialData?.serialNo || "",
   });
 
   useEffect(() => {
@@ -35,8 +42,8 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/execution-assets", {
-        method: "POST",
+      const res = await fetch(assetId ? `/api/execution-assets/${assetId}` : "/api/execution-assets", {
+        method: assetId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -45,25 +52,24 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to capture serial. Please try again.");
+        setErrorMessage("Unable to save serial. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while capturing the serial.");
+      setErrorMessage("Something went wrong while saving the serial.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Add Serial</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Record installation asset serial numbers.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={assetId ? "Edit Serial" : "Add Serial"}
+      subtitle="Record installation asset serial numbers."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Inquiry</label>
             <select
@@ -124,11 +130,10 @@ export function ExecutionForm({ onClose, onSuccess }: ExecutionFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Serial"}
+              {loading ? "Saving..." : assetId ? "Save Serial" : "Save Serial"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

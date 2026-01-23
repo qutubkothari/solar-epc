@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { TokenForm } from "@/components/token-form";
+import { ModalShell } from "@/components/modal-shell";
 import { formatDate } from "@/lib/format";
 
 type Token = {
   id: string;
   token: string;
   expiresAt: string | null;
+  allowDownload?: boolean;
+  clientId?: string;
+  inquiryId?: string;
   client: {
     name: string;
   };
@@ -21,6 +25,8 @@ export default function TokensPage() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingToken, setEditingToken] = useState<Token | null>(null);
+  const [viewToken, setViewToken] = useState<Token | null>(null);
 
   const fetchTokens = async () => {
     try {
@@ -40,6 +46,16 @@ export default function TokensPage() {
 
   const getTokenLink = (token: string) =>
     typeof window === "undefined" ? "" : `${window.location.origin}/token/${token}`;
+
+  const handleDeleteToken = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this token?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/tokens/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchTokens();
+      if (viewToken?.id === id) setViewToken(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -82,6 +98,12 @@ export default function TokensPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    onClick={() => setViewToken(token)}
+                    className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink"
+                  >
+                    View
+                  </button>
+                  <button
                     onClick={() => navigator.clipboard.writeText(getTokenLink(token.token))}
                     className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink"
                   >
@@ -92,6 +114,18 @@ export default function TokensPage() {
                     className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink"
                   >
                     Open
+                  </button>
+                  <button
+                    onClick={() => setEditingToken(token)}
+                    className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteToken(token.id)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                  >
+                    Delete
                   </button>
                 </div>
               </div>
@@ -108,6 +142,51 @@ export default function TokensPage() {
             setShowForm(false);
           }}
         />
+      )}
+
+      {editingToken && (
+        <TokenForm
+          tokenId={editingToken.id}
+          initialData={{
+            clientId: editingToken.clientId || "",
+            inquiryId: editingToken.inquiryId || "",
+            expiresAt: editingToken.expiresAt,
+            allowDownload: editingToken.allowDownload,
+          }}
+          onClose={() => setEditingToken(null)}
+          onSuccess={() => {
+            fetchTokens();
+            setEditingToken(null);
+          }}
+        />
+      )}
+
+      {viewToken && (
+        <ModalShell
+          title="Token Details"
+          subtitle={viewToken.inquiry?.title || "Token"}
+          onClose={() => setViewToken(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Client</span>
+              <span className="font-semibold">{viewToken.client.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Token</span>
+              <span className="font-semibold">{viewToken.token}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Expiry</span>
+              <span className="font-semibold">{formatDate(viewToken.expiresAt)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Allow Download</span>
+              <span className="font-semibold">{viewToken.allowDownload ? "Yes" : "No"}</span>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

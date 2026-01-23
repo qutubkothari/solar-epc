@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type ItemFormProps = {
   onClose: () => void;
@@ -62,16 +63,13 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">
-          {itemId ? "Edit Item" : "Add New Item"}
-        </h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Define product pricing, margins, and tax rules.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={itemId ? "Edit Item" : "Add New Item"}
+      subtitle="Define product pricing, margins, and tax rules."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Item Name *</label>
             <input
@@ -175,8 +173,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
               {loading ? "Saving..." : itemId ? "Save Item" : "Create Item"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Client = {
   id: string;
@@ -15,18 +16,25 @@ type Inquiry = {
 type TokenFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  tokenId?: string;
+  initialData?: {
+    clientId: string;
+    inquiryId: string;
+    expiresAt?: string | null;
+    allowDownload?: boolean;
+  };
 };
 
-export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
+export function TokenForm({ onClose, onSuccess, tokenId, initialData }: TokenFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    clientId: "",
-    inquiryId: "",
-    expiresAt: "",
-    allowDownload: true,
+    clientId: initialData?.clientId || "",
+    inquiryId: initialData?.inquiryId || "",
+    expiresAt: initialData?.expiresAt ? initialData.expiresAt.slice(0, 10) : "",
+    allowDownload: initialData?.allowDownload ?? true,
   });
 
   useEffect(() => {
@@ -47,8 +55,8 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/tokens", {
-        method: "POST",
+      const res = await fetch(tokenId ? `/api/tokens/${tokenId}` : "/api/tokens", {
+        method: tokenId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -57,25 +65,24 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to create token. Please try again.");
+        setErrorMessage("Unable to save token. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while creating the token.");
+      setErrorMessage("Something went wrong while saving the token.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Generate Token</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Create secure access link for client documents.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={tokenId ? "Edit Token" : "Generate Token"}
+      subtitle="Create secure access link for client documents."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Client</label>
             <select
@@ -152,11 +159,10 @@ export function TokenForm({ onClose, onSuccess }: TokenFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Generate Token"}
+              {loading ? "Saving..." : tokenId ? "Save Token" : "Generate Token"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

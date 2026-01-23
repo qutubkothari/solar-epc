@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { QuotationForm } from "@/components/quotation-form";
+import { ModalShell } from "@/components/modal-shell";
 import { formatCurrency } from "@/lib/format";
 
 type QuotationVersion = {
@@ -39,6 +40,8 @@ export default function QuotationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
+  const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
+  const [editData, setEditData] = useState({ title: "", status: "DRAFT" });
 
   const fetchQuotes = async () => {
     try {
@@ -61,6 +64,41 @@ export default function QuotationsPage() {
       setSelectedQuoteId(quotes[0].id);
     }
   }, [quotes, selectedQuoteId]);
+
+  useEffect(() => {
+    if (editingQuote) {
+      setEditData({
+        title: editingQuote.title || "",
+        status: editingQuote.status || "DRAFT",
+      });
+    }
+  }, [editingQuote]);
+
+  const handleDeleteQuote = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this quotation and all versions?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/quotations/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchQuotes();
+      if (selectedQuoteId === id) {
+        setSelectedQuoteId(null);
+      }
+    }
+  };
+
+  const handleEditSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingQuote) return;
+    const res = await fetch(`/api/quotations/${editingQuote.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editData),
+    });
+    if (res.ok) {
+      fetchQuotes();
+      setEditingQuote(null);
+    }
+  };
 
   const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
   const latestVersion = selectedQuote?.versions?.[0];
@@ -177,18 +215,19 @@ export default function QuotationsPage() {
                 <th className="px-4 py-3">Version</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-solar-muted">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-solar-muted">
                     Loading...
                   </td>
                 </tr>
               ) : quotes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-solar-muted">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-solar-muted">
                     No quotations yet.
                   </td>
                 </tr>
@@ -212,6 +251,28 @@ export default function QuotationsPage() {
                           {quote.status}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => window.open(`/api/quotations/${quote.id}/pdf`, "_blank")}
+                            className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => setEditingQuote(quote)}
+                            className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteQuote(quote.id)}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -232,40 +293,86 @@ export default function QuotationsPage() {
       )}
 
       {compareVersion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-            <h3 className="text-lg font-semibold text-solar-ink">Version Comparison</h3>
-            <p className="mt-1 text-sm text-solar-muted">
-              Version {compareVersion.version} summary
-            </p>
-            <div className="mt-4 space-y-2 text-sm text-solar-ink">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Margin</span>
-                <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Grand Total</span>
-                <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
-              </div>
+        <ModalShell
+          title="Version Comparison"
+          subtitle={`Version ${compareVersion.version} summary`}
+          onClose={() => setCompareVersion(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
             </div>
-            <div className="mt-6 flex gap-2">
-              <button
-                onClick={() => setCompareVersion(null)}
-                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
-              >
-                Close
-              </button>
+            <div className="flex justify-between">
+              <span>Margin</span>
+              <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tax</span>
+              <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
+            </div>
+            <div className="flex justify-between font-semibold">
+              <span>Grand Total</span>
+              <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
             </div>
           </div>
-        </div>
+          <div className="mt-6 flex gap-2">
+            <button
+              onClick={() => setCompareVersion(null)}
+              className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+            >
+              Close
+            </button>
+          </div>
+        </ModalShell>
+      )}
+
+      {editingQuote && (
+        <ModalShell
+          title="Edit Quotation"
+          subtitle="Update quotation title and status."
+          onClose={() => setEditingQuote(null)}
+          size="md"
+        >
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">Title</label>
+              <input
+                value={editData.title}
+                onChange={(event) => setEditData({ ...editData, title: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">Status</label>
+              <select
+                value={editData.status}
+                onChange={(event) => setEditData({ ...editData, status: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              >
+                <option value="DRAFT">Draft</option>
+                <option value="FINAL">Final</option>
+                <option value="APPROVED">Approved</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingQuote(null)}
+                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </ModalShell>
       )}
     </div>
   );

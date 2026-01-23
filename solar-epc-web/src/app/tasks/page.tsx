@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { TaskForm } from "@/components/task-form";
+import { ModalShell } from "@/components/modal-shell";
 import { formatDate } from "@/lib/format";
 
 type Task = {
   id: string;
   title: string;
+  description?: string | null;
   dueDate: string | null;
   status: string;
+  assignedToId?: string | null;
   createdBy?: {
     name: string;
   };
@@ -19,6 +22,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [viewTask, setViewTask] = useState<Task | null>(null);
 
   const fetchTasks = async () => {
     try {
@@ -35,6 +40,16 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  const handleDeleteTask = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this task?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchTasks();
+      if (viewTask?.id === id) setViewTask(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -71,9 +86,29 @@ export default function TasksPage() {
                     Owner: {task.createdBy?.name || "System"} • Due {formatDate(task.dueDate)}
                   </p>
                 </div>
-                <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                  {task.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
+                    {task.status}
+                  </span>
+                  <button
+                    onClick={() => setViewTask(task)}
+                    className="rounded-xl border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => setEditingTask(task)}
+                    className="rounded-xl border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(task.id)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -88,6 +123,48 @@ export default function TasksPage() {
             setShowForm(false);
           }}
         />
+      )}
+
+      {editingTask && (
+        <TaskForm
+          taskId={editingTask.id}
+          initialData={{
+            title: editingTask.title,
+            description: editingTask.description || "",
+            dueDate: editingTask.dueDate,
+            assignedToId: editingTask.assignedToId || "",
+            status: editingTask.status,
+          }}
+          onClose={() => setEditingTask(null)}
+          onSuccess={() => {
+            fetchTasks();
+            setEditingTask(null);
+          }}
+        />
+      )}
+
+      {viewTask && (
+        <ModalShell
+          title="Task Details"
+          subtitle={viewTask.title}
+          onClose={() => setViewTask(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Status</span>
+              <span className="font-semibold">{viewTask.status}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Due</span>
+              <span className="font-semibold">{formatDate(viewTask.dueDate)}</span>
+            </div>
+            <div className="pt-2">
+              <p className="text-xs text-solar-muted">Description</p>
+              <p className="text-sm text-solar-ink">{viewTask.description || "—"}</p>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

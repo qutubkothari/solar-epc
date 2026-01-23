@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Client = {
   id: string;
@@ -130,14 +131,13 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">New Quotation</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Start a new quotation version for the selected client.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title="New Quotation"
+      subtitle="Start a new quotation version for the selected client."
+      onClose={onClose}
+      size="2xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Client</label>
             <select
@@ -306,8 +306,7 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
               {loading ? "Creating..." : "Create Quotation"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

@@ -8,29 +8,25 @@ export async function PUT(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body = await request.json();
-    const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
-
     const { id } = await context.params;
+    const body = await request.json();
+    const { inquiryId, assetType, serialNo } = body;
 
     const { db } = await import("@/lib/db");
-    const item = await db.item.update({
+    const asset = await db.executionAsset.update({
       where: { id },
       data: {
-        name,
-        description,
-        unitPrice,
-        taxPercent,
-        marginPercent,
-        uom,
-        category,
+        inquiryId,
+        assetType,
+        serialNo,
       },
+      include: { inquiry: true },
     });
 
-    return NextResponse.json(item);
+    return NextResponse.json(asset);
   } catch (error) {
-    console.error("Error updating item:", error);
-    return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
+    console.error("Error updating execution asset:", error);
+    return NextResponse.json({ error: "Failed to update execution asset" }, { status: 500 });
   }
 }
 
@@ -41,13 +37,11 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const { db } = await import("@/lib/db");
-    await db.item.delete({
-      where: { id },
-    });
+    await db.executionAsset.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting item:", error);
-    return NextResponse.json({ error: "Failed to delete item" }, { status: 500 });
+    console.error("Error deleting execution asset:", error);
+    return NextResponse.json({ error: "Failed to delete execution asset" }, { status: 500 });
   }
 }

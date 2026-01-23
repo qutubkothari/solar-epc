@@ -8,29 +8,25 @@ export async function PUT(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body = await request.json();
-    const { name, description, unitPrice, taxPercent, marginPercent, uom, category } = body;
-
     const { id } = await context.params;
+    const body = await request.json();
+    const { inquiryId, name, fileUrl } = body;
 
     const { db } = await import("@/lib/db");
-    const item = await db.item.update({
+    const doc = await db.completionDocument.update({
       where: { id },
       data: {
+        inquiryId,
         name,
-        description,
-        unitPrice,
-        taxPercent,
-        marginPercent,
-        uom,
-        category,
+        fileUrl,
       },
+      include: { inquiry: true },
     });
 
-    return NextResponse.json(item);
+    return NextResponse.json(doc);
   } catch (error) {
-    console.error("Error updating item:", error);
-    return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
+    console.error("Error updating completion doc:", error);
+    return NextResponse.json({ error: "Failed to update completion doc" }, { status: 500 });
   }
 }
 
@@ -41,13 +37,11 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const { db } = await import("@/lib/db");
-    await db.item.delete({
-      where: { id },
-    });
+    await db.completionDocument.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting item:", error);
-    return NextResponse.json({ error: "Failed to delete item" }, { status: 500 });
+    console.error("Error deleting completion doc:", error);
+    return NextResponse.json({ error: "Failed to delete completion doc" }, { status: 500 });
   }
 }

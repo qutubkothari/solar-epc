@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, description, dueDate, inquiryId } = body;
+    const { title, description, dueDate, inquiryId, assignedToId, status } = body;
 
     const { db } = await import("@/lib/db");
     const { getSystemUser } = await import("@/lib/system-user");
@@ -35,9 +35,10 @@ export async function POST(request: Request) {
       data: {
         title,
         description,
+        status: status || "OPEN",
         dueDate: dueDate ? new Date(dueDate) : null,
         createdById: systemUser.id,
-        assignedToId: systemUser.id,
+        assignedToId: assignedToId || systemUser.id,
         inquiryId: inquiryId || null,
       },
       include: {

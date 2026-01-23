@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ApplicationForm } from "@/components/application-form";
+import { ModalShell } from "@/components/modal-shell";
 
 type ApplicationData = {
   id: string;
+  clientId: string;
   data: {
     applicantName?: string;
     applicantEmail?: string;
@@ -50,6 +52,8 @@ export default function ApplicationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedInquiryId, setSelectedInquiryId] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [viewApp, setViewApp] = useState<ApplicationData | null>(null);
+  const [editingApp, setEditingApp] = useState<ApplicationData | null>(null);
 
   const fetchData = async () => {
     try {
@@ -159,6 +163,16 @@ export default function ApplicationsPage() {
 
   const selectedApp = applications.find((a) => a.inquiry?.id === selectedInquiryId);
 
+  const handleDeleteApplication = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this application data?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/application-data/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchData();
+      if (viewApp?.id === id) setViewApp(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -254,7 +268,7 @@ export default function ApplicationsPage() {
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-solar-border text-left text-solar-muted"><th className="pb-2 font-semibold">Project</th><th className="pb-2 font-semibold">Applicant</th><th className="pb-2 font-semibold">System</th><th className="pb-2 font-semibold">Created</th></tr></thead>
+              <thead><tr className="border-b border-solar-border text-left text-solar-muted"><th className="pb-2 font-semibold">Project</th><th className="pb-2 font-semibold">Applicant</th><th className="pb-2 font-semibold">System</th><th className="pb-2 font-semibold">Created</th><th className="pb-2 font-semibold">Actions</th></tr></thead>
               <tbody>
                 {applications.map((app) => (
                   <tr key={app.id} className="border-b border-solar-border/50">
@@ -262,6 +276,28 @@ export default function ApplicationsPage() {
                     <td className="py-3">{app.data.applicantName || "N/A"}</td>
                     <td className="py-3">{app.data.systemCapacity || "N/A"} kW</td>
                     <td className="py-3 text-solar-muted">{new Date(app.createdAt).toLocaleDateString()}</td>
+                    <td className="py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setViewApp(app)}
+                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => setEditingApp(app)}
+                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteApplication(app.id)}
+                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -272,6 +308,42 @@ export default function ApplicationsPage() {
 
       {showForm && (
         <ApplicationForm onClose={() => setShowForm(false)} onSuccess={() => { fetchData(); setShowForm(false); }} />
+      )}
+
+      {editingApp && (
+        <ApplicationForm
+          applicationId={editingApp.id}
+          initialData={{
+            clientId: editingApp.clientId,
+            inquiryId: editingApp.inquiry?.id || "",
+            data: editingApp.data,
+          }}
+          onClose={() => setEditingApp(null)}
+          onSuccess={() => {
+            fetchData();
+            setEditingApp(null);
+          }}
+        />
+      )}
+
+      {viewApp && (
+        <ModalShell
+          title="Application Details"
+          subtitle={viewApp.inquiry?.title || "Unassigned"}
+          onClose={() => setViewApp(null)}
+          size="lg"
+        >
+          <div className="grid gap-2 text-sm text-solar-ink">
+            <div className="flex justify-between"><span className="text-solar-muted">Applicant</span><span className="font-semibold">{viewApp.data.applicantName || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Email</span><span className="font-semibold">{viewApp.data.applicantEmail || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Phone</span><span className="font-semibold">{viewApp.data.applicantPhone || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Consumer No.</span><span className="font-semibold">{viewApp.data.consumerNumber || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Meter No.</span><span className="font-semibold">{viewApp.data.meterNumber || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">System Capacity</span><span className="font-semibold">{viewApp.data.systemCapacity || "N/A"} kW</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Panels</span><span className="font-semibold">{viewApp.data.panelCount || "N/A"}</span></div>
+            <div className="flex justify-between"><span className="text-solar-muted">Inverter</span><span className="font-semibold">{viewApp.data.inverterCapacity || "N/A"} kW</span></div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

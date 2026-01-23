@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type User = {
   id: string;
@@ -10,17 +11,26 @@ type User = {
 type TaskFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  taskId?: string;
+  initialData?: {
+    title: string;
+    description?: string | null;
+    dueDate?: string | null;
+    assignedToId?: string | null;
+    status?: string;
+  };
 };
 
-export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
+export function TaskForm({ onClose, onSuccess, taskId, initialData }: TaskFormProps) {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    dueDate: "",
-    assignedToId: "",
+    title: initialData?.title || "",
+    description: initialData?.description || "",
+    dueDate: initialData?.dueDate ? initialData.dueDate.slice(0, 10) : "",
+    assignedToId: initialData?.assignedToId || "",
+    status: initialData?.status || "OPEN",
   });
 
   useEffect(() => {
@@ -36,8 +46,8 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
+      const res = await fetch(taskId ? `/api/tasks/${taskId}` : "/api/tasks", {
+        method: taskId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
@@ -49,25 +59,24 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to create task. Please try again.");
+        setErrorMessage("Unable to save task. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while creating the task.");
+      setErrorMessage("Something went wrong while saving the task.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Create Task</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Assign tasks and set reminders.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={taskId ? "Edit Task" : "Create Task"}
+      subtitle="Assign tasks and set reminders."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Title</label>
             <input
@@ -116,6 +125,20 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-semibold text-solar-ink">Status</label>
+            <select
+              value={formData.status}
+              onChange={(event) => setFormData({ ...formData, status: event.target.value })}
+              className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+            >
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="DONE">Done</option>
+              <option value="BLOCKED">Blocked</option>
+            </select>
+          </div>
+
           {errorMessage && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {errorMessage}
@@ -135,11 +158,10 @@ export function TaskForm({ onClose, onSuccess }: TaskFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Task"}
+              {loading ? "Saving..." : taskId ? "Save Task" : "Create Task"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

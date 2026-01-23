@@ -36,12 +36,16 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { data } = body;
+    const { clientId, inquiryId, data } = body;
 
     const { db } = await import("@/lib/db");
     const application = await db.applicationData.update({
       where: { id },
-      data: { data },
+      data: {
+        data,
+        clientId: clientId || undefined,
+        inquiryId: inquiryId || null,
+      },
       include: {
         client: true,
         inquiry: true,

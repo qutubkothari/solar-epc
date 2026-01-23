@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type BarcodeScannerProps = {
   onScan: (serialNumber: string) => void;
@@ -110,92 +111,82 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-solar-ink">Scan Barcode</h2>
-          <button
-            onClick={handleClose}
-            className="rounded-lg p-2 text-solar-muted hover:bg-solar-sand"
-          >
-            ✕
-          </button>
+    <ModalShell
+      title="Scan Barcode"
+      subtitle="Point camera at equipment barcode or enter serial manually."
+      onClose={handleClose}
+      size="lg"
+    >
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
-        <p className="mt-1 text-sm text-solar-muted">
-          Point camera at equipment barcode or enter serial manually.
-        </p>
-
-        {error ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : (
-          <div className="mt-4 relative rounded-xl overflow-hidden bg-black">
-            <video
-              ref={videoRef}
-              className="w-full h-64 object-cover"
-              playsInline
-              muted
-            />
-            <canvas ref={canvasRef} className="hidden" />
-            {/* Scan overlay */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-64 h-24 border-2 border-solar-amber rounded-lg">
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-solar-amber rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-solar-amber rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-solar-amber rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-solar-amber rounded-br-lg" />
-              </div>
+      ) : (
+        <div className="relative rounded-xl overflow-hidden bg-black">
+          <video
+            ref={videoRef}
+            className="w-full h-64 object-cover"
+            playsInline
+            muted
+          />
+          <canvas ref={canvasRef} className="hidden" />
+          {/* Scan overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-64 h-24 border-2 border-solar-amber rounded-lg">
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-solar-amber rounded-tl-lg" />
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-solar-amber rounded-tr-lg" />
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-solar-amber rounded-bl-lg" />
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-solar-amber rounded-br-lg" />
             </div>
-            {scanning && (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-3 py-1 text-xs text-white">
-                Scanning...
-              </div>
-            )}
           </div>
-        )}
+          {scanning && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-3 py-1 text-xs text-white">
+              Scanning...
+            </div>
+          )}
+        </div>
+      )}
 
-        {lastScanned && (
-          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm text-green-700">
-              <span className="font-semibold">Last Scanned:</span> {lastScanned}
-            </p>
-          </div>
-        )}
+      {lastScanned && (
+        <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+          <p className="text-sm text-green-700">
+            <span className="font-semibold">Last Scanned:</span> {lastScanned}
+          </p>
+        </div>
+      )}
 
-        {/* Manual Entry */}
-        <form onSubmit={handleManualSubmit} className="mt-4">
-          <label className="block text-sm font-semibold text-solar-ink">
-            Manual Entry
-          </label>
-          <div className="mt-2 flex gap-2">
-            <input
-              type="text"
-              value={manualEntry}
-              onChange={(e) => setManualEntry(e.target.value)}
-              placeholder="Enter serial number"
-              className="flex-1 rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!manualEntry.trim()}
-              className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              Add
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-4 flex gap-2">
+      {/* Manual Entry */}
+      <form onSubmit={handleManualSubmit} className="mt-4">
+        <label className="block text-sm font-semibold text-solar-ink">
+          Manual Entry
+        </label>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="text"
+            value={manualEntry}
+            onChange={(e) => setManualEntry(e.target.value)}
+            placeholder="Enter serial number"
+            className="flex-1 rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+          />
           <button
-            type="button"
-            onClick={handleClose}
-            className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+            type="submit"
+            disabled={!manualEntry.trim()}
+            className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Done
+            Add
           </button>
         </div>
+      </form>
+
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={handleClose}
+          className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+        >
+          Done
+        </button>
       </div>
-    </div>
+    </ModalShell>
   );
 }

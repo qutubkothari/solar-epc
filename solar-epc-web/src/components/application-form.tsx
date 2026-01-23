@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Client = {
   id: string;
@@ -15,30 +16,36 @@ type Inquiry = {
 type ApplicationFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  applicationId?: string;
+  initialData?: {
+    clientId: string;
+    inquiryId?: string | null;
+    data?: Record<string, string | undefined>;
+  };
 };
 
-export function ApplicationForm({ onClose, onSuccess }: ApplicationFormProps) {
+export function ApplicationForm({ onClose, onSuccess, applicationId, initialData }: ApplicationFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    clientId: "",
-    inquiryId: "",
-    applicantName: "",
-    applicantEmail: "",
-    applicantPhone: "",
-    applicantAddress: "",
-    consumerNumber: "",
-    meterNumber: "",
-    sanctionedLoad: "",
-    connectionType: "RESIDENTIAL",
-    roofType: "RCC",
-    roofArea: "",
-    systemCapacity: "",
-    panelCount: "",
-    inverterCapacity: "",
-    notes: "",
+    clientId: initialData?.clientId || "",
+    inquiryId: initialData?.inquiryId || "",
+    applicantName: initialData?.data?.applicantName || "",
+    applicantEmail: initialData?.data?.applicantEmail || "",
+    applicantPhone: initialData?.data?.applicantPhone || "",
+    applicantAddress: initialData?.data?.applicantAddress || "",
+    consumerNumber: initialData?.data?.consumerNumber || "",
+    meterNumber: initialData?.data?.meterNumber || "",
+    sanctionedLoad: initialData?.data?.sanctionedLoad || "",
+    connectionType: initialData?.data?.connectionType || "RESIDENTIAL",
+    roofType: initialData?.data?.roofType || "RCC",
+    roofArea: initialData?.data?.roofArea || "",
+    systemCapacity: initialData?.data?.systemCapacity || "",
+    panelCount: initialData?.data?.panelCount || "",
+    inverterCapacity: initialData?.data?.inverterCapacity || "",
+    notes: initialData?.data?.notes || "",
   });
 
   useEffect(() => {
@@ -58,8 +65,10 @@ export function ApplicationForm({ onClose, onSuccess }: ApplicationFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/application-data", {
-        method: "POST",
+      const res = await fetch(
+        applicationId ? `/api/application-data/${applicationId}` : "/api/application-data",
+        {
+          method: applicationId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId: formData.clientId,
@@ -98,14 +107,13 @@ export function ApplicationForm({ onClose, onSuccess }: ApplicationFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm overflow-y-auto py-8">
-      <div className="w-full max-w-2xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar mx-4">
-        <h2 className="text-xl font-semibold text-solar-ink">Application Data Entry</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Enter customer application details for statutory document generation.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+    <ModalShell
+      title={applicationId ? "Edit Application Data" : "Application Data Entry"}
+      subtitle="Enter customer application details for statutory document generation."
+      onClose={onClose}
+      size="2xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 pr-1">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-semibold text-solar-ink">Client</label>
@@ -310,11 +318,10 @@ export function ApplicationForm({ onClose, onSuccess }: ApplicationFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Application"}
+              {loading ? "Saving..." : applicationId ? "Save Application" : "Save Application"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

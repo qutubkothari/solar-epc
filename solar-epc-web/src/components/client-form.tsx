@@ -1,22 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type ClientFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  clientId?: string;
+  initialData?: {
+    name: string;
+    contactName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    notes?: string | null;
+  };
 };
 
-export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
+export function ClientForm({ onClose, onSuccess, clientId, initialData }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: "",
-    contactName: "",
-    email: "",
-    phone: "",
-    address: "",
-    notes: "",
+    name: initialData?.name || "",
+    contactName: initialData?.contactName || "",
+    email: initialData?.email || "",
+    phone: initialData?.phone || "",
+    address: initialData?.address || "",
+    notes: initialData?.notes || "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,8 +35,8 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/clients", {
-        method: "POST",
+      const res = await fetch(clientId ? `/api/clients/${clientId}` : "/api/clients", {
+        method: clientId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -35,25 +45,24 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
         onSuccess();
         onClose();
       } else {
-        setErrorMessage("Unable to create client. Please try again.");
+        setErrorMessage("Unable to save client. Please try again.");
       }
     } catch (error) {
       console.error(error);
-      setErrorMessage("Something went wrong while creating the client.");
+      setErrorMessage("Something went wrong while saving the client.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">Add New Client</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Create a new client record for inquiries and quotations.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={clientId ? "Edit Client" : "Add New Client"}
+      subtitle="Create a new client record for inquiries and quotations."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Company Name *</label>
             <input
@@ -136,11 +145,10 @@ export function ClientForm({ onClose, onSuccess }: ClientFormProps) {
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Client"}
+              {loading ? "Saving..." : clientId ? "Save Client" : "Create Client"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

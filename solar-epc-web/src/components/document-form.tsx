@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ModalShell } from "@/components/modal-shell";
 
 type Inquiry = {
   id: string;
@@ -12,16 +13,22 @@ type DocumentFormProps = {
   endpoint: string;
   onClose: () => void;
   onSuccess: () => void;
+  docId?: string;
+  initialData?: {
+    inquiryId: string;
+    name: string;
+    fileUrl: string;
+  };
 };
 
-export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFormProps) {
+export function DocumentForm({ title, endpoint, onClose, onSuccess, docId, initialData }: DocumentFormProps) {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    inquiryId: "",
-    name: "",
-    fileUrl: "",
+    inquiryId: initialData?.inquiryId || "",
+    name: initialData?.name || "",
+    fileUrl: initialData?.fileUrl || "",
   });
 
   useEffect(() => {
@@ -37,8 +44,8 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
     setErrorMessage(null);
 
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
+      const res = await fetch(docId ? `${endpoint}/${docId}` : endpoint, {
+        method: docId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -58,14 +65,13 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <h2 className="text-xl font-semibold text-solar-ink">{title}</h2>
-        <p className="mt-1 text-sm text-solar-muted">
-          Register generated documents for this project.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <ModalShell
+      title={docId ? `Edit ${title}` : title}
+      subtitle="Register generated documents for this project."
+      onClose={onClose}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Inquiry</label>
             <select
@@ -124,11 +130,10 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess }: DocumentFo
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Document"}
+              {loading ? "Saving..." : docId ? "Save Document" : "Save Document"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
   );
 }

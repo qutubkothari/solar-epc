@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ExecutionForm } from "@/components/execution-form";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { ModalShell } from "@/components/modal-shell";
 
 type Asset = {
   id: string;
   serialNo: string;
   assetType: string;
+  inquiryId?: string;
   inquiry?: {
     title: string;
   };
@@ -29,6 +31,8 @@ export default function ExecutionPage() {
   const [quickType, setQuickType] = useState("PANEL");
   const [quickInquiryId, setQuickInquiryId] = useState("");
   const [scanCount, setScanCount] = useState(0);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [viewAsset, setViewAsset] = useState<Asset | null>(null);
 
   const fetchAssets = async () => {
     try {
@@ -84,6 +88,16 @@ export default function ExecutionPage() {
     if (res.ok) {
       setScanCount((prev) => prev + 1);
       fetchAssets();
+    }
+  };
+
+  const handleDeleteAsset = async (id: string) => {
+    const confirmDelete = window.confirm("Delete this captured serial?");
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/execution-assets/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchAssets();
+      if (viewAsset?.id === id) setViewAsset(null);
     }
   };
 
@@ -186,9 +200,29 @@ export default function ExecutionPage() {
                       {asset.assetType}  {asset.inquiry?.title || "Unassigned"}
                     </p>
                   </div>
-                  <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                    Captured
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
+                      Captured
+                    </span>
+                    <button
+                      onClick={() => setViewAsset(asset)}
+                      className="rounded-xl border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => setEditingAsset(asset)}
+                      className="rounded-xl border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAsset(asset.id)}
+                      className="rounded-xl border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -204,6 +238,42 @@ export default function ExecutionPage() {
             setShowForm(false);
           }}
         />
+      )}
+
+      {editingAsset && (
+        <ExecutionForm
+          assetId={editingAsset.id}
+          initialData={{
+            inquiryId: editingAsset.inquiryId || "",
+            assetType: editingAsset.assetType,
+            serialNo: editingAsset.serialNo,
+          }}
+          onClose={() => setEditingAsset(null)}
+          onSuccess={() => {
+            fetchAssets();
+            setEditingAsset(null);
+          }}
+        />
+      )}
+
+      {viewAsset && (
+        <ModalShell
+          title="Asset Details"
+          subtitle={viewAsset.serialNo}
+          onClose={() => setViewAsset(null)}
+          size="md"
+        >
+          <div className="space-y-2 text-sm text-solar-ink">
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Type</span>
+              <span className="font-semibold">{viewAsset.assetType}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-solar-muted">Project</span>
+              <span className="font-semibold">{viewAsset.inquiry?.title || "Unassigned"}</span>
+            </div>
+          </div>
+        </ModalShell>
       )}
 
       {showScanner && (
