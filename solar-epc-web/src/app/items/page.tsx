@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { SectionHeader } from "@/components/section-header";
+import { formatCurrency } from "@/lib/format";
 import { ItemForm } from "@/components/item-form";
 import { ModalShell } from "@/components/modal-shell";
 
@@ -196,7 +197,7 @@ export default function ItemsPage() {
                   <p className="mt-1 text-xs text-solar-muted">{item.description}</p>
                 )}
                 <div className="mt-3 space-y-1 text-xs text-solar-muted">
-                  <p>Unit Price: AED {Number(item.unitPrice).toFixed(2)}</p>
+                  <p>Unit Price: {formatCurrency(Number(item.unitPrice))}</p>
                   <p>Margin: {Number(item.marginPercent).toFixed(1)}%</p>
                   <p>Tax: {Number(item.taxPercent).toFixed(1)}%</p>
                   <p>UOM: {item.uom || "—"}</p>
@@ -264,7 +265,7 @@ export default function ItemsPage() {
             )}
             <div className="flex justify-between">
               <span className="text-solar-muted">Unit Price</span>
-              <span className="font-semibold">AED {Number(viewItem.unitPrice).toFixed(2)}</span>
+              <span className="font-semibold">{formatCurrency(Number(viewItem.unitPrice))}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-solar-muted">Margin</span>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
+import { formatCurrency } from "@/lib/format";
 
 type Client = {
   id: string;
@@ -12,9 +13,11 @@ type Client = {
 type Item = {
   id: string;
   name: string;
+  description?: string | null;
   unitPrice: number;
   taxPercent: number;
   marginPercent: number;
+  uom?: string | null;
 };
 
 type LineItem = {
@@ -61,11 +64,18 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
     label: client.name,
   }));
 
-  const itemOptions = items.map((item) => ({
-    value: item.id,
-    label: item.name,
-    subtitle: `AED ${Number(item.unitPrice || 0).toFixed(2)}`,
-  }));
+  const itemOptions = items.map((item) => {
+    const primaryLabel = item.description || item.name;
+    const codeLabel = item.description && item.description !== item.name ? item.name : "";
+    const priceLabel = formatCurrency(Number(item.unitPrice || 0));
+    const uomLabel = item.uom ? ` • ${item.uom}` : "";
+    const subtitleParts = [codeLabel ? `Code ${codeLabel}` : "", priceLabel + uomLabel].filter(Boolean);
+    return {
+      value: item.id,
+      label: primaryLabel,
+      subtitle: subtitleParts.join(" • "),
+    };
+  });
 
   const updateLineItem = (index: number, field: keyof LineItem, value: string | number | undefined) => {
     setLineItems((prev) =>
@@ -274,10 +284,12 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
                   </div>
                   {line.itemId && (
                     <div className="mt-2 flex gap-4 text-xs text-solar-muted">
-                      <span>Unit: AED {items.find(i => i.id === line.itemId)?.unitPrice?.toFixed(2) || "0.00"}</span>
+                      <span>
+                        Unit: {formatCurrency(Number(items.find((i) => i.id === line.itemId)?.unitPrice || 0))}
+                      </span>
                       <span>Tax: {items.find(i => i.id === line.itemId)?.taxPercent || 0}%</span>
                       <span className="text-solar-ink font-medium">
-                        Line Total: AED {selectedLines.find((_, i) => i === lineItems.filter(l => l.itemId).findIndex((l, li) => li === lineItems.slice(0, index + 1).filter(x => x.itemId).length - 1))?.lineTotal?.toFixed(2) || "0.00"}
+                        Line Total: {formatCurrency(Number(selectedLines.find((_, i) => i === lineItems.filter(l => l.itemId).findIndex((l, li) => li === lineItems.slice(0, index + 1).filter(x => x.itemId).length - 1))?.lineTotal || 0))}
                       </span>
                     </div>
                   )}
@@ -297,19 +309,19 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
           <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3 text-sm">
             <div className="flex justify-between text-solar-muted">
               <span>Subtotal:</span>
-              <span>AED {subtotal.toFixed(2)}</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-solar-muted">
               <span>Margin:</span>
-              <span>AED {marginTotal.toFixed(2)}</span>
+              <span>{formatCurrency(marginTotal)}</span>
             </div>
             <div className="flex justify-between text-solar-muted">
               <span>Tax:</span>
-              <span>AED {taxTotal.toFixed(2)}</span>
+              <span>{formatCurrency(taxTotal)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-solar-border pt-2 text-solar-ink font-semibold">
               <span>Total:</span>
-              <span>AED {totalValue.toFixed(2)}</span>
+              <span>{formatCurrency(totalValue)}</span>
             </div>
           </div>
 

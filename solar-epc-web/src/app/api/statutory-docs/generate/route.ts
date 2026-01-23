@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,7 +114,11 @@ async function generateAgreement(data: Record<string, unknown>) {
   y -= 16;
   page.drawText(`Panel Count: ${data.panelCount || "N/A"}`, { x: leftMargin, y, font, size: 10 });
   y -= 16;
-  page.drawText(`Total Value: AED ${data.totalValue || "N/A"}`, { x: leftMargin, y, font, size: 10 });
+  const totalValue = Number(data.totalValue || 0);
+  page.drawText(
+    `Total Value: ${Number.isNaN(totalValue) ? "N/A" : formatCurrency(totalValue)}`,
+    { x: leftMargin, y, font, size: 10 }
+  );
   y -= 40;
 
   page.drawText("AGREED TERMS:", { x: leftMargin, y, font: boldFont, size: 10 });

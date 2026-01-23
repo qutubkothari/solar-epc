@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +61,7 @@ export async function GET(
     if (version?.items?.length) {
       version.items.forEach((line) => {
         drawText(`${line.item.name} x ${line.quantity}`, 40, y, 11);
-        drawText(`AED ${Number(line.lineTotal).toFixed(2)}`, 420, y, 11);
+        drawText(`${formatCurrency(Number(line.lineTotal))}`, 420, y, 11);
         y -= 18;
       });
     } else {
@@ -69,13 +70,13 @@ export async function GET(
     }
 
     y -= 10;
-    drawText(`Subtotal: AED ${Number(version?.subtotal || 0).toFixed(2)}`, 40, y, 11, true);
+    drawText(`Subtotal: ${formatCurrency(Number(version?.subtotal || 0))}`, 40, y, 11, true);
     y -= 16;
-    drawText(`Margin: AED ${Number(version?.marginTotal || 0).toFixed(2)}`, 40, y, 11, true);
+    drawText(`Margin: ${formatCurrency(Number(version?.marginTotal || 0))}`, 40, y, 11, true);
     y -= 16;
-    drawText(`Tax: AED ${Number(version?.taxTotal || 0).toFixed(2)}`, 40, y, 11, true);
+    drawText(`Tax: ${formatCurrency(Number(version?.taxTotal || 0))}`, 40, y, 11, true);
     y -= 16;
-    drawText(`Grand Total: AED ${Number(version?.grandTotal || 0).toFixed(2)}`, 40, y, 12, true);
+    drawText(`Grand Total: ${formatCurrency(Number(version?.grandTotal || 0))}`, 40, y, 12, true);
 
     const pdfBytes = await pdfDoc.save();
 

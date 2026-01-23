@@ -94,7 +94,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-semibold text-solar-ink">Unit Price (AED) *</label>
+              <label className="block text-sm font-semibold text-solar-ink">Unit Price (INR) *</label>
               <input
                 required
                 type="number"

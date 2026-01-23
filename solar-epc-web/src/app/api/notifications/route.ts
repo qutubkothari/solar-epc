@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ A quotation has been finalized and is ready for processing.
 
 Project: ${data.projectTitle}
 Client: ${data.clientName}
-Total Value: AED ${data.totalValue}
+Total Value: ${data.totalValue}
 Version: ${data.version}
 
 Please proceed with the next steps in the workflow.
@@ -182,7 +183,7 @@ export async function POST(request: Request) {
 
         if (inquiry.quotations?.[0]?.versions?.[0]) {
           const version = inquiry.quotations[0].versions[0];
-          templateData.totalValue = String(version.grandTotal);
+          templateData.totalValue = formatCurrency(Number(version.grandTotal || 0));
           templateData.version = version.version;
         }
 

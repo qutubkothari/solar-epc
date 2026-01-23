@@ -57,7 +57,7 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
     state: initialData?.state || "",
     country: initialData?.country || "",
     postalCode: initialData?.postalCode || "",
-    currency: initialData?.currency || "AED",
+    currency: initialData?.currency || "INR",
     creditLimit: initialData?.creditLimit?.toString() || "",
     paymentTerms: initialData?.paymentTerms || "",
     accountManager: initialData?.accountManager || "",
@@ -308,7 +308,7 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                   className="mt-1 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm outline-none"
-                  placeholder="AED"
+                  placeholder="INR"
                 />
               </div>
               <div>

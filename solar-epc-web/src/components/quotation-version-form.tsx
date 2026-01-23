@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
+import { formatCurrency } from "@/lib/format";
 
 type Item = {
   id: string;
   name: string;
+  description?: string | null;
   unitPrice: number;
   taxPercent: number;
   marginPercent: number;
+  uom?: string | null;
 };
 
 type LineItem = {
@@ -47,11 +50,18 @@ export function QuotationVersionForm({
       .catch(() => setItems([]));
   }, []);
 
-  const itemOptions = items.map((item) => ({
-    value: item.id,
-    label: item.name,
-    subtitle: `AED ${Number(item.unitPrice || 0).toFixed(2)}`,
-  }));
+  const itemOptions = items.map((item) => {
+    const primaryLabel = item.description || item.name;
+    const codeLabel = item.description && item.description !== item.name ? item.name : "";
+    const priceLabel = formatCurrency(Number(item.unitPrice || 0));
+    const uomLabel = item.uom ? ` • ${item.uom}` : "";
+    const subtitleParts = [codeLabel ? `Code ${codeLabel}` : "", priceLabel + uomLabel].filter(Boolean);
+    return {
+      value: item.id,
+      label: primaryLabel,
+      subtitle: subtitleParts.join(" • "),
+    };
+  });
 
   const updateLineItem = (
     index: number,
@@ -245,11 +255,11 @@ export function QuotationVersionForm({
                 {line.itemId && (
                   <div className="mt-2 flex gap-4 text-xs text-solar-muted">
                     <span>
-                      Unit: AED {items.find((i) => i.id === line.itemId)?.unitPrice?.toFixed(2) || "0.00"}
+                      Unit: {formatCurrency(Number(items.find((i) => i.id === line.itemId)?.unitPrice || 0))}
                     </span>
                     <span>Tax: {items.find((i) => i.id === line.itemId)?.taxPercent || 0}%</span>
                     <span className="text-solar-ink font-medium">
-                      Line Total: AED {selectedLines.find((_, i) => i === index)?.lineTotal?.toFixed(2) || "0.00"}
+                      Line Total: {formatCurrency(Number(selectedLines.find((_, i) => i === index)?.lineTotal || 0))}
                     </span>
                   </div>
                 )}
@@ -268,19 +278,19 @@ export function QuotationVersionForm({
         <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3 text-sm">
           <div className="flex justify-between">
             <span className="text-solar-muted">Subtotal</span>
-            <span className="font-semibold">AED {subtotal.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-solar-muted">Margin</span>
-            <span className="font-semibold">AED {marginTotal.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(marginTotal)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-solar-muted">Tax</span>
-            <span className="font-semibold">AED {taxTotal.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(taxTotal)}</span>
           </div>
           <div className="flex justify-between text-solar-ink">
             <span className="font-semibold">Grand Total</span>
-            <span className="font-semibold">AED {totalValue.toFixed(2)}</span>
+            <span className="font-semibold">{formatCurrency(totalValue)}</span>
           </div>
         </div>
 
