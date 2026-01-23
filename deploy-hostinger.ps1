@@ -71,6 +71,8 @@ fi
 cd "{0}"
 GIT_TERMINAL_PROMPT=0 git fetch origin {2}
 git checkout {2}
+git reset --hard
+git clean -fd
 GIT_TERMINAL_PROMPT=0 git pull origin {2}
 '@ -f $REMOTE_PATH, $REPO_URL, $BRANCH
 Invoke-RemoteCommand $prepCmd
