@@ -1,1 +1,2 @@
-// Intentionally left blank for Prisma CLI compatibility.
+// Minimal Prisma config to satisfy CLI parser.
+export default {};
