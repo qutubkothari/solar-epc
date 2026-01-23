@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const gst = searchParams.get("gst");
@@ -9,97 +12,65 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Try multiple APIs in order of preference
+    // Use the most reliable free GST API
+    const apiUrl = `https://appyflow.in/verifyGST?gstNo=${gst}&key_secret=OnlyForTesting`;
     
-    // API 1: GST Master Check
-    try {
-      const response1 = await fetch(`https://sheet.gstincheck.co.in/check/${gst}`, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      const data1 = await response1.json();
-      
-      if (data1.flag && data1.data) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            name: data1.data.tradeNam || data1.data.lgnm || '',
-            address: data1.data.pradr?.addr?.bno ? 
-              `${data1.data.pradr.addr.bno || ''} ${data1.data.pradr.addr.st || ''}`.trim() :
-              data1.data.pradr?.addr?.st || '',
-            city: data1.data.pradr?.addr?.dst || '',
-            state: data1.data.pradr?.addr?.stcd || '',
-            postalCode: data1.data.pradr?.addr?.pncd || '',
-          }
-        });
-      }
-    } catch (err) {
-      console.log('API 1 failed:', err);
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('API response not OK:', response.status);
+      return NextResponse.json({ 
+        success: false, 
+        error: "GST API failed" 
+      }, { status: 404 });
     }
 
-    // API 2: Knowlarity API
-    try {
-      const response2 = await fetch(`https://api.knowlarity.com/v1/gst/verify?gstin=${gst}`, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      const data2 = await response2.json();
+    const data = await response.json();
+    console.log('GST API Response:', JSON.stringify(data, null, 2));
+
+    // Check for successful response
+    if (data && data.taxpayerInfo) {
+      const info = data.taxpayerInfo;
+      const pradr = info.pradr || {};
       
-      if (data2.status === 'success' && data2.data) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            name: data2.data.legal_name || data2.data.trade_name || '',
-            address: data2.data.principal_place_address || '',
-            city: data2.data.principal_place_city || '',
-            state: data2.data.principal_place_state || '',
-            postalCode: data2.data.principal_place_pincode || '',
-          }
-        });
-      }
-    } catch (err) {
-      console.log('API 2 failed:', err);
+      // Build address string
+      let addressParts = [];
+      if (pradr.bno) addressParts.push(pradr.bno);
+      if (pradr.bnm) addressParts.push(pradr.bnm);
+      if (pradr.st) addressParts.push(pradr.st);
+      if (pradr.loc) addressParts.push(pradr.loc);
+      
+      const address = addressParts.join(', ');
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          name: info.tradeNam || info.lgnm || '',
+          address: address || '',
+          city: pradr.dst || '',
+          state: pradr.stcd || info.stjCd || '',
+          postalCode: pradr.pncd || '',
+        }
+      });
     }
 
-    // API 3: GST Portal (public search)
-    try {
-      const response3 = await fetch(`https://services.gst.gov.in/services/api/search/tp?gstin=${gst}`, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      const data3 = await response3.json();
-      
-      if (data3.status === 'Active' || data3.sts === 'Active') {
-        return NextResponse.json({
-          success: true,
-          data: {
-            name: data3.tradeNam || data3.legalName || '',
-            address: data3.pradr?.addr?.bno ? 
-              `${data3.pradr.addr.bno || ''} ${data3.pradr.addr.st || ''}`.trim() :
-              data3.pradr?.adr || '',
-            city: data3.pradr?.addr?.dst || '',
-            state: data3.pradr?.addr?.stcd || data3.stj || '',
-            postalCode: data3.pradr?.addr?.pncd || '',
-          }
-        });
-      }
-    } catch (err) {
-      console.log('API 3 failed:', err);
-    }
-
+    // If no data found, return error
     return NextResponse.json({ 
       success: false, 
-      error: "GST details not found" 
+      error: "GST details not found - verify the GST number is correct" 
     }, { status: 404 });
 
   } catch (error) {
     console.error("GST lookup error:", error);
     return NextResponse.json({ 
       success: false, 
-      error: "Failed to lookup GST details" 
+      error: "Failed to lookup GST details - API error" 
     }, { status: 500 });
   }
 }
