@@ -381,11 +381,12 @@ const run = async () => {
   const sheet1 = workbook.Sheets["Sheet1"];
   const sheet2 = workbook.Sheets["Sheet2"];
 
-  if (inventorySheet) {
-    const rows = XLSX.utils.sheet_to_json(inventorySheet, { header: 1, defval: null });
-    const result = await importInventory(rows);
-    console.log("Inventory import:", result);
-  }
+  // SKIP INVENTORY - Only use PRICE LIST for items
+  // if (inventorySheet) {
+  //   const rows = XLSX.utils.sheet_to_json(inventorySheet, { header: 1, defval: null });
+  //   const result = await importInventory(rows);
+  //   console.log("Inventory import:", result);
+  // }
 
   if (priceSheet) {
     const rows = XLSX.utils.sheet_to_json(priceSheet, { header: 1, defval: null });
