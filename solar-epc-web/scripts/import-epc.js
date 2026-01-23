@@ -120,10 +120,35 @@ const importInventory = async (rows) => {
 };
 
 const importPriceList = async (rows) => {
-  const headerIndex = findHeaderRow(rows, ["item name", "unit", "rate", "gst"]);
+  const headerIndex = findHeaderRow(rows, ["sr no", "item name", "unit", "rate", "gst"]);
   const { items } = rowsToObjects(rows, headerIndex);
+  
+  // Helper function to categorize solar EPC items
+  const getCategory = (name) => {
+    if (!name) return 'Other';
+    const n = String(name).toUpperCase();
+    if (n.includes('MODULE') || n.includes('PANEL') || n.includes('BI FACIAL') || n.includes('TOPCON') || n.includes('MONO')) return 'Solar Modules';
+    if (n.includes('INVERTER') || n.includes('SG') && /\d+K/.test(n)) return 'Inverters';
+    if (n.includes('STRUCTURE') || n.includes('ELEVATED') || n.includes('60 X 40') || n.includes('80 X 40')) return 'Mounting Structure';
+    if (n.includes('ACDB')) return 'ACDB';
+    if (n.includes('DCDB')) return 'DCDB';
+    if (n.includes('EARTHING') || n.includes('EARTH') || n.includes('GI STRIP')) return 'Earthing';
+    if (n.includes('LIGHTNING') || n.includes('LA ') || n.includes('ESE')) return 'Lightning Arrestor';
+    if (n.includes('CABLE') || n.includes('DC 1C') || n.includes('SQMM') || n.includes('WIRE')) return 'Cables';
+    if (n.includes('MC4') || n.includes('CONNECTOR')) return 'Connectors';
+    if (n.includes('NET METER') || n.includes('NETMETER')) return 'Net Meter';
+    if (n.includes('MONITORING') || n.includes('DATALOGGER')) return 'Monitoring';
+    if (n.includes('CIVIL') || n.includes('FOUNDATION')) return 'Civil Works';
+    if (n.includes('CABLE TRAY') || n.includes('FRP')) return 'Cable Trays';
+    if (n.includes('CONDUIT') || n.includes('CONDUITE')) return 'Conduits';
+    if (n.includes('WALKWAY')) return 'Walkway';
+    if (n.includes('BOLT') || n.includes('CLAMP') || n.includes('FASTENER')) return 'Fasteners';
+    return 'Other';
+  };
+  
   const priceItems = items
     .map(({ record }) => ({
+      srNo: record["SR NO"] || record["Sr No"] || null,
       name: record["ITEM NAME"],
       unit: record["UNIT"],
       rate: safeNumber(record["RATE"]),
@@ -145,14 +170,29 @@ const importPriceList = async (rows) => {
 
   for (const item of priceItems) {
     const name = String(item.name).trim();
+    const unitStr = item.unit ? String(item.unit).trim().toUpperCase() : null;
+    
+    // Determine pricing unit for solar EPC calculations
+    let pricingUnit = 'PER_UNIT'; // Default
+    if (unitStr) {
+      if (unitStr.includes('RS/WATT') || unitStr.includes('RS/W')) {
+        pricingUnit = 'RS_PER_WATT';
+      } else if (unitStr.includes('RS/KW') || unitStr.includes('RS/Kw')) {
+        pricingUnit = 'RS_PER_KW';
+      }
+    }
+    
     const data = {
       name,
       description: null,
+      srNo: item.srNo ? parseInt(String(item.srNo).trim()) : null,
       unitPrice: item.rate ?? 0,
       taxPercent: item.gst ?? 0,
       marginPercent: 0,
-      uom: item.unit ? String(item.unit).trim() : null,
-      category: "Price List",
+      uom: unitStr,
+      pricingUnit,
+      category: getCategory(name),
+      isActive: true,
     };
     const existingId = existingMap.get(name);
     if (existingId) {

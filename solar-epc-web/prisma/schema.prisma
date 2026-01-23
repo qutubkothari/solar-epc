@@ -139,10 +139,12 @@ model Item {
   unitPrice     Decimal  @default(0)
   taxPercent    Decimal  @default(0)
   marginPercent Decimal  @default(0)
-  uom           String?
+  uom           String?  // "nos", "meter", "unit", "lot"
+  pricingUnit   String?  // "RS/WATT", "Rs/Kw", "PER_UNIT" - for solar EPC pricing
   category      String?
   sku           String?  // Item code/SKU for quick lookup
   isActive      Boolean  @default(true)
+  srNo          Int?     // Serial number from PRICE LIST
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
