@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { ModalShell } from "@/components/modal-shell";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type Client = {
   id: string;
@@ -54,6 +55,17 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
       .then((data) => setItems(data))
       .catch(() => setItems([]));
   }, []);
+
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: client.name,
+  }));
+
+  const itemOptions = items.map((item) => ({
+    value: item.id,
+    label: item.name,
+    subtitle: `AED ${Number(item.unitPrice || 0).toFixed(2)}`,
+  }));
 
   const updateLineItem = (index: number, field: keyof LineItem, value: string | number | undefined) => {
     setLineItems((prev) =>
@@ -142,19 +154,15 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
       <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-solar-ink">Client</label>
-            <select
-              required
-              value={formData.clientId}
-              onChange={(event) => setFormData({ ...formData, clientId: event.target.value })}
-              className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-            >
-              <option value="">Select client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                value={formData.clientId}
+                options={clientOptions}
+                onChange={(value) => setFormData({ ...formData, clientId: value })}
+                placeholder="Select client"
+                searchPlaceholder="Search clients"
+              />
+            </div>
           </div>
 
           <div>
@@ -223,18 +231,15 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
               {lineItems.map((line, index) => (
                 <div key={`line-${index}`} className="rounded-xl border border-solar-border bg-white p-3">
                   <div className="flex flex-wrap gap-2">
-                    <select
-                      value={line.itemId}
-                      onChange={(event) => updateLineItem(index, "itemId", event.target.value)}
-                      className="flex-1 rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-                    >
-                      <option value="">Select item</option>
-                      {items.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="min-w-[220px] flex-1">
+                      <SearchableSelect
+                        value={line.itemId}
+                        options={itemOptions}
+                        onChange={(value) => updateLineItem(index, "itemId", value)}
+                        placeholder="Select item"
+                        searchPlaceholder="Search items"
+                      />
+                    </div>
                     <input
                       type="number"
                       min={1}

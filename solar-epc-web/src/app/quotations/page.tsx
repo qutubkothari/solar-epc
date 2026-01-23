@@ -5,6 +5,7 @@ import { SectionHeader } from "@/components/section-header";
 import { QuotationForm } from "@/components/quotation-form";
 import { QuotationVersionForm } from "@/components/quotation-version-form";
 import { ModalShell } from "@/components/modal-shell";
+import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
 
 type QuotationVersion = {
@@ -107,6 +108,11 @@ export default function QuotationsPage() {
 
   const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
   const latestVersion = selectedQuote?.versions?.[0];
+  const quoteOptions = quotes.map((quote) => ({
+    value: quote.id,
+    label: quote.title,
+    subtitle: quote.client.name,
+  }));
   const compareReady = Boolean(compareA && compareB);
   const compareDiff = compareReady
     ? Number(compareA?.grandTotal || 0) - Number(compareB?.grandTotal || 0)
@@ -285,17 +291,15 @@ export default function QuotationsPage() {
             {quotes.length > 0 && (
               <div className="mt-4">
                 <label className="text-xs font-semibold text-solar-muted">Select Quotation</label>
-                <select
-                  value={selectedQuoteId || ""}
-                  onChange={(event) => setSelectedQuoteId(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm"
-                >
-                  {quotes.map((quote) => (
-                    <option key={quote.id} value={quote.id}>
-                      {quote.title} • {quote.client.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-2">
+                  <SearchableSelect
+                    value={selectedQuoteId || ""}
+                    options={quoteOptions}
+                    onChange={(value) => setSelectedQuoteId(value)}
+                    placeholder="Select quotation"
+                    searchPlaceholder="Search quotations"
+                  />
+                </div>
               </div>
             )}
             <div className="mt-4 space-y-2 text-xs text-solar-muted">
