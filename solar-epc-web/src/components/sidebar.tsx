@@ -8,6 +8,7 @@ import {
   FileText,
   FileSpreadsheet,
   BadgeCheck,
+  Users,
   QrCode,
   Settings,
   ListChecks,
@@ -24,6 +25,7 @@ type SidebarProps = {
 
 const navItems = [
   { href: "/", label: "Performance Hub", icon: LayoutDashboard },
+  { href: "/clients", label: "Clients", icon: Users },
   { href: "/inquiries", label: "Inquiries", icon: ClipboardList },
   { href: "/items", label: "Item Master", icon: Package },
   { href: "/quotations", label: "Quotations", icon: FileSpreadsheet },

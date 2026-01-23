@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { InquiryForm } from "@/components/inquiry-form";
-import { ClientForm } from "@/components/client-form";
 import { MediaForm } from "@/components/media-form";
 import { ModalShell } from "@/components/modal-shell";
 
@@ -22,7 +21,6 @@ type Inquiry = {
 export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
-  const [showClientForm, setShowClientForm] = useState(false);
   const [showMediaForm, setShowMediaForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [viewInquiry, setViewInquiry] = useState<Inquiry | null>(null);
@@ -81,12 +79,6 @@ export default function InquiriesPage() {
         subtitle="Capture new client requests and manage site media uploads."
         action={
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowClientForm(true)}
-              className="rounded-xl border border-solar-border bg-white px-4 py-2 text-sm font-semibold text-solar-ink"
-            >
-              Add Client
-            </button>
             <button
               onClick={() => setShowInquiryForm(true)}
               className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
@@ -204,13 +196,6 @@ export default function InquiriesPage() {
             fetchInquiries();
             setEditingInquiry(null);
           }}
-        />
-      )}
-
-      {showClientForm && (
-        <ClientForm
-          onClose={() => setShowClientForm(false)}
-          onSuccess={() => setShowClientForm(false)}
         />
       )}
 

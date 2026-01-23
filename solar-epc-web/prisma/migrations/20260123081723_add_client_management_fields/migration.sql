@@ -1,0 +1,19 @@
+-- AlterTable
+ALTER TABLE "Client" ADD COLUMN "accountManager" TEXT;
+ALTER TABLE "Client" ADD COLUMN "billingAddress" TEXT;
+ALTER TABLE "Client" ADD COLUMN "city" TEXT;
+ALTER TABLE "Client" ADD COLUMN "companyType" TEXT;
+ALTER TABLE "Client" ADD COLUMN "country" TEXT;
+ALTER TABLE "Client" ADD COLUMN "creditLimit" DECIMAL;
+ALTER TABLE "Client" ADD COLUMN "currency" TEXT;
+ALTER TABLE "Client" ADD COLUMN "industry" TEXT;
+ALTER TABLE "Client" ADD COLUMN "mobile" TEXT;
+ALTER TABLE "Client" ADD COLUMN "paymentTerms" TEXT;
+ALTER TABLE "Client" ADD COLUMN "phoneAlt" TEXT;
+ALTER TABLE "Client" ADD COLUMN "postalCode" TEXT;
+ALTER TABLE "Client" ADD COLUMN "registrationNo" TEXT;
+ALTER TABLE "Client" ADD COLUMN "shippingAddress" TEXT;
+ALTER TABLE "Client" ADD COLUMN "state" TEXT;
+ALTER TABLE "Client" ADD COLUMN "status" TEXT;
+ALTER TABLE "Client" ADD COLUMN "taxId" TEXT;
+ALTER TABLE "Client" ADD COLUMN "website" TEXT;

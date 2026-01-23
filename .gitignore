@@ -144,6 +144,7 @@ solar-epc-web/playwright-report/
 
 # Local Prisma database
 solar-epc-web/prisma/dev.db
+solar-epc-web/dev.db
 
 # Local Prisma config backup
 solar-epc-web/prisma.config.ts.bak

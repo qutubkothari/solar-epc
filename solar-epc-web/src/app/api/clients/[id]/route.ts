@@ -10,12 +10,62 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { name, contactName, email, phone, address, notes } = body;
+    const {
+      name,
+      contactName,
+      email,
+      phone,
+      phoneAlt,
+      mobile,
+      website,
+      industry,
+      companyType,
+      taxId,
+      registrationNo,
+      address,
+      billingAddress,
+      shippingAddress,
+      city,
+      state,
+      country,
+      postalCode,
+      currency,
+      creditLimit,
+      paymentTerms,
+      accountManager,
+      status,
+      notes,
+    } = body;
 
     const { db } = await import("@/lib/db");
     const client = await db.client.update({
       where: { id },
-      data: { name, contactName, email, phone, address, notes },
+      data: {
+        name,
+        contactName,
+        email,
+        phone,
+        phoneAlt,
+        mobile,
+        website,
+        industry,
+        companyType,
+        taxId,
+        registrationNo,
+        address,
+        billingAddress,
+        shippingAddress,
+        city,
+        state,
+        country,
+        postalCode,
+        currency,
+        creditLimit,
+        paymentTerms,
+        accountManager,
+        status,
+        notes,
+      },
     });
 
     return NextResponse.json(client);

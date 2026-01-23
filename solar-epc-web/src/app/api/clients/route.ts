@@ -21,7 +21,32 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, contactName, email, phone, address, notes } = body;
+    const {
+      name,
+      contactName,
+      email,
+      phone,
+      phoneAlt,
+      mobile,
+      website,
+      industry,
+      companyType,
+      taxId,
+      registrationNo,
+      address,
+      billingAddress,
+      shippingAddress,
+      city,
+      state,
+      country,
+      postalCode,
+      currency,
+      creditLimit,
+      paymentTerms,
+      accountManager,
+      status,
+      notes,
+    } = body;
 
     const { db } = await import("@/lib/db");
 
@@ -31,7 +56,25 @@ export async function POST(request: Request) {
         contactName,
         email,
         phone,
+        phoneAlt,
+        mobile,
+        website,
+        industry,
+        companyType,
+        taxId,
+        registrationNo,
         address,
+        billingAddress,
+        shippingAddress,
+        city,
+        state,
+        country,
+        postalCode,
+        currency,
+        creditLimit,
+        paymentTerms,
+        accountManager,
+        status,
         notes,
       },
     });
