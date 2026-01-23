@@ -156,6 +156,99 @@ export default function QuotationsPage() {
       })()
     : [];
 
+  const exportComparisonCsv = () => {
+    if (!compareReady || !compareA || !compareB) return;
+    const headers = [
+      "Item",
+      "Qty A",
+      "Total A",
+      "Qty B",
+      "Total B",
+      "Delta (A-B)",
+    ];
+    const rows = compareLines.map((line) => [
+      line.name,
+      line.qtyA,
+      line.totalA.toFixed(2),
+      line.qtyB,
+      line.totalB.toFixed(2),
+      (line.totalA - line.totalB).toFixed(2),
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `quotation-compare-${compareA.version}-vs-${compareB.version}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const printComparison = () => {
+    if (!compareReady || !compareA || !compareB) return;
+    const rows = compareLines
+      .map(
+        (line) => `
+          <tr>
+            <td>${line.name}</td>
+            <td>${line.qtyA || "—"}</td>
+            <td>${line.totalA ? formatCurrency(line.totalA) : "—"}</td>
+            <td>${line.qtyB || "—"}</td>
+            <td>${line.totalB ? formatCurrency(line.totalB) : "—"}</td>
+            <td>${formatCurrency(line.totalA - line.totalB)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Quotation Comparison</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { font-size: 18px; margin-bottom: 8px; }
+            h2 { font-size: 14px; margin: 0 0 16px; color: #4b5563; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+            th { background: #f3f4f6; }
+            .summary { margin-top: 16px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Quotation Comparison</h1>
+          <h2>Option A: ${compareA.version} ${compareA.brand ? `• ${compareA.brand}` : ""}</h2>
+          <h2>Option B: ${compareB.version} ${compareB.brand ? `• ${compareB.brand}` : ""}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty A</th>
+                <th>Total A</th>
+                <th>Qty B</th>
+                <th>Total B</th>
+                <th>Delta (A-B)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+          <div class="summary">
+            <strong>Difference (A - B):</strong> ${formatCurrency(compareDiff)}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const handleComparePick = (version: QuotationVersion) => {
     if (!compareA || (compareA && compareB)) {
       setCompareA(version);
@@ -474,6 +567,22 @@ export default function QuotationsPage() {
                 <span className={`font-semibold ${compareDiff >= 0 ? "text-solar-forest" : "text-red-600"}`}>
                   {formatCurrency(compareDiff)}
                 </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={exportComparisonCsv}
+                  className="rounded-xl border border-solar-border bg-white px-4 py-2 text-xs font-semibold text-solar-ink"
+                >
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={printComparison}
+                  className="rounded-xl bg-solar-forest px-4 py-2 text-xs font-semibold text-white"
+                >
+                  Print Comparison
+                </button>
               </div>
             </div>
           ) : (
