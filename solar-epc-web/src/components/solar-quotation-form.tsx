@@ -69,6 +69,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [autoCalculating, setAutoCalculating] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [selectedItemToAdd, setSelectedItemToAdd] = useState("");
 
   useEffect(() => {
     fetch("/api/clients")
@@ -273,6 +276,84 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
   const totalGst = lineItems.reduce((sum, item) => sum + item.totalGst, 0);
   const grandTotal = subtotal + totalGst;
 
+  // Update line item quantity
+  const updateLineItemQty = (index: number, newQty: number) => {
+    setLineItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        
+        const foundItem = items.find(i => i.id === item.itemId);
+        if (!foundItem) return item;
+
+        let total = 0;
+        if (foundItem.pricingUnit === 'RS_PER_WATT') {
+          total = actualSystemWatts * foundItem.unitPrice;
+        } else if (foundItem.pricingUnit === 'RS_PER_KW') {
+          total = newQty * foundItem.unitPrice;
+        } else {
+          total = newQty * foundItem.unitPrice;
+        }
+
+        const gst = total * foundItem.taxPercent;
+
+        return {
+          ...item,
+          quantity: newQty,
+          total,
+          totalGst: gst,
+        };
+      })
+    );
+  };
+
+  // Remove line item
+  const removeLineItem = (index: number) => {
+    setLineItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Add manual item
+  const addManualItem = () => {
+    if (!selectedItemToAdd) return;
+    
+    const foundItem = items.find(i => i.id === selectedItemToAdd);
+    if (!foundItem) return;
+
+    const qty = foundItem.pricingUnit === 'RS_PER_WATT' ? actualSystemWatts : 
+                foundItem.pricingUnit === 'RS_PER_KW' ? actualSystemKw : 1;
+    
+    let total = 0;
+    if (foundItem.pricingUnit === 'RS_PER_WATT') {
+      total = actualSystemWatts * foundItem.unitPrice;
+    } else if (foundItem.pricingUnit === 'RS_PER_KW') {
+      total = qty * foundItem.unitPrice;
+    } else {
+      total = qty * foundItem.unitPrice;
+    }
+
+    const gst = total * foundItem.taxPercent;
+
+    const newItem: LineItem = {
+      itemId: foundItem.id,
+      itemName: foundItem.name,
+      itemHead: foundItem.category || 'OTHER',
+      itemType: foundItem.name,
+      make: foundItem.brand || '',
+      description: foundItem.description || '',
+      unit: foundItem.uom || 'NOS',
+      rateWithoutGst: foundItem.unitPrice,
+      quantity: qty,
+      total,
+      gstPercent: foundItem.taxPercent,
+      totalGst: gst,
+      rateWithGst: foundItem.unitPrice * (1 + foundItem.taxPercent),
+      pricingUnit: foundItem.pricingUnit || undefined,
+    };
+
+    setLineItems((prev) => [...prev, newItem]);
+    setSelectedItemToAdd("");
+    setShowAddItem(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -463,15 +544,69 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         {/* Bill of Materials */}
         {lineItems.length > 0 && (
           <div className="border rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b">
+            <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
               <h3 className="text-sm font-semibold text-gray-700">
                 Bill of Materials ({lineItems.length} items)
               </h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddItem(!showAddItem)}
+                  className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded hover:bg-blue-100"
+                >
+                  + Add Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode(!editMode)}
+                  className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  {editMode ? '✓ Done Editing' : '✏️ Edit'}
+                </button>
+              </div>
             </div>
+
+            {/* Add Item Section */}
+            {showAddItem && (
+              <div className="bg-blue-50 px-4 py-3 border-b flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Select Item to Add
+                  </label>
+                  <SearchableSelect
+                    options={items.map(item => ({
+                      value: item.id,
+                      label: item.name,
+                      subtitle: `${item.category || 'Other'} • ${formatCurrency(item.unitPrice)}${item.pricingUnit === 'RS_PER_WATT' ? '/W' : item.pricingUnit === 'RS_PER_KW' ? '/kW' : ''} • ${(item.taxPercent * 100).toFixed(0)}% GST`,
+                    }))}
+                    value={selectedItemToAdd}
+                    onChange={setSelectedItemToAdd}
+                    placeholder="Search items..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addManualItem}
+                  disabled={!selectedItemToAdd}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddItem(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
+                    {editMode && <th className="px-2 py-2 w-10"></th>}
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Item</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Make</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Qty</th>
@@ -484,16 +619,41 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
                 <tbody className="bg-white divide-y divide-gray-200">
                   {lineItems.map((item, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
+                      {editMode && (
+                        <td className="px-2 py-2">
+                          <button
+                            type="button"
+                            onClick={() => removeLineItem(idx)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Remove item"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-sm">
                         <div className="font-medium text-gray-900">{item.itemHead}</div>
                         <div className="text-xs text-gray-500">{item.itemName}</div>
                       </td>
                       <td className="px-3 py-2 text-sm text-gray-600">{item.make}</td>
                       <td className="px-3 py-2 text-sm text-right text-gray-900">
-                        {item.quantity.toLocaleString()} {item.unit}
+                        {editMode && !item.pricingUnit?.includes('WATT') ? (
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateLineItemQty(idx, parseFloat(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-right border border-gray-300 rounded"
+                            step="0.01"
+                          />
+                        ) : (
+                          <span>{item.quantity.toLocaleString()}</span>
+                        )}
+                        {' '}{item.unit}
                       </td>
                       <td className="px-3 py-2 text-sm text-right text-gray-900">
                         {formatCurrency(item.rateWithoutGst)}
+                        {item.pricingUnit === 'RS_PER_WATT' && <div className="text-xs text-blue-600">/Watt</div>}
+                        {item.pricingUnit === 'RS_PER_KW' && <div className="text-xs text-blue-600">/kW</div>}
                       </td>
                       <td className="px-3 py-2 text-sm text-right text-gray-900">
                         {formatCurrency(item.total)}
