@@ -36,7 +36,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, title, items = [] } = body;
+    const { clientId, title, items = [], version = "1.0", brand } = body;
 
     const { db } = await import("@/lib/db");
     const itemIds = items.map((item: { itemId: string }) => item.itemId).filter(Boolean);
@@ -93,7 +93,8 @@ export async function POST(request: Request) {
         status: "DRAFT",
         versions: {
           create: {
-            version: "1.0",
+            version,
+            brand,
             isFinal: false,
             subtotal,
             marginTotal,

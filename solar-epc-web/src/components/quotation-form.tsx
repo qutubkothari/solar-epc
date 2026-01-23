@@ -35,6 +35,8 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
   const [formData, setFormData] = useState({
     clientId: "",
     title: "",
+    version: "1.0",
+    brand: "",
   });
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { itemId: "", quantity: 1 },
@@ -164,6 +166,28 @@ export function QuotationForm({ onClose, onSuccess }: QuotationFormProps) {
               className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
               placeholder="e.g., Al Qudra Villas Quotation"
             />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">Version Label</label>
+              <input
+                required
+                value={formData.version}
+                onChange={(event) => setFormData({ ...formData, version: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+                placeholder="e.g., 1.0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">Vendor / Brand</label>
+              <input
+                value={formData.brand}
+                onChange={(event) => setFormData({ ...formData, brand: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+                placeholder="e.g., Siemens, Adani"
+              />
+            </div>
           </div>
 
           <div>

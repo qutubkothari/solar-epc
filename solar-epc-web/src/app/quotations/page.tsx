@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { QuotationForm } from "@/components/quotation-form";
+import { QuotationVersionForm } from "@/components/quotation-version-form";
 import { ModalShell } from "@/components/modal-shell";
 import { formatCurrency } from "@/lib/format";
 
 type QuotationVersion = {
   id: string;
   version: string;
+  brand?: string | null;
   grandTotal: number;
   isFinal: boolean;
   subtotal: number;
@@ -38,8 +40,11 @@ export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showVersionForm, setShowVersionForm] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
+  const [compareA, setCompareA] = useState<QuotationVersion | null>(null);
+  const [compareB, setCompareB] = useState<QuotationVersion | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editData, setEditData] = useState({ title: "", status: "DRAFT" });
 
@@ -102,6 +107,21 @@ export default function QuotationsPage() {
 
   const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
   const latestVersion = selectedQuote?.versions?.[0];
+  const compareReady = Boolean(compareA && compareB);
+  const compareDiff = compareReady
+    ? Number(compareA?.grandTotal || 0) - Number(compareB?.grandTotal || 0)
+    : 0;
+
+  const handleComparePick = (version: QuotationVersion) => {
+    if (!compareA || (compareA && compareB)) {
+      setCompareA(version);
+      setCompareB(null);
+      return;
+    }
+    if (compareA && !compareB && compareA.id !== version.id) {
+      setCompareB(version);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -171,6 +191,14 @@ export default function QuotationsPage() {
             >
               Download PDF
             </button>
+            {selectedQuote && (
+              <button
+                onClick={() => setShowVersionForm(true)}
+                className="mt-2 w-full rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+              >
+                Add New Version
+              </button>
+            )}
           </div>
 
           <div className="rounded-xl border border-solar-border bg-white p-4">
@@ -179,30 +207,52 @@ export default function QuotationsPage() {
               Preserve every iteration with final approval flag.
             </p>
             <div className="mt-4 space-y-2 text-xs">
-              {quotes.length === 0 ? (
+              {!selectedQuote?.versions?.length ? (
                 <div className="text-solar-muted">No versions yet.</div>
               ) : (
-                quotes
-                  .flatMap((quote) => quote.versions)
-                  .slice(0, 3)
+                selectedQuote.versions
+                  .slice(0, 5)
                   .map((version) => (
                     <div
                       key={version.id}
                       className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
                     >
                       <span className="font-semibold text-solar-ink">
-                        {version.version} {version.isFinal ? "(Final)" : ""}
+                        {version.version} {version.brand ? `• ${version.brand}` : ""} {version.isFinal ? "(Final)" : ""}
                       </span>
                       <button
-                        onClick={() => setCompareVersion(version)}
+                        onClick={() => handleComparePick(version)}
                         className="text-solar-forest"
                       >
-                        Compare
+                        {compareA?.id === version.id
+                          ? "Selected A"
+                          : compareB?.id === version.id
+                          ? "Selected B"
+                          : "Pick"}
                       </button>
                     </div>
                   ))
               )}
             </div>
+            {compareReady && (
+              <button
+                onClick={() => setCompareVersion(compareA)}
+                className="mt-3 w-full rounded-xl bg-solar-forest py-2 text-xs font-semibold text-white"
+              >
+                Open Comparison
+              </button>
+            )}
+            {(compareA || compareB) && (
+              <button
+                onClick={() => {
+                  setCompareA(null);
+                  setCompareB(null);
+                }}
+                className="mt-2 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
+              >
+                Clear Selection
+              </button>
+            )}
           </div>
         </div>
 
@@ -295,28 +345,59 @@ export default function QuotationsPage() {
       {compareVersion && (
         <ModalShell
           title="Version Comparison"
-          subtitle={`Version ${compareVersion.version} summary`}
+          subtitle={compareReady ? "Compare two options" : `Version ${compareVersion.version} summary`}
           onClose={() => setCompareVersion(null)}
           size="md"
         >
-          <div className="space-y-2 text-sm text-solar-ink">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
+          {compareReady ? (
+            <div className="space-y-4 text-sm text-solar-ink">
+              <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
+                <p className="text-xs text-solar-muted">Option A</p>
+                <p className="text-sm font-semibold">
+                  {compareA?.version} {compareA?.brand ? `• ${compareA.brand}` : ""}
+                </p>
+                <div className="mt-2 flex justify-between">
+                  <span>Total</span>
+                  <span className="font-semibold">{formatCurrency(Number(compareA?.grandTotal || 0))}</span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
+                <p className="text-xs text-solar-muted">Option B</p>
+                <p className="text-sm font-semibold">
+                  {compareB?.version} {compareB?.brand ? `• ${compareB.brand}` : ""}
+                </p>
+                <div className="mt-2 flex justify-between">
+                  <span>Total</span>
+                  <span className="font-semibold">{formatCurrency(Number(compareB?.grandTotal || 0))}</span>
+                </div>
+              </div>
+              <div className="flex justify-between rounded-xl border border-solar-border bg-white px-4 py-3">
+                <span className="font-semibold">Difference (A - B)</span>
+                <span className={`font-semibold ${compareDiff >= 0 ? "text-solar-forest" : "text-red-600"}`}>
+                  {formatCurrency(compareDiff)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Margin</span>
-              <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+          ) : (
+            <div className="space-y-2 text-sm text-solar-ink">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Margin</span>
+                <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Grand Total</span>
+                <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Tax</span>
-              <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
-            </div>
-            <div className="flex justify-between font-semibold">
-              <span>Grand Total</span>
-              <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
-            </div>
-          </div>
+          )}
           <div className="mt-6 flex gap-2">
             <button
               onClick={() => setCompareVersion(null)}
@@ -326,6 +407,17 @@ export default function QuotationsPage() {
             </button>
           </div>
         </ModalShell>
+      )}
+
+      {showVersionForm && selectedQuote && (
+        <QuotationVersionForm
+          quotationId={selectedQuote.id}
+          onClose={() => setShowVersionForm(false)}
+          onSuccess={() => {
+            fetchQuotes();
+            setShowVersionForm(false);
+          }}
+        />
       )}
 
       {editingQuote && (

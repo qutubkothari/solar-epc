@@ -164,6 +164,7 @@ model QuotationVersion {
   id            String   @id @default(cuid())
   quotationId   String
   version       String
+  brand         String?
   isFinal       Boolean  @default(false)
   subtotal      Decimal  @default(0)
   taxTotal      Decimal  @default(0)
