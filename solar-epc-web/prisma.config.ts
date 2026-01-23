@@ -1,5 +1,5 @@
-import { defineConfig } from "prisma/config";
-
-export default defineConfig({
+const config = {
 	schema: "./prisma/schema.prisma",
-});
+};
+
+module.exports = config;
