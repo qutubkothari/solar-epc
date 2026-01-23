@@ -1,2 +1,5 @@
-// Minimal Prisma config to satisfy CLI parser.
-export default {};
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+	schema: "./prisma/schema.prisma",
+});
