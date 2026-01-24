@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ClientForm } from "@/components/client-form";
 import { ModalShell } from "@/components/modal-shell";
+import Link from "next/link";
 
 type Client = {
   id: string;
@@ -31,12 +32,27 @@ type Client = {
   accountManager?: string | null;
   status?: string | null;
   notes?: string | null;
+  lastContactDate?: string | null;
+  nextFollowupDate?: string | null;
+  followupNotes?: string | null;
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  Lead: "bg-blue-100 text-blue-800",
+  Qualified: "bg-purple-100 text-purple-800",
+  Quoted: "bg-yellow-100 text-yellow-800",
+  Approved: "bg-green-100 text-green-800",
+  "In Progress": "bg-orange-100 text-orange-800",
+  Completed: "bg-teal-100 text-teal-800",
+  Lost: "bg-red-100 text-red-800",
 };
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [followupFilter, setFollowupFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [viewClient, setViewClient] = useState<Client | null>(null);
@@ -59,21 +75,48 @@ export default function ClientsPage() {
 
   const filteredClients = useMemo(() => {
     const search = query.trim().toLowerCase();
-    if (!search) return clients;
-    return clients.filter((client) => {
-      return [
-        client.name,
-        client.contactName,
-        client.email,
-        client.phone,
-        client.mobile,
-        client.companyType,
-        client.industry,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(search));
-    });
-  }, [clients, query]);
+    let result = clients;
+    
+    // Text search
+    if (search) {
+      result = result.filter((client) => {
+        return [
+          client.name,
+          client.contactName,
+          client.email,
+          client.phone,
+          client.mobile,
+          client.companyType,
+          client.industry,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(search));
+      });
+    }
+    
+    // Status filter
+    if (statusFilter !== "all") {
+      result = result.filter((client) => client.status === statusFilter);
+    }
+    
+    // Follow-up filter
+    if (followupFilter === "due") {
+      result = result.filter((client) => {
+        if (!client.nextFollowupDate) return false;
+        return new Date(client.nextFollowupDate) <= new Date();
+      });
+    } else if (followupFilter === "upcoming") {
+      result = result.filter((client) => {
+        if (!client.nextFollowupDate) return false;
+        const followupDate = new Date(client.nextFollowupDate);
+        const today = new Date();
+        const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return followupDate > today && followupDate <= weekFromNow;
+      });
+    }
+    
+    return result;
+  }, [clients, query, statusFilter, followupFilter]);
 
   const handleDeleteClient = async (id: string) => {
     const confirmDelete = window.confirm("Delete this client?");
@@ -104,13 +147,42 @@ export default function ClientsPage() {
       />
 
       <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           <input
-            className="w-full max-w-xs rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-            placeholder="Search clients"
+            className="flex-1 min-w-[200px] rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+            placeholder="Search clients..."
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
+          
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+          >
+            <option value="all">All Status</option>
+            <option value="Lead">Lead</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Quoted">Quoted</option>
+            <option value="Approved">Approved</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Lost">Lost</option>
+          </select>
+          
+          <select
+            value={followupFilter}
+            onChange={(e) => setFollowupFilter(e.target.value)}
+            className="rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+          >
+            <option value="all">All Follow-ups</option>
+            <option value="due">Due Now</option>
+            <option value="upcoming">This Week</option>
+          </select>
+          
+          <div className="text-sm text-solar-muted">
+            {filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}
+          </div>
         </div>
 
         {loading ? (
@@ -125,60 +197,74 @@ export default function ClientsPage() {
               <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
                 <tr>
                   <th className="px-4 py-3">Company</th>
-                  <th className="px-4 py-3">Primary Contact</th>
+                  <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Follow-up</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredClients.map((client) => (
-                  <tr key={client.id} className="border-t border-solar-border">
-                    <td className="px-4 py-3 font-medium text-solar-ink">
-                      {client.name}
-                    </td>
-                    <td className="px-4 py-3 text-solar-muted">
-                      {client.contactName || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-solar-muted">
-                      {client.mobile || client.phone || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-solar-muted">
-                      {client.email || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                        {client.status || "ACTIVE"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setViewClient(client)}
-                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
-                        >
-                          View
+                {filteredClients.map((client) => {
+                  const isFollowupDue = client.nextFollowupDate && new Date(client.nextFollowupDate) <= new Date();
+                  
+                  return (
+                    <tr key={client.id} className={`border-t border-solar-border ${isFollowupDue ? 'bg-red-50' : ''}`}>
+                      <td className="px-4 py-3">
+                        <Link href={`/clients/${client.id}`} className="font-semibold text-solar-amber hover:underline">
+                          {client.name}
+                        </Link>
+                        {client.contactName && (
+                          <div className="text-xs text-solar-muted">{client.contactName}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-solar-muted text-xs">
+                        {client.email && <div>{client.email}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-solar-muted text-xs">
+                        {client.mobile || client.phone || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block rounded px-2 py-1 text-xs font-semibold ${STATUS_COLORS[client.status || 'Lead'] || 'bg-gray-100 text-gray-800'}`}>
+                          {client.status || "Lead"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {client.nextFollowupDate ? (
+                          <div className={`text-xs ${isFollowupDue ? 'text-red-600 font-semibold' : 'text-solar-muted'}`}>
+                            {isFollowupDue && '🔔 '}
+                            {new Date(client.nextFollowupDate).toLocaleDateString()}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-solar-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/clients/${client.id}`}
+                            className="text-xs text-solar-amber hover:underline"
+                          >
+                            View
+                          </Link>
+                          <button
+                            onClick={() => {
+                              setEditingClient(client);
+                              setShowForm(true);
+                            }}
+                            className="text-xs text-solar-ink hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClient(client.id)}
+                            className="text-xs text-red-600 hover:underline"
                         </button>
-                        <button
-                          onClick={() => {
-                            setEditingClient(client);
-                            setShowForm(true);
-                          }}
-                          className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(client.id)}
-                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
