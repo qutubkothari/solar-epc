@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Sanitize text for PDF - replace ₹ with Rs. and strip non-ASCII
+const sanitizeForPdf = (text: string): string => {
+  return text.replace(/₹/g, "Rs.").replace(/[^\x00-\x7F]/g, "");
+};
+
+// Format currency for PDF (uses Rs. instead of ₹)
+const formatCurrencyForPdf = (value: number): string => {
+  return `Rs. ${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+};
 
 const DOCUMENT_TEMPLATES = {
   "terms-conditions": {
@@ -116,7 +125,7 @@ async function generateAgreement(data: Record<string, unknown>) {
   y -= 16;
   const totalValue = Number(data.totalValue || 0);
   page.drawText(
-    `Total Value: ${Number.isNaN(totalValue) ? "N/A" : formatCurrency(totalValue)}`,
+    `Total Value: ${Number.isNaN(totalValue) ? "N/A" : formatCurrencyForPdf(totalValue)}`,
     { x: leftMargin, y, font, size: 10 }
   );
   y -= 40;
