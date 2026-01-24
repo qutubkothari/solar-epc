@@ -80,6 +80,9 @@ fi
 if [ -d "solar-epc-web/prisma/backups" ]; then
   cp -r solar-epc-web/prisma/backups /tmp/solar-epc-preserve/ 2>/dev/null || true
 fi
+if [ -d "solar-epc-web/public/uploads" ]; then
+  cp -r solar-epc-web/public/uploads /tmp/solar-epc-preserve/ 2>/dev/null || true
+fi
 git clean -fd
 # Restore database and backups after clean
 if [ -d "/tmp/solar-epc-preserve/prisma" ]; then
@@ -89,6 +92,10 @@ fi
 if [ -d "/tmp/solar-epc-preserve/backups" ]; then
   mkdir -p solar-epc-web/prisma
   cp -r /tmp/solar-epc-preserve/backups solar-epc-web/prisma/ 2>/dev/null || true
+fi
+if [ -d "/tmp/solar-epc-preserve/uploads" ]; then
+  mkdir -p solar-epc-web/public
+  cp -r /tmp/solar-epc-preserve/uploads solar-epc-web/public/ 2>/dev/null || true
 fi
 rm -rf /tmp/solar-epc-preserve
 GIT_TERMINAL_PROMPT=0 git pull origin {2}
