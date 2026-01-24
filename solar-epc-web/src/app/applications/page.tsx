@@ -101,9 +101,13 @@ export default function ApplicationsPage() {
         a.download = `${templateType}.pdf`;
         a.click();
         window.URL.revokeObjectURL(url);
+      } else {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to generate document: ${errorData.error || res.statusText}`);
       }
     } catch (error) {
       console.error("Failed to generate document:", error);
+      alert("Failed to generate document. Please try again.");
     } finally {
       setGenerating(null);
     }

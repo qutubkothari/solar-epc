@@ -399,20 +399,24 @@ export async function POST(request: Request) {
 
     const pdfBytes = await template.generate(templateData);
 
-    // Save the document record
-    const doc = await db.statutoryDocument.create({
-      data: {
-        inquiryId,
-        name: template.title,
-        fileUrl: `/generated/${templateType}-${inquiryId}.pdf`,
-      },
-    });
+    // Save the document record (optional - don't fail if this fails)
+    try {
+      await db.statutoryDocument.create({
+        data: {
+          inquiryId,
+          name: template.title,
+          fileUrl: `/generated/${templateType}-${inquiryId}.pdf`,
+        },
+      });
+    } catch (saveError) {
+      console.error("Failed to save document record:", saveError);
+      // Continue anyway - we still want to return the PDF
+    }
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${template.title.replace(/\s+/g, "_")}.pdf"`,
-        "X-Document-Id": doc.id,
       },
     });
   } catch (error) {
