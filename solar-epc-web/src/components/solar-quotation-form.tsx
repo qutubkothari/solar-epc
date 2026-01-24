@@ -127,9 +127,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
     const moduleItem = items.find(i => i.id === systemConfig.moduleId);
     if (moduleItem) {
       const qty = actualSystemWatts;
-      const rate = moduleItem.unitPrice;
+      const rate = Number(moduleItem.unitPrice);
       const total = qty * rate;
-      const gst = total * moduleItem.taxPercent;
+      const gst = total * Number(moduleItem.taxPercent);
       bom.push({
         itemId: moduleItem.id,
         itemName: moduleItem.name,
@@ -141,9 +141,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         rateWithoutGst: rate,
         quantity: qty,
         total,
-        gstPercent: moduleItem.taxPercent,
+        gstPercent: Number(moduleItem.taxPercent),
         totalGst: gst,
-        rateWithGst: rate * (1 + moduleItem.taxPercent),
+        rateWithGst: rate * (1 + Number(moduleItem.taxPercent)),
         pricingUnit: 'RS_PER_WATT',
       });
     }
@@ -152,9 +152,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
     const inverterItem = items.find(i => i.id === systemConfig.inverterId);
     if (inverterItem) {
       const qty = 1;
-      const rate = inverterItem.unitPrice;
+      const rate = Number(inverterItem.unitPrice);
       const baseTotal = rate; // Inverter is sold per unit, not per watt
-      const gst = baseTotal * inverterItem.taxPercent;
+      const gst = baseTotal * Number(inverterItem.taxPercent);
       bom.push({
         itemId: inverterItem.id,
         itemName: inverterItem.name,
@@ -166,9 +166,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         rateWithoutGst: rate,
         quantity: qty,
         total: baseTotal,
-        gstPercent: inverterItem.taxPercent,
+        gstPercent: Number(inverterItem.taxPercent),
         totalGst: gst,
-        rateWithGst: rate * (1 + inverterItem.taxPercent),
+        rateWithGst: rate * (1 + Number(inverterItem.taxPercent)),
         pricingUnit: 'PER_UNIT',
       });
     }
@@ -177,9 +177,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
     const structureItem = items.find(i => i.id === systemConfig.structureId);
     if (structureItem) {
       const estimatedKg = actualSystemKw * 45; // ~45 kg/kW for structure
-      const rate = structureItem.unitPrice;
+      const rate = Number(structureItem.unitPrice);
       const total = estimatedKg * rate;
-      const gst = total * structureItem.taxPercent;
+      const gst = total * Number(structureItem.taxPercent);
       bom.push({
         itemId: structureItem.id,
         itemName: structureItem.name,
@@ -191,9 +191,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         rateWithoutGst: rate,
         quantity: estimatedKg,
         total,
-        gstPercent: structureItem.taxPercent,
+        gstPercent: Number(structureItem.taxPercent),
         totalGst: gst,
-        rateWithGst: rate * (1 + structureItem.taxPercent),
+        rateWithGst: rate * (1 + Number(structureItem.taxPercent)),
       });
     }
 
@@ -211,11 +211,11 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
       const bosItem = items.find(i => i.category === bos.category);
       if (bosItem) {
         const qty = bos.qtyMultiplier;
-        const rate = bosItem.unitPrice;
+        const rate = Number(bosItem.unitPrice);
         const total = bosItem.pricingUnit === 'RS_PER_WATT' 
           ? actualSystemWatts * rate 
           : qty * rate;
-        const gst = total * bosItem.taxPercent;
+        const gst = total * Number(bosItem.taxPercent);
         bom.push({
           itemId: bosItem.id,
           itemName: bosItem.name,
@@ -227,9 +227,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
           rateWithoutGst: rate,
           quantity: qty,
           total,
-          gstPercent: bosItem.taxPercent,
+          gstPercent: Number(bosItem.taxPercent),
           totalGst: gst,
-          rateWithGst: rate * (1 + bosItem.taxPercent),
+          rateWithGst: rate * (1 + Number(bosItem.taxPercent)),
           pricingUnit: bosItem.pricingUnit || undefined,
         });
       }
@@ -239,9 +239,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
     const kwBasedItems = items.filter(i => i.pricingUnit === 'RS_PER_KW');
     kwBasedItems.forEach(kwItem => {
       const qty = actualSystemKw;
-      const rate = kwItem.unitPrice;
+      const rate = Number(kwItem.unitPrice);
       const total = qty * rate;
-      const gst = total * kwItem.taxPercent;
+      const gst = total * Number(kwItem.taxPercent);
       bom.push({
         itemId: kwItem.id,
         itemName: kwItem.name,
@@ -253,9 +253,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         rateWithoutGst: rate,
         quantity: qty,
         total,
-        gstPercent: kwItem.taxPercent,
+        gstPercent: Number(kwItem.taxPercent),
         totalGst: gst,
-        rateWithGst: rate * (1 + kwItem.taxPercent),
+        rateWithGst: rate * (1 + Number(kwItem.taxPercent)),
         pricingUnit: 'RS_PER_KW',
       });
     });
@@ -272,8 +272,8 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
   }, [systemConfig]);
 
   // Calculate totals
-  const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
-  const totalGst = lineItems.reduce((sum, item) => sum + item.totalGst, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const totalGst = lineItems.reduce((sum, item) => sum + Number(item.totalGst || 0), 0);
   const grandTotal = subtotal + totalGst;
 
   // Update line item quantity
