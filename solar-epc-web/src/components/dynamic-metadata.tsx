@@ -11,7 +11,7 @@ export function DynamicMetadata() {
 
         // Update page title
         if (settings.companyName) {
-          document.title = settings.companyName;
+          document.title = `${settings.companyName} - EPC Suite`;
         }
 
         // Update favicon
