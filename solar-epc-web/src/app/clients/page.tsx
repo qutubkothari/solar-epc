@@ -259,7 +259,9 @@ export default function ClientsPage() {
                           <button
                             onClick={() => handleDeleteClient(client.id)}
                             className="text-xs text-red-600 hover:underline"
-                        </button>
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
