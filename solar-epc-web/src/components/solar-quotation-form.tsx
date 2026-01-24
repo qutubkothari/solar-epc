@@ -43,9 +43,24 @@ type LineItem = {
 type SolarQuotationFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  // For creating new version of existing quotation
+  quotationId?: string;
+  defaultClientId?: string;
+  defaultTitle?: string;
+  defaultVersion?: string;
+  clientName?: string;
 };
 
-export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormProps) {
+export function SolarQuotationForm({ 
+  onClose, 
+  onSuccess,
+  quotationId,
+  defaultClientId,
+  defaultTitle,
+  defaultVersion,
+  clientName,
+}: SolarQuotationFormProps) {
+  const isNewVersion = Boolean(quotationId);
   const [clients, setClients] = useState<Client[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,9 +68,9 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
   
   // Form Data
   const [formData, setFormData] = useState({
-    clientId: "",
-    title: "",
-    version: "1.0",
+    clientId: defaultClientId || "",
+    title: defaultTitle || "",
+    version: defaultVersion || "1.0",
   });
 
   // Solar System Configuration
@@ -393,7 +408,12 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         })),
       };
 
-      const response = await fetch("/api/quotations", {
+      // If quotationId provided, create new version; otherwise create new quotation
+      const url = quotationId 
+        ? `/api/quotations/${quotationId}/versions`
+        : "/api/quotations";
+      
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -416,7 +436,8 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
   return (
     <ModalShell
       onClose={onClose}
-      title="New Solar EPC Quotation"
+      title={isNewVersion ? `New Version ${formData.version}` : "New Solar EPC Quotation"}
+      subtitle={isNewVersion && clientName ? `For ${clientName}` : undefined}
       size="xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -426,30 +447,55 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
           </div>
         )}
 
+        {/* Version Badge for new versions */}
+        {isNewVersion && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <span className="text-amber-600 text-lg">📋</span>
+            <div>
+              <p className="text-sm font-medium text-amber-900">Creating Version {formData.version}</p>
+              <p className="text-xs text-amber-700">
+                This will add a new version to the existing quotation. Select items and configure the system for this version.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Client & Title */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Client <span className="text-red-500">*</span>
             </label>
-            <SearchableSelect
-              options={clientOptions}
-              value={formData.clientId}
-              onChange={(value) => setFormData({ ...formData, clientId: value })}
-              placeholder="Select client..."
-            />
+            {isNewVersion ? (
+              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-gray-700">
+                {clientName || "Loading..."}
+              </div>
+            ) : (
+              <SearchableSelect
+                options={clientOptions}
+                value={formData.clientId}
+                onChange={(value) => setFormData({ ...formData, clientId: value })}
+                placeholder="Select client..."
+              />
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quotation Title <span className="text-red-500">*</span>
+              {isNewVersion ? "Quotation" : "Quotation Title"} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g., Roof Top Solar System"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
+            {isNewVersion ? (
+              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-gray-700">
+                {formData.title}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="e.g., Roof Top Solar System"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            )}
           </div>
         </div>
 

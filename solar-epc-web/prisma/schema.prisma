@@ -30,6 +30,8 @@ enum QuotationStatus {
   DRAFT
   FINAL
   APPROVED
+  WON
+  LOST
 }
 
 enum TaskStatus {

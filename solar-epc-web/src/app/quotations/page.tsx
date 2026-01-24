@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { SolarQuotationForm } from "@/components/solar-quotation-form";
-import { QuotationVersionForm } from "@/components/quotation-version-form";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
@@ -31,6 +30,7 @@ type Quotation = {
   id: string;
   title: string;
   status: string;
+  clientId: string;
   client: {
     name: string;
   };
@@ -41,8 +41,7 @@ export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showVersionForm, setShowVersionForm] = useState(false);
-  const [showVersionPrompt, setShowVersionPrompt] = useState(false);
+  const [newVersionForQuote, setNewVersionForQuote] = useState<Quotation | null>(null);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
   const [compareA, setCompareA] = useState<QuotationVersion | null>(null);
@@ -109,8 +108,11 @@ export default function QuotationsPage() {
 
   const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
   const latestVersion = selectedQuote?.versions?.[0];
-  const nextVersionLabel = (() => {
-    const versions = selectedQuote?.versions || [];
+  
+  // Calculate next version for a quotation
+  const getNextVersion = (quote: Quotation | null) => {
+    if (!quote) return "1.0";
+    const versions = quote.versions || [];
     if (versions.length === 0) return "1.0";
     const parsed = versions
       .map((v) => {
@@ -126,7 +128,9 @@ export default function QuotationsPage() {
       return acc;
     }, parsed[0]);
     return `${max.major}.${max.minor + 1}`;
-  })();
+  };
+  
+  const nextVersionLabel = newVersionForQuote ? getNextVersion(newVersionForQuote) : getNextVersion(selectedQuote);
   const quoteOptions = quotes.map((quote) => ({
     value: quote.id,
     label: quote.title,
@@ -292,13 +296,7 @@ export default function QuotationsPage() {
         subtitle="Create, version, and compare quotations with real-time pricing."
         action={
           <button
-            onClick={() => {
-              if (selectedQuote?.versions?.length) {
-                setShowVersionPrompt(true);
-              } else {
-                setShowForm(true);
-              }
-            }}
+            onClick={() => setShowForm(true)}
             className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
           >
             New Quotation
@@ -359,10 +357,10 @@ export default function QuotationsPage() {
             </button>
             {selectedQuote && (
               <button
-                onClick={() => setShowVersionForm(true)}
+                onClick={() => setNewVersionForQuote(selectedQuote)}
                 className="mt-2 w-full rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
               >
-                Add New Version
+                Create New Version ({getNextVersion(selectedQuote)})
               </button>
             )}
           </div>
@@ -651,51 +649,20 @@ export default function QuotationsPage() {
         </ModalShell>
       )}
 
-      {showVersionForm && selectedQuote && (
-        <QuotationVersionForm
-          quotationId={selectedQuote.id}
-          defaultVersion={nextVersionLabel}
-          onClose={() => setShowVersionForm(false)}
+      {/* New Version Form - uses same SolarQuotationForm with pre-filled data */}
+      {newVersionForQuote && (
+        <SolarQuotationForm
+          quotationId={newVersionForQuote.id}
+          defaultClientId={newVersionForQuote.clientId}
+          defaultTitle={newVersionForQuote.title}
+          defaultVersion={getNextVersion(newVersionForQuote)}
+          clientName={newVersionForQuote.client.name}
+          onClose={() => setNewVersionForQuote(null)}
           onSuccess={() => {
             fetchQuotes();
-            setShowVersionForm(false);
+            setNewVersionForQuote(null);
           }}
         />
-      )}
-
-      {showVersionPrompt && selectedQuote && (
-        <ModalShell
-          title="Create New Version?"
-          subtitle={`This quotation already has versions. Next version will be ${nextVersionLabel}.`}
-          onClose={() => setShowVersionPrompt(false)}
-          size="md"
-        >
-          <div className="space-y-4 text-sm text-solar-ink">
-            <p>
-              Do you want to create a new version of the selected quotation, or start a fresh quotation?
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setShowVersionPrompt(false);
-                  setShowVersionForm(true);
-                }}
-                className="flex-1 rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
-              >
-                Create Version {nextVersionLabel}
-              </button>
-              <button
-                onClick={() => {
-                  setShowVersionPrompt(false);
-                  setShowForm(true);
-                }}
-                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
-              >
-                New Quotation
-              </button>
-            </div>
-          </div>
-        </ModalShell>
       )}
 
       {editingQuote && (
@@ -724,6 +691,8 @@ export default function QuotationsPage() {
                 <option value="DRAFT">Draft</option>
                 <option value="FINAL">Final</option>
                 <option value="APPROVED">Approved</option>
+                <option value="WON">Won (Order Received)</option>
+                <option value="LOST">Lost</option>
               </select>
             </div>
             <div className="flex gap-2">

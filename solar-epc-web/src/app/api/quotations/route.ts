@@ -36,9 +36,45 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, title, items = [], version = "1.0", brand } = body;
+    const { clientId, title, items = [], version, brand } = body;
 
     const { db } = await import("@/lib/db");
+    
+    // Determine initial version based on closed quotations for this client
+    let initialVersion = version || "1.0";
+    if (!version) {
+      // Check for closed quotations (WON/LOST) for this client
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const closedQuotations = await (db.quotation.findMany as any)({
+        where: {
+          clientId,
+          status: { in: ["WON", "LOST"] },
+        },
+        include: {
+          versions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+      
+      if (closedQuotations.length > 0) {
+        // Find the highest major version among closed quotations
+        let highestMajor = 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const q of closedQuotations as any[]) {
+          const latestVersion = q.versions?.[0]?.version || "1.0";
+          const match = latestVersion.match(/^(\d+)/);
+          if (match) {
+            const major = parseInt(match[1], 10);
+            if (major > highestMajor) highestMajor = major;
+          }
+        }
+        // New quotation starts at next major version
+        initialVersion = `${highestMajor + 1}.0`;
+      }
+    }
+    
     const itemIds = items.map((item: { itemId: string }) => item.itemId).filter(Boolean);
     const itemRecords = await db.item.findMany({
       where: { id: { in: itemIds } },
@@ -93,7 +129,7 @@ export async function POST(request: Request) {
         status: "DRAFT",
         versions: {
           create: {
-            version,
+            version: initialVersion,
             brand,
             isFinal: false,
             subtotal,
