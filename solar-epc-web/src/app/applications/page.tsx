@@ -191,17 +191,29 @@ export default function ApplicationsPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr,1.5fr]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-            <h3 className="text-lg font-semibold text-solar-ink">Select Project</h3>
+            <h3 className="text-lg font-semibold text-solar-ink">Select Client Inquiry</h3>
+            <p className="text-xs text-solar-muted mt-1 mb-3">
+              Choose the client inquiry/project for document generation
+            </p>
             <select
               value={selectedInquiryId}
               onChange={(e) => setSelectedInquiryId(e.target.value)}
-              className="mt-3 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              className="w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             >
-              <option value="">Choose a project...</option>
+              <option value="">Choose a client inquiry...</option>
               {inquiries.map((inq) => (
                 <option key={inq.id} value={inq.id}>{inq.title}</option>
               ))}
             </select>
+            <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3">
+              <p className="text-xs font-semibold text-amber-900">📋 How to Use:</p>
+              <ol className="text-xs text-amber-800 mt-2 space-y-1 ml-4 list-decimal">
+                <li>Select a client inquiry from dropdown</li>
+                <li>Add application data (consumer details, system specs)</li>
+                <li>Generate statutory documents (DG NOC, Net Metering)</li>
+                <li>Generate completion docs (commissioning certificates)</li>
+              </ol>
+            </div>
           </div>
 
           {selectedApp && (
