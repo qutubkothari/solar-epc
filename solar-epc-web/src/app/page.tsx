@@ -1,7 +1,25 @@
-﻿import Link from "next/link";
+﻿"use client";
+
+import Link from "next/link";
 import { SectionHeader } from "@/components/section-header";
+import { useEffect, useState } from "react";
+
+type CompanySettings = {
+  companyName: string;
+  companyTagline?: string | null;
+  companyLogo?: string | null;
+};
 
 export default function Home() {
+  const [settings, setSettings] = useState<CompanySettings | null>(null);
+
+  useEffect(() => {
+    fetch("/api/company-settings")
+      .then((res) => res.json())
+      .then((data) => setSettings(data))
+      .catch(console.error);
+  }, []);
+
   return (
     <div className="space-y-8">
       <SectionHeader
@@ -18,9 +36,18 @@ export default function Home() {
       />
 
       <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar text-center">
-        <h3 className="text-lg font-semibold text-solar-ink">Welcome to Solar EPC</h3>
+        {settings?.companyLogo && (
+          <img
+            src={settings.companyLogo}
+            alt={settings.companyName}
+            className="h-24 mx-auto object-contain mb-4"
+          />
+        )}
+        <h3 className="text-lg font-semibold text-solar-ink">
+          {settings?.companyName || "Solar EPC"}
+        </h3>
         <p className="text-sm text-solar-muted mt-2">
-          Your complete solar project management system
+          {settings?.companyTagline || "Your complete solar project management system"}
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Link

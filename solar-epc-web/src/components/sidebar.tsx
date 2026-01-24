@@ -17,6 +17,7 @@ import {
   ScrollText,
   ChevronLeft,
   ChevronRight,
+  Palette,
 } from "lucide-react";
 
 type SidebarProps = {
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/documents", label: "Closure Pack", icon: BookOpen },
   { href: "/tasks", label: "Tasks & Reminders", icon: ListChecks },
   { href: "/tokens", label: "Client Tokens", icon: QrCode },
+  { href: "/company-branding", label: "Company Branding", icon: Palette },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
