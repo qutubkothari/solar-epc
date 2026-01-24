@@ -43,8 +43,11 @@ export async function GET(
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+    const sanitizeText = (text: string) =>
+      text.replace(/₹/g, "Rs.").replace(/[^\x00-\x7F]/g, "");
+
     const drawText = (text: string, x: number, y: number, size = 12, bold = false) => {
-      page.drawText(text, {
+      page.drawText(sanitizeText(text), {
         x,
         y,
         size,
