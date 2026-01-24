@@ -203,7 +203,11 @@ function TokenDocumentsView({
       const allDocs = [
         ...completionDocs
           .filter((d: any) => d.inquiryId === inquiryId)
-          .map((d: any) => ({ ...d, type: 'Completion Document', downloadUrl: d.fileUrl })),
+          .map((d: any) => ({
+            ...d,
+            type: 'Completion Document',
+            downloadUrl: `/api/completion-docs/${d.id}/file`,
+          })),
         ...quotations
           .filter((q: any) => q.inquiryId === inquiryId)
           .map((q: any) => ({ 

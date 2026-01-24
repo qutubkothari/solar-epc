@@ -94,7 +94,7 @@ export default function TokenAccessPage({
               .map((d: any) => ({ 
                 id: d.id, 
                 name: d.name, 
-                fileUrl: d.fileUrl,
+                fileUrl: `/api/completion-docs/${d.id}/file`,
                 type: 'Document',
                 createdAt: d.createdAt
               })),
