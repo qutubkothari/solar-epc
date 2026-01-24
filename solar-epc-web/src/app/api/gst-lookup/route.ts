@@ -12,8 +12,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Use Masters India API - free GST lookup
-    const apiUrl = `https://commonapi.mastersindia.co/commonapis/searchGSTIN?gstinNumber=${gst}`;
+    // Use GST API India - free lookup service
+    const apiUrl = `https://gstapi.charteredinfo.com/API/GSTIN/${gst}`;
     
     console.log('Fetching GST details for:', gst);
     
@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
       },
     });
 
@@ -35,18 +36,18 @@ export async function GET(request: Request) {
     const data = await response.json();
     console.log('GST API Response:', JSON.stringify(data, null, 2));
 
-    // Masters India returns: {error: false, data: {...}}
-    if (data && data.error === false && data.data) {
-      const info = data.data;
-      const addr = info.pradr?.addr || {};
+    // GST API India returns taxpayer info directly
+    if (data && data.lgnm) {
+      const pradr = data.pradr || {};
+      const addr = pradr.addr || {};
       
       return NextResponse.json({
         success: true,
         data: {
-          name: info.lgnm || info.tradeNam || '',
+          name: data.tradeNam || data.lgnm || '',
           address: addr.st || '',
           city: addr.dst || '',
-          state: addr.stcd || info.ctb || '',
+          state: addr.stcd || data.ctb || '',
           postalCode: addr.pncd || '',
         }
       });
