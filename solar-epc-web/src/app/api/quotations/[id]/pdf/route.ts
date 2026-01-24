@@ -33,6 +33,10 @@ export async function GET(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
+    if (!quotation.versions || quotation.versions.length === 0) {
+      return NextResponse.json({ error: "No versions found for this quotation" }, { status: 404 });
+    }
+
     const version = quotation.versions[0];
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595, 842]);
@@ -49,34 +53,59 @@ export async function GET(
       });
     };
 
+    // Header
     drawText("Solar EPC Quotation", 40, 800, 18, true);
     drawText(`Client: ${quotation.client.name}`, 40, 770, 12);
     drawText(`Quote: ${quotation.title}`, 40, 750, 12);
-    drawText(`Version: ${version?.version || "1.0"}`, 40, 730, 12);
+    drawText(`Version: ${version.version || "1.0"}`, 40, 730, 12);
+    if (version.brand) {
+      drawText(`Brand: ${version.brand}`, 40, 710, 12);
+    }
 
-    let y = 700;
-    drawText("Items", 40, y, 12, true);
+    let y = version.brand ? 680 : 700;
+    
+    // Table Header
+    drawText("Item", 40, y, 11, true);
+    drawText("Qty", 280, y, 11, true);
+    drawText("Rate", 340, y, 11, true);
+    drawText("Amount", 480, y, 11, true);
     y -= 20;
 
-    if (version?.items?.length) {
+    if (version.items && version.items.length > 0) {
       version.items.forEach((line) => {
-        drawText(`${line.item.name} x ${line.quantity}`, 40, y, 11);
-        drawText(`${formatCurrency(Number(line.lineTotal))}`, 420, y, 11);
-        y -= 18;
+        const itemName = line.item.name || 'Unknown Item';
+        const qty = Number(line.quantity).toFixed(2);
+        const rate = formatCurrency(Number(line.rate));
+        const total = formatCurrency(Number(line.lineTotal));
+        
+        // Truncate long item names
+        const displayName = itemName.length > 35 ? itemName.substring(0, 32) + '...' : itemName;
+        
+        drawText(displayName, 40, y, 10);
+        drawText(qty, 280, y, 10);
+        drawText(rate, 340, y, 10);
+        drawText(total, 480, y, 10);
+        y -= 16;
+        
+        // Add page if needed
+        if (y < 150) {
+          const newPage = pdfDoc.addPage([595, 842]);
+          y = 800;
+        }
       });
     } else {
       drawText("No line items recorded.", 40, y, 11);
       y -= 18;
     }
 
-    y -= 10;
-    drawText(`Subtotal: ${formatCurrency(Number(version?.subtotal || 0))}`, 40, y, 11, true);
+    y -= 20;
+    drawText(`Subtotal: ${formatCurrency(Number(version.subtotal || 0))}`, 350, y, 11, true);
     y -= 16;
-    drawText(`Margin: ${formatCurrency(Number(version?.marginTotal || 0))}`, 40, y, 11, true);
+    drawText(`Margin: ${formatCurrency(Number(version.marginTotal || 0))}`, 350, y, 11, true);
     y -= 16;
-    drawText(`Tax: ${formatCurrency(Number(version?.taxTotal || 0))}`, 40, y, 11, true);
-    y -= 16;
-    drawText(`Grand Total: ${formatCurrency(Number(version?.grandTotal || 0))}`, 40, y, 12, true);
+    drawText(`Tax: ${formatCurrency(Number(version.taxTotal || 0))}`, 350, y, 11, true);
+    y -= 20;
+    drawText(`Grand Total: ${formatCurrency(Number(version.grandTotal || 0))}`, 350, y, 14, true);
 
     const pdfBytes = await pdfDoc.save();
 
@@ -89,6 +118,9 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error generating quotation PDF:", error);
-    return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Failed to generate PDF", 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 });
   }
 }
