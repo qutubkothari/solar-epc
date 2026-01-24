@@ -25,17 +25,25 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const contentType = request.headers.get("content-type");
+    // Try to parse as FormData first (for file uploads)
+    let isFormData = false;
+    let formData: FormData | null = null;
+    
+    try {
+      formData = await request.formData();
+      isFormData = true;
+    } catch (e) {
+      // Not FormData, will try JSON
+    }
     
     // Handle file upload (FormData)
-    if (contentType?.includes("multipart/form-data")) {
-      const formData = await request.formData();
+    if (isFormData && formData) {
       const file = formData.get('file') as File;
       const inquiryId = formData.get('inquiryId') as string;
       const name = formData.get('name') as string;
 
       if (!file || !inquiryId) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        return NextResponse.json({ error: "Missing required fields: file and inquiryId" }, { status: 400 });
       }
 
       // Save file to public/uploads directory
