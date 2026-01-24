@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +25,56 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const contentType = request.headers.get("content-type");
+    
+    // Handle file upload (FormData)
+    if (contentType?.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      const inquiryId = formData.get('inquiryId') as string;
+      const name = formData.get('name') as string;
+
+      if (!file || !inquiryId) {
+        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      }
+
+      // Save file to public/uploads directory
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'documents');
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const filePath = join(uploadsDir, fileName);
+      
+      // Ensure uploads directory exists
+      const { mkdir } = await import('fs/promises');
+      try {
+        await mkdir(uploadsDir, { recursive: true });
+      } catch (e) {
+        // Directory might already exist
+      }
+      
+      await writeFile(filePath, buffer);
+      
+      // Store relative URL in database
+      const fileUrl = `/uploads/documents/${fileName}`;
+
+      const { db } = await import("@/lib/db");
+      const doc = await db.completionDocument.create({
+        data: {
+          inquiryId,
+          name: name || file.name,
+          fileUrl,
+        },
+        include: {
+          inquiry: true,
+        },
+      });
+
+      return NextResponse.json(doc);
+    } 
+    
+    // Handle JSON data (legacy support)
     const body = await request.json();
     const { inquiryId, name, fileUrl } = body;
 
@@ -41,6 +93,9 @@ export async function POST(request: Request) {
     return NextResponse.json(doc);
   } catch (error) {
     console.error("Error creating completion doc:", error);
-    return NextResponse.json({ error: "Failed to create completion doc" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Failed to create completion doc",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }

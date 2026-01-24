@@ -20,9 +20,11 @@ type CompletionDoc = {
   id: string;
   name: string;
   fileUrl: string;
+  type?: string;
   inquiry?: {
     id: string;
   };
+  createdAt?: string;
 };
 
 type CompanySettings = {
@@ -69,9 +71,11 @@ export default function TokenAccessPage({
     if (!tokenParam) return;
     const fetchData = async () => {
       try {
-        const [tokenRes, docsRes, settingsRes] = await Promise.all([
+        const [tokenRes, docsRes, quotationsRes, proposalsRes, settingsRes] = await Promise.all([
           fetch("/api/tokens"),
           fetch("/api/completion-docs"),
+          fetch("/api/quotations"),
+          fetch("/api/technical-proposals"),
           fetch("/api/company-settings"),
         ]);
         
@@ -79,9 +83,42 @@ export default function TokenAccessPage({
         const match = tokenData.find((item) => item.token === tokenParam);
         setTokenRecord(match || null);
 
-        const docsData: CompletionDoc[] = await docsRes.json();
         if (match?.inquiry?.id) {
-          setDocs(docsData.filter((doc) => doc.inquiry?.id === match.inquiry.id));
+          const completionDocs = await docsRes.json();
+          const quotations = await quotationsRes.json();
+          const proposals = await proposalsRes.json();
+          
+          const allDocs = [
+            ...completionDocs
+              .filter((d: any) => d.inquiry?.id === match.inquiry.id)
+              .map((d: any) => ({ 
+                id: d.id, 
+                name: d.name, 
+                fileUrl: d.fileUrl,
+                type: 'Document',
+                createdAt: d.createdAt
+              })),
+            ...quotations
+              .filter((q: any) => q.inquiryId === match.inquiry.id)
+              .map((q: any) => ({ 
+                id: q.id, 
+                name: q.title, 
+                fileUrl: `/api/quotations/${q.id}/pdf`,
+                type: 'Quotation',
+                createdAt: q.createdAt
+              })),
+            ...proposals
+              .filter((p: any) => p.inquiryId === match.inquiry.id)
+              .map((p: any) => ({ 
+                id: p.id, 
+                name: p.title, 
+                fileUrl: `/api/technical-proposals/${p.id}/pdf`,
+                type: 'Technical Proposal',
+                createdAt: p.createdAt
+              })),
+          ];
+          
+          setDocs(allDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         } else {
           setDocs([]);
         }
@@ -170,7 +207,7 @@ export default function TokenAccessPage({
               >
                 <div>
                   <p className="text-sm font-semibold text-solar-ink">{doc.name}</p>
-                  <p className="text-xs text-solar-muted">Completion Document</p>
+                  <p className="text-xs text-solar-muted">{doc.type || 'Document'}</p>
                 </div>
                 <a
                   href={doc.fileUrl}
@@ -178,7 +215,7 @@ export default function TokenAccessPage({
                   rel="noreferrer"
                   className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink hover:bg-solar-sky transition-colors"
                 >
-                  {tokenRecord.allowDownload ? "Open" : "View"}
+                  {tokenRecord.allowDownload ? "Download" : "View"}
                 </a>
               </div>
             ))
