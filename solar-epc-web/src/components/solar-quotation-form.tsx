@@ -153,7 +153,7 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
     if (inverterItem) {
       const qty = 1;
       const rate = inverterItem.unitPrice;
-      const baseTotal = actualSystemWatts * rate;
+      const baseTotal = rate; // Inverter is sold per unit, not per watt
       const gst = baseTotal * inverterItem.taxPercent;
       bom.push({
         itemId: inverterItem.id,
@@ -163,13 +163,13 @@ export function SolarQuotationForm({ onClose, onSuccess }: SolarQuotationFormPro
         make: inverterItem.brand || '',
         description: inverterItem.description || '',
         unit: 'Nos',
-        rateWithoutGst: baseTotal,
+        rateWithoutGst: rate,
         quantity: qty,
         total: baseTotal,
         gstPercent: inverterItem.taxPercent,
         totalGst: gst,
-        rateWithGst: baseTotal * (1 + inverterItem.taxPercent),
-        pricingUnit: 'RS_PER_WATT',
+        rateWithGst: rate * (1 + inverterItem.taxPercent),
+        pricingUnit: 'PER_UNIT',
       });
     }
 
