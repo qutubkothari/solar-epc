@@ -22,7 +22,6 @@ export async function GET(
           include: {
             versions: {
               orderBy: { createdAt: "desc" },
-              take: 1,
             },
           },
           orderBy: { createdAt: "desc" },

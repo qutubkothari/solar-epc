@@ -42,6 +42,7 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [newVersionForQuote, setNewVersionForQuote] = useState<Quotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
   const [compareA, setCompareA] = useState<QuotationVersion | null>(null);
@@ -64,12 +65,6 @@ export default function QuotationsPage() {
   useEffect(() => {
     fetchQuotes();
   }, []);
-
-  useEffect(() => {
-    if (!selectedQuoteId && quotes.length > 0) {
-      setSelectedQuoteId(quotes[0].id);
-    }
-  }, [quotes, selectedQuoteId]);
 
   useEffect(() => {
     if (editingQuote) {
@@ -106,8 +101,17 @@ export default function QuotationsPage() {
     }
   };
 
-  const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
-  const latestVersion = selectedQuote?.versions?.[0];
+  // Filter quotes by search query (client name or title)
+  const filteredQuotes = quotes.filter((quote) => {
+    if (!searchQuery) return true;
+    const search = searchQuery.toLowerCase();
+    return (
+      quote.title.toLowerCase().includes(search) ||
+      quote.client.name.toLowerCase().includes(search)
+    );
+  });
+
+  const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId);
   
   // Calculate next version for a quotation
   const getNextVersion = (quote: Quotation | null) => {
@@ -130,12 +134,6 @@ export default function QuotationsPage() {
     return `${max.major}.${max.minor + 1}`;
   };
   
-  const nextVersionLabel = newVersionForQuote ? getNextVersion(newVersionForQuote) : getNextVersion(selectedQuote);
-  const quoteOptions = quotes.map((quote) => ({
-    value: quote.id,
-    label: quote.title,
-    subtitle: quote.client.name,
-  }));
   const compareReady = Boolean(compareA && compareB);
   const compareDiff = compareReady
     ? Number(compareA?.grandTotal || 0) - Number(compareB?.grandTotal || 0)
@@ -305,135 +303,24 @@ export default function QuotationsPage() {
       />
 
       <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-          <div className="rounded-xl border border-solar-border bg-solar-sand p-4">
-            <p className="text-sm font-semibold text-solar-ink">Quote Builder</p>
-            <p className="text-xs text-solar-muted mt-1">
-              Select items, adjust margin, and generate the internal PDF.
-            </p>
-            {quotes.length > 0 && (
-              <div className="mt-4">
-                <label className="text-xs font-semibold text-solar-muted">Select Quotation</label>
-                <div className="mt-2">
-                  <SearchableSelect
-                    value={selectedQuoteId || ""}
-                    options={quoteOptions}
-                    onChange={(value) => setSelectedQuoteId(value)}
-                    placeholder="Select quotation"
-                    searchPlaceholder="Search quotations"
-                  />
-                </div>
-              </div>
-            )}
-            {selectedQuote && latestVersion && (
-              <div className="mt-4 rounded-lg bg-white p-3 border border-solar-border">
-                <div className="flex justify-between text-sm">
-                  <span className="text-solar-muted">Client</span>
-                  <span className="font-medium text-solar-ink">{selectedQuote.client.name}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-2">
-                  <span className="text-solar-muted">Latest Version</span>
-                  <span className="font-medium text-solar-ink">{latestVersion.version}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-2">
-                  <span className="text-solar-muted">Items</span>
-                  <span className="font-medium text-solar-ink">{latestVersion.items?.length || 0} items</span>
-                </div>
-                <div className="flex justify-between text-sm mt-2 pt-2 border-t border-solar-border">
-                  <span className="font-semibold text-solar-ink">Grand Total</span>
-                  <span className="font-semibold text-solar-forest">{formatCurrency(Number(latestVersion.grandTotal))}</span>
-                </div>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                if (selectedQuote) {
-                  window.open(`/api/quotations/${selectedQuote.id}/pdf`, "_blank");
-                }
-              }}
-              disabled={!selectedQuote}
-              className="mt-4 w-full rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
-            >
-              Download PDF
-            </button>
-            {selectedQuote && (
-              <button
-                onClick={() => setNewVersionForQuote(selectedQuote)}
-                className="mt-2 w-full rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
-              >
-                Create New Version ({getNextVersion(selectedQuote)})
-              </button>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-solar-border bg-white p-4">
-            <p className="text-sm font-semibold text-solar-ink">Versions</p>
-            <p className="text-xs text-solar-muted mt-1">
-              View every version and pick two to compare.
-            </p>
-            <div className="mt-4 space-y-2 text-xs max-h-80 overflow-y-auto">
-              {!selectedQuote?.versions?.length ? (
-                <div className="text-solar-muted">No versions yet.</div>
-              ) : (
-                selectedQuote.versions.map((version) => (
-                  <div
-                    key={version.id}
-                    className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
-                  >
-                    <span className="font-semibold text-solar-ink">
-                      {version.version} {version.brand ? `• ${version.brand}` : ""} {version.isFinal ? "(Final)" : ""}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCompareVersion(version)}
-                        className="text-solar-ink"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => handleComparePick(version)}
-                        className="text-solar-forest"
-                      >
-                        {compareA?.id === version.id
-                          ? "Selected A"
-                          : compareB?.id === version.id
-                          ? "Selected B"
-                          : "Pick"}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {compareReady && (
-              <button
-                onClick={() => setCompareVersion(compareA)}
-                className="mt-3 w-full rounded-xl bg-solar-forest py-2 text-xs font-semibold text-white"
-              >
-                Open Comparison
-              </button>
-            )}
-            {(compareA || compareB) && (
-              <button
-                onClick={() => {
-                  setCompareA(null);
-                  setCompareB(null);
-                }}
-                className="mt-2 w-full rounded-xl border border-solar-border bg-white py-2 text-xs font-semibold text-solar-ink"
-              >
-                Clear Selection
-              </button>
-            )}
-          </div>
+        {/* Search Bar */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search by client name or quotation title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl border border-solar-border bg-solar-sand px-4 py-2 text-sm outline-none focus:border-solar-amber"
+          />
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-xl border border-solar-border">
+        <div className="overflow-hidden rounded-xl border border-solar-border">
           <table className="w-full text-left text-sm">
             <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
               <tr>
                 <th className="px-4 py-3">Quote ID</th>
                 <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Version</th>
+                <th className="px-4 py-3">Versions</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
@@ -446,55 +333,97 @@ export default function QuotationsPage() {
                     Loading...
                   </td>
                 </tr>
-              ) : quotes.length === 0 ? (
+              ) : filteredQuotes.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-sm text-solar-muted">
-                    No quotations yet.
+                    {searchQuery ? "No quotations match your search." : "No quotations yet."}
                   </td>
                 </tr>
               ) : (
-                quotes.map((quote) => {
+                filteredQuotes.map((quote) => {
                   const latestVersion = quote.versions[0];
+                  const isExpanded = selectedQuoteId === quote.id;
                   return (
-                    <tr key={quote.id} className="border-t border-solar-border">
-                      <td className="px-4 py-3 font-medium text-solar-ink">
-                        {quote.title}
-                      </td>
-                      <td className="px-4 py-3 text-solar-muted">{quote.client.name}</td>
-                      <td className="px-4 py-3 text-solar-muted">
-                        {latestVersion?.version || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-solar-muted">
-                        {formatCurrency(Number(latestVersion?.grandTotal || 0))}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
-                          {quote.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => window.open(`/api/quotations/${quote.id}/pdf`, "_blank")}
-                            className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => setEditingQuote(quote)}
-                            className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteQuote(quote.id)}
-                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={quote.id} className="border-t border-solar-border hover:bg-solar-sand/50 cursor-pointer" onClick={() => setSelectedQuoteId(isExpanded ? null : quote.id)}>
+                        <td className="px-4 py-3 font-medium text-solar-ink">
+                          <div className="flex items-center gap-2">
+                            <span className="text-solar-muted">{isExpanded ? "▼" : "▶"}</span>
+                            {quote.title}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-solar-muted">{quote.client.name}</td>
+                        <td className="px-4 py-3 text-solar-muted">
+                          {quote.versions.length} version(s)
+                        </td>
+                        <td className="px-4 py-3 font-medium text-solar-ink">
+                          {formatCurrency(Number(latestVersion?.grandTotal || 0))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            quote.status === "WON" ? "bg-green-100 text-green-800" :
+                            quote.status === "LOST" ? "bg-red-100 text-red-800" :
+                            "bg-solar-sky text-solar-forest"
+                          }`}>
+                            {quote.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => setNewVersionForQuote(quote)}
+                              className="rounded-lg bg-solar-amber px-3 py-1 text-xs font-semibold text-white"
+                            >
+                              + Version
+                            </button>
+                            <button
+                              onClick={() => setEditingQuote(quote)}
+                              className="rounded-lg border border-solar-border bg-white px-3 py-1 text-xs font-semibold text-solar-ink"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteQuote(quote.id)}
+                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Expanded version rows */}
+                      {isExpanded && quote.versions.map((version) => (
+                        <tr key={version.id} className="bg-solar-sand/30">
+                          <td className="px-4 py-2 pl-10 text-sm text-solar-muted">
+                            └ v{version.version} {version.brand ? `• ${version.brand}` : ""} {version.isFinal ? "(Final)" : ""}
+                          </td>
+                          <td className="px-4 py-2 text-xs text-solar-muted">
+                            {version.items?.length || 0} items
+                          </td>
+                          <td className="px-4 py-2"></td>
+                          <td className="px-4 py-2 text-sm text-solar-ink">
+                            {formatCurrency(Number(version.grandTotal))}
+                          </td>
+                          <td className="px-4 py-2"></td>
+                          <td className="px-4 py-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setCompareVersion(version)}
+                                className="text-xs text-solar-forest hover:underline"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                onClick={() => window.open(`/api/quotations/${quote.id}/pdf?version=${version.id}`, "_blank")}
+                                className="text-xs text-solar-amber hover:underline"
+                              >
+                                PDF
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   );
                 })
               )}

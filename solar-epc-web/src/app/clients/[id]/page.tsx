@@ -182,23 +182,44 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           {quotationCount > 0 && (
             <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
               <h3 className="text-lg font-semibold text-solar-ink mb-4">💰 Quotations ({quotationCount})</h3>
-              <div className="space-y-2">
-                {client.quotations?.map((quot: any) => (
-                  <div key={quot.id} className="flex justify-between items-center p-3 rounded-lg bg-solar-sand hover:bg-solar-sky transition">
-                    <div>
-                      <div className="font-semibold text-sm">{quot.title}</div>
-                      <div className="text-xs text-solar-muted">
-                        {quot.versions?.length || 0} version(s)
+              <div className="space-y-3">
+                {client.quotations?.map((quot: any) => {
+                  const latestVersion = quot.versions?.[0];
+                  return (
+                    <div key={quot.id} className="rounded-lg border border-solar-border overflow-hidden">
+                      <div className="flex justify-between items-center p-3 bg-solar-sand">
+                        <div>
+                          <div className="font-semibold text-sm text-solar-ink">{quot.title}</div>
+                          <div className="text-xs text-solar-muted">
+                            {quot.versions?.length || 0} version(s) • Status: {quot.status}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-solar-forest">
+                            ₹{Number(latestVersion?.grandTotal || 0).toLocaleString()}
+                          </div>
+                          <Link
+                            href="/quotations"
+                            className="text-xs text-solar-amber hover:underline"
+                          >
+                            Open in Quotations →
+                          </Link>
+                        </div>
                       </div>
+                      {/* Version list */}
+                      {quot.versions?.length > 0 && (
+                        <div className="p-2 bg-white">
+                          {quot.versions.map((ver: any) => (
+                            <div key={ver.id} className="flex justify-between items-center px-2 py-1 text-xs text-solar-muted">
+                              <span>v{ver.version} {ver.isFinal ? "(Final)" : ""}</span>
+                              <span>₹{Number(ver.grandTotal || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <Link
-                      href={`/quotations?id=${quot.id}`}
-                      className="text-xs text-solar-amber hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
