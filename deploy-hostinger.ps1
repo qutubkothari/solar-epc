@@ -72,11 +72,29 @@ cd "{0}"
 GIT_TERMINAL_PROMPT=0 git fetch origin {2}
 git checkout {2}
 git reset --hard
+# Preserve database and backups before clean
+mkdir -p /tmp/solar-epc-preserve
+if [ -d "solar-epc-web/prisma/prisma" ]; then
+  cp -r solar-epc-web/prisma/prisma /tmp/solar-epc-preserve/ 2>/dev/null || true
+fi
+if [ -d "solar-epc-web/prisma/backups" ]; then
+  cp -r solar-epc-web/prisma/backups /tmp/solar-epc-preserve/ 2>/dev/null || true
+fi
 git clean -fd
+# Restore database and backups after clean
+if [ -d "/tmp/solar-epc-preserve/prisma" ]; then
+  mkdir -p solar-epc-web/prisma
+  cp -r /tmp/solar-epc-preserve/prisma solar-epc-web/prisma/ 2>/dev/null || true
+fi
+if [ -d "/tmp/solar-epc-preserve/backups" ]; then
+  mkdir -p solar-epc-web/prisma
+  cp -r /tmp/solar-epc-preserve/backups solar-epc-web/prisma/ 2>/dev/null || true
+fi
+rm -rf /tmp/solar-epc-preserve
 GIT_TERMINAL_PROMPT=0 git pull origin {2}
 '@ -f $REMOTE_PATH, $REPO_URL, $BRANCH
 Invoke-RemoteCommand $prepCmd
-Write-Host "Code updated on server" -ForegroundColor Green
+Write-Host "Code updated on server (database preserved)" -ForegroundColor Green
 
 Write-Host "`n[5/7] Installing Dependencies" -ForegroundColor Yellow
 $depsCmd = @'

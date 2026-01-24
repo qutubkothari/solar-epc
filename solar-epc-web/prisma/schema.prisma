@@ -107,6 +107,21 @@ model Inquiry {
   title       String
   notes       String?
   siteAddress String?
+  // GPS & Location
+  latitude    Float?
+  longitude   Float?
+  // Site Survey Data
+  buildingHeight      Float?        // in meters
+  roofArea            Float?        // in sq meters
+  roofType            String?       // Flat/Pitched/Metal/Tile
+  roofOrientation     String?       // North/South/East/West
+  sunDirection        String?       // Primary sun exposure
+  shadingObstructions String?       // Trees, buildings, chimneys
+  electricalPanelDistance Float?    // meters from proposed array
+  electricalPanelCapacity Float?    // in Amps
+  structuralNotes     String?       // Roof condition, access
+  sitePhotosCount     Int           @default(0)
+  
   status      InquiryStatus @default(NEW)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -124,12 +139,17 @@ model Inquiry {
 }
 
 model InquiryMedia {
-  id        String   @id @default(cuid())
-  inquiryId String
-  fileName  String
-  fileType  String
-  fileUrl   String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  inquiryId   String
+  fileName    String
+  fileType    String   // image/video/document
+  fileUrl     String
+  category    String?  // roof/electrical-panel/meter/obstruction/other
+  notes       String?  // Dimension notes, observations
+  latitude    Float?   // GPS location where photo was taken
+  longitude   Float?
+  takenAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   inquiry Inquiry @relation(fields: [inquiryId], references: [id])
 }

@@ -33,7 +33,24 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { clientId, title, notes, siteAddress, status } = body;
+    const { 
+      clientId, 
+      title, 
+      notes, 
+      siteAddress, 
+      status,
+      latitude,
+      longitude,
+      buildingHeight,
+      roofArea,
+      roofType,
+      roofOrientation,
+      sunDirection,
+      shadingObstructions,
+      electricalPanelDistance,
+      electricalPanelCapacity,
+      structuralNotes
+    } = body;
 
     const { db } = await import("@/lib/db");
     const inquiry = await db.inquiry.update({
@@ -44,6 +61,17 @@ export async function PUT(
         notes,
         siteAddress,
         status,
+        latitude,
+        longitude,
+        buildingHeight,
+        roofArea,
+        roofType,
+        roofOrientation,
+        sunDirection,
+        shadingObstructions,
+        electricalPanelDistance,
+        electricalPanelCapacity,
+        structuralNotes,
       },
       include: { client: true },
     });

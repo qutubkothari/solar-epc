@@ -25,7 +25,23 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, title, notes, siteAddress } = body;
+    const { 
+      clientId, 
+      title, 
+      notes, 
+      siteAddress,
+      latitude,
+      longitude,
+      buildingHeight,
+      roofArea,
+      roofType,
+      roofOrientation,
+      sunDirection,
+      shadingObstructions,
+      electricalPanelDistance,
+      electricalPanelCapacity,
+      structuralNotes
+    } = body;
 
     const { db } = await import("@/lib/db");
 
@@ -35,6 +51,17 @@ export async function POST(request: Request) {
         title,
         notes,
         siteAddress,
+        latitude,
+        longitude,
+        buildingHeight,
+        roofArea,
+        roofType,
+        roofOrientation,
+        sunDirection,
+        shadingObstructions,
+        electricalPanelDistance,
+        electricalPanelCapacity,
+        structuralNotes,
         status: "NEW",
       },
       include: {
