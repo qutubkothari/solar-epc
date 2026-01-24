@@ -55,17 +55,26 @@ export function MediaForm({ onClose, onSuccess }: MediaFormProps) {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, // Prefer back camera on mobile
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false 
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setShowCamera(true);
-      }
+      
+      setShowCamera(true);
+      
+      // Wait for next tick to ensure video element is rendered
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+        }
+      }, 100);
     } catch (error) {
       console.error("Camera access error:", error);
       setErrorMessage("Unable to access camera. Please check permissions.");
+      setShowCamera(false);
     }
   };
 
@@ -257,12 +266,19 @@ export function MediaForm({ onClose, onSuccess }: MediaFormProps) {
         {/* Camera Section */}
         {showCamera ? (
           <div className="space-y-3">
-            <div className="relative rounded-xl overflow-hidden bg-black">
+            <div className="relative rounded-xl overflow-hidden bg-black" style={{ minHeight: '400px' }}>
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className="w-full h-auto max-h-96"
+                muted
+                style={{ 
+                  width: '100%', 
+                  height: 'auto',
+                  minHeight: '400px',
+                  maxHeight: '600px',
+                  objectFit: 'cover'
+                }}
               />
             </div>
             <div className="flex gap-2">
