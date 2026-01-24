@@ -42,6 +42,7 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showVersionForm, setShowVersionForm] = useState(false);
+  const [showVersionPrompt, setShowVersionPrompt] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
   const [compareA, setCompareA] = useState<QuotationVersion | null>(null);
@@ -108,6 +109,24 @@ export default function QuotationsPage() {
 
   const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId) || quotes[0];
   const latestVersion = selectedQuote?.versions?.[0];
+  const nextVersionLabel = (() => {
+    const versions = selectedQuote?.versions || [];
+    if (versions.length === 0) return "1.0";
+    const parsed = versions
+      .map((v) => {
+        const match = String(v.version || "").match(/^(\d+)(?:\.(\d+))?/);
+        if (!match) return null;
+        return { major: Number(match[1]), minor: Number(match[2] ?? 0) };
+      })
+      .filter(Boolean) as Array<{ major: number; minor: number }>;
+    if (parsed.length === 0) return "1.1";
+    const max = parsed.reduce((acc, cur) => {
+      if (cur.major > acc.major) return cur;
+      if (cur.major === acc.major && cur.minor > acc.minor) return cur;
+      return acc;
+    }, parsed[0]);
+    return `${max.major}.${max.minor + 1}`;
+  })();
   const quoteOptions = quotes.map((quote) => ({
     value: quote.id,
     label: quote.title,
@@ -273,7 +292,13 @@ export default function QuotationsPage() {
         subtitle="Create, version, and compare quotations with real-time pricing."
         action={
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              if (selectedQuote?.versions?.length) {
+                setShowVersionPrompt(true);
+              } else {
+                setShowForm(true);
+              }
+            }}
             className="rounded-xl bg-solar-amber px-4 py-2 text-sm font-semibold text-white"
           >
             New Quotation
@@ -343,24 +368,29 @@ export default function QuotationsPage() {
           </div>
 
           <div className="rounded-xl border border-solar-border bg-white p-4">
-            <p className="text-sm font-semibold text-solar-ink">Versioning</p>
+            <p className="text-sm font-semibold text-solar-ink">Versions</p>
             <p className="text-xs text-solar-muted mt-1">
-              Preserve every iteration with final approval flag.
+              View every version and pick two to compare.
             </p>
-            <div className="mt-4 space-y-2 text-xs">
+            <div className="mt-4 space-y-2 text-xs max-h-80 overflow-y-auto">
               {!selectedQuote?.versions?.length ? (
                 <div className="text-solar-muted">No versions yet.</div>
               ) : (
-                selectedQuote.versions
-                  .slice(0, 5)
-                  .map((version) => (
-                    <div
-                      key={version.id}
-                      className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
-                    >
-                      <span className="font-semibold text-solar-ink">
-                        {version.version} {version.brand ? `• ${version.brand}` : ""} {version.isFinal ? "(Final)" : ""}
-                      </span>
+                selectedQuote.versions.map((version) => (
+                  <div
+                    key={version.id}
+                    className="flex items-center justify-between rounded-lg border border-solar-border px-3 py-2"
+                  >
+                    <span className="font-semibold text-solar-ink">
+                      {version.version} {version.brand ? `• ${version.brand}` : ""} {version.isFinal ? "(Final)" : ""}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCompareVersion(version)}
+                        className="text-solar-ink"
+                      >
+                        View
+                      </button>
                       <button
                         onClick={() => handleComparePick(version)}
                         className="text-solar-forest"
@@ -372,7 +402,8 @@ export default function QuotationsPage() {
                           : "Pick"}
                       </button>
                     </div>
-                  ))
+                  </div>
+                ))
               )}
             </div>
             {compareReady && (
@@ -623,12 +654,48 @@ export default function QuotationsPage() {
       {showVersionForm && selectedQuote && (
         <QuotationVersionForm
           quotationId={selectedQuote.id}
+          defaultVersion={nextVersionLabel}
           onClose={() => setShowVersionForm(false)}
           onSuccess={() => {
             fetchQuotes();
             setShowVersionForm(false);
           }}
         />
+      )}
+
+      {showVersionPrompt && selectedQuote && (
+        <ModalShell
+          title="Create New Version?"
+          subtitle={`This quotation already has versions. Next version will be ${nextVersionLabel}.`}
+          onClose={() => setShowVersionPrompt(false)}
+          size="md"
+        >
+          <div className="space-y-4 text-sm text-solar-ink">
+            <p>
+              Do you want to create a new version of the selected quotation, or start a fresh quotation?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowVersionPrompt(false);
+                  setShowVersionForm(true);
+                }}
+                className="flex-1 rounded-xl bg-solar-forest py-2 text-sm font-semibold text-white"
+              >
+                Create Version {nextVersionLabel}
+              </button>
+              <button
+                onClick={() => {
+                  setShowVersionPrompt(false);
+                  setShowForm(true);
+                }}
+                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
+              >
+                New Quotation
+              </button>
+            </div>
+          </div>
+        </ModalShell>
       )}
 
       {editingQuote && (
