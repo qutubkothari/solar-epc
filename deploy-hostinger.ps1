@@ -86,19 +86,35 @@ npm install
 Invoke-RemoteCommand $depsCmd
 Write-Host "Dependencies updated" -ForegroundColor Green
 
-Write-Host "`n[6/7] Prisma Setup" -ForegroundColor Yellow
+Write-Host "`n[6/7] Database Backup & Prisma Setup" -ForegroundColor Yellow
 $prismaCmd = @'
 cd "{0}"
 rm -f prisma.config.ts
 if [ ! -f .env ]; then
   echo "DATABASE_URL=file:./prisma/dev.db" > .env
 fi
+
+# Create backups directory
+mkdir -p prisma/backups
+
+# Backup existing database before any schema changes
+if [ -f prisma/prisma/dev.db ]; then
+  BACKUP_FILE="prisma/backups/dev.db.backup.$(date +%Y%m%d_%H%M%S)"
+  echo "Creating backup: $BACKUP_FILE"
+  cp prisma/prisma/dev.db "$BACKUP_FILE"
+  
+  # Keep only last 10 backups
+  ls -t prisma/backups/dev.db.backup.* 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
+  
+  echo "Backup created successfully"
+fi
+
 export PRISMA_CLIENT_ENGINE_TYPE=binary
 npx prisma generate
-npx prisma migrate deploy || npx prisma db push
+npx prisma db push
 '@ -f $APP_PATH
 Invoke-RemoteCommand $prismaCmd
-Write-Host "Prisma updated" -ForegroundColor Green
+Write-Host "Database backed up and Prisma updated" -ForegroundColor Green
 
 Write-Host "`n[7/7] Build and Restart" -ForegroundColor Yellow
 $restartCmd = @'

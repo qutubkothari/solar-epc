@@ -72,11 +72,11 @@ export function SearchableSelect({
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
         className={clsx(
-          "flex w-full items-center justify-between rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm text-left",
-          disabled && "opacity-60 cursor-not-allowed"
+          "flex w-full items-center justify-between rounded-xl border border-solar-border bg-white px-3 py-2 text-sm text-left shadow-sm hover:border-solar-amber transition-colors",
+          disabled && "opacity-60 cursor-not-allowed bg-gray-100"
         )}
       >
-        <span className={clsx(!selected && "text-solar-muted")}>
+        <span className={clsx(!selected && "text-gray-500")}>
           {selected ? selected.label : placeholder}
         </span>
         <span className="text-solar-muted">▾</span>
