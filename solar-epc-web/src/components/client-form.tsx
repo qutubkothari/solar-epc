@@ -37,7 +37,6 @@ type ClientFormProps = {
 
 export function ClientForm({ onClose, onSuccess, clientId, initialData }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
-  const [gstLoading, setGstLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
@@ -149,49 +148,15 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
               </div>
               <div>
                 <label className="block text-sm font-semibold text-solar-ink">GST Number</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formData.taxId}
-                    onChange={(e) => setFormData({ ...formData, taxId: e.target.value.toUpperCase() })}
-                    onBlur={async (e) => {
-                      const gst = e.target.value.trim();
-                      if (gst && gst.length === 15 && !clientId) {
-                        setGstLoading(true);
-                        try {
-                          const response = await fetch(`/api/gst-lookup?gst=${encodeURIComponent(gst)}`);
-                          const result = await response.json();
-                          
-                          if (result.success && result.data) {
-                            setFormData(prev => ({
-                              ...prev,
-                              name: prev.name || result.data.name || '',
-                              address: prev.address || result.data.address || '',
-                              city: prev.city || result.data.city || '',
-                              state: prev.state || result.data.state || '',
-                              postalCode: prev.postalCode || result.data.postalCode || '',
-                            }));
-                          } else {
-                            console.log('GST lookup returned no data:', result.error);
-                          }
-                        } catch (err) {
-                          console.log('GST lookup failed:', err);
-                        } finally {
-                          setGstLoading(false);
-                        }
-                      }
-                    }}
-                    className="mt-1 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm outline-none pr-10"
-                    placeholder="22AAAAA0000A1Z5"
-                    maxLength={15}
-                  />
-                  {gstLoading && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-solar-amber border-t-transparent"></div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-solar-muted mt-1">Auto-fills company details on blur</p>
+                <input
+                  type="text"
+                  value={formData.taxId}
+                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value.toUpperCase() })}
+                  className="mt-1 w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm outline-none"
+                  placeholder="22AAAAA0000A1Z5"
+                  maxLength={15}
+                />
+                <p className="text-xs text-solar-muted mt-1">15-digit GST identification number</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-solar-ink">Registration No.</label>
