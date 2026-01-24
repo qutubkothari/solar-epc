@@ -325,25 +325,26 @@ export default function QuotationsPage() {
                 </div>
               </div>
             )}
-            <div className="mt-4 space-y-2 text-xs text-solar-muted">
-              {latestVersion?.items?.length ? (
-                latestVersion.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2"
-                  >
-                    <span>
-                      {item.item.name} x {item.quantity}
-                    </span>
-                    <span>{formatCurrency(Number(item.lineTotal))}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-lg bg-white px-3 py-2 text-solar-muted">
-                  No line items yet. Add items when creating a quotation.
+            {selectedQuote && latestVersion && (
+              <div className="mt-4 rounded-lg bg-white p-3 border border-solar-border">
+                <div className="flex justify-between text-sm">
+                  <span className="text-solar-muted">Client</span>
+                  <span className="font-medium text-solar-ink">{selectedQuote.client.name}</span>
                 </div>
-              )}
-            </div>
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-solar-muted">Latest Version</span>
+                  <span className="font-medium text-solar-ink">{latestVersion.version}</span>
+                </div>
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-solar-muted">Items</span>
+                  <span className="font-medium text-solar-ink">{latestVersion.items?.length || 0} items</span>
+                </div>
+                <div className="flex justify-between text-sm mt-2 pt-2 border-t border-solar-border">
+                  <span className="font-semibold text-solar-ink">Grand Total</span>
+                  <span className="font-semibold text-solar-forest">{formatCurrency(Number(latestVersion.grandTotal))}</span>
+                </div>
+              </div>
+            )}
             <button
               onClick={() => {
                 if (selectedQuote) {
@@ -619,22 +620,54 @@ export default function QuotationsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-2 text-sm text-solar-ink">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
+            <div className="space-y-4 text-sm text-solar-ink">
+              {/* Items Table */}
+              <div className="overflow-hidden rounded-xl border border-solar-border">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-solar-sand text-[11px] uppercase tracking-wider text-solar-muted">
+                    <tr>
+                      <th className="px-3 py-2">Item</th>
+                      <th className="px-3 py-2 text-right">Qty</th>
+                      <th className="px-3 py-2 text-right">Rate</th>
+                      <th className="px-3 py-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compareVersion.items?.length ? (
+                      compareVersion.items.map((item) => (
+                        <tr key={item.id} className="border-t border-solar-border">
+                          <td className="px-3 py-2 text-solar-ink">{item.item.name}</td>
+                          <td className="px-3 py-2 text-right text-solar-muted">{Number(item.quantity)}</td>
+                          <td className="px-3 py-2 text-right text-solar-muted">{formatCurrency(Number(item.lineTotal) / Number(item.quantity))}</td>
+                          <td className="px-3 py-2 text-right font-medium text-solar-ink">{formatCurrency(Number(item.lineTotal))}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-3 text-center text-solar-muted">No items</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div className="flex justify-between">
-                <span>Margin</span>
-                <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Grand Total</span>
-                <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
+              {/* Totals */}
+              <div className="rounded-xl border border-solar-border bg-solar-sand p-3 space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Margin</span>
+                  <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax (GST)</span>
+                  <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-solar-forest pt-2 border-t border-solar-border">
+                  <span>Grand Total</span>
+                  <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
+                </div>
               </div>
             </div>
           )}
