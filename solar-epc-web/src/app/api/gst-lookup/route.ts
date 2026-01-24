@@ -12,14 +12,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Use the most reliable free GST API
-    const apiUrl = `https://appyflow.in/verifyGST?gstNo=${gst}&key_secret=OnlyForTesting`;
+    // Use Masters India API - free GST lookup
+    const apiUrl = `https://commonapi.mastersindia.co/commonapis/searchGSTIN?gstinNumber=${gst}`;
+    
+    console.log('Fetching GST details for:', gst);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
       },
     });
 
@@ -34,28 +35,19 @@ export async function GET(request: Request) {
     const data = await response.json();
     console.log('GST API Response:', JSON.stringify(data, null, 2));
 
-    // Check for successful response
-    if (data && data.taxpayerInfo) {
-      const info = data.taxpayerInfo;
-      const pradr = info.pradr || {};
+    // Masters India returns: {error: false, data: {...}}
+    if (data && data.error === false && data.data) {
+      const info = data.data;
+      const addr = info.pradr?.addr || {};
       
-      // Build address string
-      let addressParts = [];
-      if (pradr.bno) addressParts.push(pradr.bno);
-      if (pradr.bnm) addressParts.push(pradr.bnm);
-      if (pradr.st) addressParts.push(pradr.st);
-      if (pradr.loc) addressParts.push(pradr.loc);
-      
-      const address = addressParts.join(', ');
-
       return NextResponse.json({
         success: true,
         data: {
-          name: info.tradeNam || info.lgnm || '',
-          address: address || '',
-          city: pradr.dst || '',
-          state: pradr.stcd || info.stjCd || '',
-          postalCode: pradr.pncd || '',
+          name: info.lgnm || info.tradeNam || '',
+          address: addr.st || '',
+          city: addr.dst || '',
+          state: addr.stcd || info.ctb || '',
+          postalCode: addr.pncd || '',
         }
       });
     }
