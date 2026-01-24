@@ -206,7 +206,7 @@ async function generateAuthorization(data: Record<string, unknown>) {
   y -= 18;
   page.drawText(`${data.clientName || "[Client Name]"}`, { x: leftMargin, y, font, size: 11 });
   y -= 16;
-  page.drawText(`ID/Emirates ID: _______________`, { x: leftMargin, y, font, size: 11 });
+  page.drawText(`Aadhaar/PAN: _______________`, { x: leftMargin, y, font, size: 11 });
 
   return pdfDoc.save();
 }
