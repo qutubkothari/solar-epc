@@ -76,23 +76,41 @@ export async function POST(
     );
     const grandTotal = subtotal + marginTotal + taxTotal;
 
-    const quotationVersion = await db.quotationVersion.create({
-      data: {
-        quotationId: id,
-        version,
-        brand,
-        isFinal,
-        subtotal,
-        marginTotal,
-        taxTotal,
-        grandTotal,
-        items: {
-          create: lineItems,
+    const quotationVersion = await db.$transaction(async (tx) => {
+      if (isFinal) {
+        await tx.quotationVersion.updateMany({
+          where: { quotationId: id },
+          data: { isFinal: false },
+        });
+      }
+
+      const createdVersion = await tx.quotationVersion.create({
+        data: {
+          quotationId: id,
+          version,
+          brand,
+          isFinal,
+          subtotal,
+          marginTotal,
+          taxTotal,
+          grandTotal,
+          items: {
+            create: lineItems,
+          },
         },
-      },
-      include: {
-        items: { include: { item: true } },
-      },
+        include: {
+          items: { include: { item: true } },
+        },
+      });
+
+      if (isFinal) {
+        await tx.quotation.update({
+          where: { id },
+          data: { finalVersionId: createdVersion.id },
+        });
+      }
+
+      return createdVersion;
     });
 
     return NextResponse.json(quotationVersion);

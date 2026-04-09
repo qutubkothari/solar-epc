@@ -16,14 +16,17 @@ type Asset = {
   };
 };
 
-type Inquiry = {
-  id: string;
-  title: string;
+type ProjectOption = {
+  inquiryId: string;
+  inquiryTitle: string;
+  clientName: string;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationVersionLabel?: string | null;
 };
 
 export default function ExecutionPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -47,11 +50,13 @@ export default function ExecutionPage() {
 
   useEffect(() => {
     fetchAssets();
-    fetch("/api/inquiries")
+    fetch("/api/project-options")
       .then((res) => res.json())
-      .then((data) => setInquiries(data))
-      .catch(() => setInquiries([]));
+      .then((data) => setProjects(data || []))
+      .catch(() => setProjects([]));
   }, []);
+
+  const selectedProject = projects.find((project) => project.inquiryId === quickInquiryId);
 
   const handleQuickSave = async () => {
     if (!quickSerial || !quickInquiryId) return;
@@ -135,12 +140,18 @@ export default function ExecutionPage() {
               className="w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             >
               <option value="">Select inquiry</option>
-              {inquiries.map((inquiry) => (
-                <option key={inquiry.id} value={inquiry.id}>
-                  {inquiry.title}
+              {projects.map((project) => (
+                <option key={project.inquiryId} value={project.inquiryId}>
+                  {project.clientName} • {project.inquiryTitle}
+                  {project.quotationVersionLabel ? ` • ${project.quotationStage === "FINAL" ? "Final" : "Latest"} v${project.quotationVersionLabel}` : ""}
                 </option>
               ))}
             </select>
+            {selectedProject?.quotationVersionLabel && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                Capturing serials for {selectedProject.quotationStage === "FINAL" ? "final" : "latest"} quotation version v{selectedProject.quotationVersionLabel}.
+              </div>
+            )}
             <input
               value={quickSerial}
               onChange={(event) => setQuickSerial(event.target.value)}

@@ -12,6 +12,7 @@ export async function GET() {
       },
       include: {
         client: true,
+        inquiry: true,
         versions: {
           orderBy: {
             createdAt: "desc",
@@ -36,7 +37,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, title, items = [], version, brand } = body;
+    const { clientId, inquiryId, title, items = [], version, brand } = body;
 
     const { db } = await import("@/lib/db");
     
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
     const quotation = await db.quotation.create({
       data: {
         clientId,
+        inquiryId: inquiryId || null,
         title,
         status: "DRAFT",
         versions: {
@@ -151,6 +153,7 @@ export async function POST(request: Request) {
       },
       include: {
         client: true,
+        inquiry: true,
         versions: {
           include: {
             items: {

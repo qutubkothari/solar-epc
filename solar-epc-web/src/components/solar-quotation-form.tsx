@@ -19,6 +19,12 @@ type Client = {
   name: string;
 };
 
+type Inquiry = {
+  id: string;
+  title: string;
+  clientId: string;
+};
+
 type BoqDraftRow = {
   sequence: number;
   itemHead: string;
@@ -49,9 +55,11 @@ type SolarQuotationFormProps = {
   onSuccess: () => void;
   quotationId?: string;
   defaultClientId?: string;
+  defaultInquiryId?: string;
   defaultTitle?: string;
   defaultVersion?: string;
   clientName?: string;
+  inquiryTitle?: string;
 };
 
 const createInitialRows = (): BoqDraftRow[] =>
@@ -68,17 +76,21 @@ export function SolarQuotationForm({
   onSuccess,
   quotationId,
   defaultClientId,
+  defaultInquiryId,
   defaultTitle,
   defaultVersion,
   clientName,
+  inquiryTitle,
 }: SolarQuotationFormProps) {
   const isNewVersion = Boolean(quotationId);
   const [clients, setClients] = useState<Client[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [items, setItems] = useState<SolarBoqItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     clientId: defaultClientId || "",
+    inquiryId: defaultInquiryId || "",
     title: defaultTitle || "",
     version: defaultVersion || "1.0",
     brand: "",
@@ -94,6 +106,10 @@ export function SolarQuotationForm({
       .then((res) => res.json())
       .then((data) => setClients(data))
       .catch(() => setClients([]));
+    fetch("/api/inquiries")
+      .then((res) => res.json())
+      .then((data) => setInquiries(data))
+      .catch(() => setInquiries([]));
     fetch("/api/items")
       .then((res) => res.json())
       .then((data) => setItems(data))
@@ -104,6 +120,48 @@ export function SolarQuotationForm({
     value: client.id,
     label: client.name,
   }));
+
+  const inquiryOptions = inquiries
+    .filter((inquiry) => !formData.clientId || inquiry.clientId === formData.clientId)
+    .map((inquiry) => ({
+      value: inquiry.id,
+      label: inquiry.title,
+    }));
+
+  useEffect(() => {
+    if (!formData.clientId || !formData.inquiryId) {
+      return;
+    }
+
+    const inquiry = inquiries.find((entry) => entry.id === formData.inquiryId);
+    if (inquiry && inquiry.clientId !== formData.clientId) {
+      setFormData((prev) => ({ ...prev, inquiryId: "" }));
+    }
+  }, [formData.clientId, formData.inquiryId, inquiries]);
+
+  useEffect(() => {
+    if (!formData.inquiryId) {
+      return;
+    }
+
+    const inquiry = inquiries.find((entry) => entry.id === formData.inquiryId);
+    if (!inquiry) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const nextClientId = prev.clientId || inquiry.clientId;
+      const nextTitle = prev.title || inquiry.title;
+      if (nextClientId === prev.clientId && nextTitle === prev.title) {
+        return prev;
+      }
+      return {
+        ...prev,
+        clientId: nextClientId,
+        title: nextTitle,
+      };
+    });
+  }, [formData.inquiryId, inquiries]);
 
   const systemCapacityWatts = systemConfig.systemCapacityKw * 1000;
   const safeModuleWattage = Math.max(systemConfig.moduleWattage || 1, 1);
@@ -287,6 +345,7 @@ export function SolarQuotationForm({
     try {
       const payload = {
         clientId: formData.clientId,
+        inquiryId: formData.inquiryId || null,
         title: formData.title,
         version: formData.version,
         brand: formData.brand,
@@ -363,6 +422,24 @@ export function SolarQuotationForm({
               />
             )}
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Inquiry / Project</label>
+            {isNewVersion ? (
+              <div className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+                {inquiryTitle || "Not linked"}
+              </div>
+            ) : (
+              <SearchableSelect
+                options={inquiryOptions}
+                value={formData.inquiryId}
+                onChange={(value) => setFormData((prev) => ({ ...prev, inquiryId: value }))}
+                placeholder="Select inquiry..."
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               {isNewVersion ? "Quotation" : "Quotation Title"} <span className="text-red-500">*</span>

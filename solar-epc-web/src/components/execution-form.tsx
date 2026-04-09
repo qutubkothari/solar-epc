@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 
-type Inquiry = {
-  id: string;
-  title: string;
+type ProjectOption = {
+  inquiryId: string;
+  inquiryTitle: string;
+  clientName: string;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationVersionLabel?: string | null;
 };
 
 type ExecutionFormProps = {
@@ -20,7 +23,7 @@ type ExecutionFormProps = {
 };
 
 export function ExecutionForm({ onClose, onSuccess, assetId, initialData }: ExecutionFormProps) {
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -30,10 +33,10 @@ export function ExecutionForm({ onClose, onSuccess, assetId, initialData }: Exec
   });
 
   useEffect(() => {
-    fetch("/api/inquiries")
+    fetch("/api/project-options")
       .then((res) => res.json())
-      .then((data) => setInquiries(data))
-      .catch(() => setInquiries([]));
+      .then((data) => setProjects(data || []))
+      .catch(() => setProjects([]));
   }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -79,13 +82,20 @@ export function ExecutionForm({ onClose, onSuccess, assetId, initialData }: Exec
               className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             >
               <option value="">Select inquiry</option>
-              {inquiries.map((inquiry) => (
-                <option key={inquiry.id} value={inquiry.id}>
-                  {inquiry.title}
+              {projects.map((project) => (
+                <option key={project.inquiryId} value={project.inquiryId}>
+                  {project.clientName} • {project.inquiryTitle}
+                  {project.quotationVersionLabel ? ` • ${project.quotationStage === "FINAL" ? "Final" : "Latest"} v${project.quotationVersionLabel}` : ""}
                 </option>
               ))}
             </select>
           </div>
+
+          {projects.find((project) => project.inquiryId === formData.inquiryId)?.quotationVersionLabel && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              Linked quotation available for this project.
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>

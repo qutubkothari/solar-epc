@@ -25,6 +25,7 @@ type Quotation = {
   id: string;
   title: string;
   clientId: string;
+  inquiryId?: string | null;
   versions: {
     id: string;
     version: string;
@@ -138,12 +139,12 @@ export function TechnicalProposalForm({
   const [preparedBy, setPreparedBy] = useState((initialData?.preparedBy as string) || "Technical Team");
   const [contactPerson, setContactPerson] = useState((initialData?.contactPerson as string) || "Sales Manager");
   const [contactPhone, setContactPhone] = useState((initialData?.contactPhone as string) || "+91 ");
-  const [contactEmail, setContactEmail] = useState((initialData?.contactEmail as string) || "sales@solarepc.com");
-  const [companyName, setCompanyName] = useState((initialData?.companyName as string) || "Solar EPC Solutions");
-  const [companyLogo, setCompanyLogo] = useState((initialData?.companyLogo as string) || "");
-  const [clientLogo, setClientLogo] = useState((initialData?.clientLogo as string) || "");
-  const [introText, setIntroText] = useState((initialData?.introText as string) || "We are pleased to present this comprehensive technical proposal for the installation of a Solar Photovoltaic (PV) system. This proposal outlines the complete system design, equipment specifications, financial analysis, and expected performance of the proposed solar power plant.");
-  const [scopeOfWork, setScopeOfWork] = useState((initialData?.scopeOfWork as string) || "1. Site Survey and Technical Assessment\n2. System Design and Engineering\n3. Procurement of Equipment and Materials\n4. Civil and Structural Works\n5. Electrical Installation and Wiring\n6. Grid Synchronization and Net Metering\n7. Testing and Commissioning\n8. Training and Documentation\n9. Handover to Client\n10. Warranty and AMC Support");
+  const [contactEmail] = useState((initialData?.contactEmail as string) || "sales@solarepc.com");
+  const [companyName] = useState((initialData?.companyName as string) || "Solar EPC Solutions");
+  const [companyLogo] = useState((initialData?.companyLogo as string) || "");
+  const [clientLogo] = useState((initialData?.clientLogo as string) || "");
+  const [introText] = useState((initialData?.introText as string) || "We are pleased to present this comprehensive technical proposal for the installation of a Solar Photovoltaic (PV) system. This proposal outlines the complete system design, equipment specifications, financial analysis, and expected performance of the proposed solar power plant.");
+  const [scopeOfWork] = useState((initialData?.scopeOfWork as string) || "1. Site Survey and Technical Assessment\n2. System Design and Engineering\n3. Procurement of Equipment and Materials\n4. Civil and Structural Works\n5. Electrical Installation and Wiring\n6. Grid Synchronization and Net Metering\n7. Testing and Commissioning\n8. Training and Documentation\n9. Handover to Client\n10. Warranty and AMC Support");
 
   // Step 2: Existing Usage Data
   const [sanctionedLoad, setSanctionedLoad] = useState((initialData?.sanctionedLoad as string) || "");
@@ -216,9 +217,16 @@ export function TechnicalProposalForm({
   }, [clientId, inquiries]);
 
   const filteredQuotations = useMemo(() => {
-    if (!clientId) return quotations;
-    return quotations.filter((q) => q.clientId === clientId);
-  }, [clientId, quotations]);
+    return quotations.filter((q) => {
+      if (clientId && q.clientId !== clientId) {
+        return false;
+      }
+      if (inquiryId && q.inquiryId && q.inquiryId !== inquiryId) {
+        return false;
+      }
+      return true;
+    });
+  }, [clientId, inquiryId, quotations]);
 
   const selectedQuotation = useMemo(() => {
     return quotations.find((q) => q.id === selectedQuotationId);
@@ -228,6 +236,29 @@ export function TechnicalProposalForm({
     if (!selectedQuotation) return [];
     return selectedQuotation.versions || [];
   }, [selectedQuotation]);
+
+  useEffect(() => {
+    if (!selectedQuotationId) {
+      return;
+    }
+
+    const matchingQuotation = filteredQuotations.find((entry) => entry.id === selectedQuotationId);
+    if (!matchingQuotation) {
+      setSelectedQuotationId("");
+      setSelectedVersionId("");
+    }
+  }, [filteredQuotations, selectedQuotationId]);
+
+  useEffect(() => {
+    if (!selectedQuotation) {
+      return;
+    }
+
+    const preferredVersion = selectedQuotation.versions.find((entry) => entry.isFinal) || selectedQuotation.versions[0];
+    if (preferredVersion && !selectedVersionId) {
+      setSelectedVersionId(preferredVersion.id);
+    }
+  }, [selectedQuotation, selectedVersionId]);
 
   // Import quotation data when version is selected
   useEffect(() => {

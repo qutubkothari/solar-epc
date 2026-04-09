@@ -22,6 +22,8 @@ type ApplicationData = {
     systemCapacity?: string;
     panelCount?: string;
     inverterCapacity?: string;
+    quotationVersionLabel?: string;
+    quotationTitle?: string;
   };
   client?: {
     name: string;
@@ -33,9 +35,17 @@ type ApplicationData = {
   createdAt: string;
 };
 
-type Inquiry = {
-  id: string;
-  title: string;
+type ProjectOption = {
+  inquiryId: string;
+  inquiryTitle: string;
+  clientName: string;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationTitle?: string | null;
+  quotationVersionLabel?: string | null;
+  quotationGrandTotal?: number | null;
+  systemCapacityKw?: number | null;
+  panelCount?: number | null;
+  inverterCapacityKw?: number | null;
 };
 
 type Template = {
@@ -45,7 +55,7 @@ type Template = {
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationData[]>([]);
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [statutoryTemplates, setStatutoryTemplates] = useState<Template[]>([]);
   const [completionTemplates, setCompletionTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +69,7 @@ export default function ApplicationsPage() {
     try {
       const [appRes, inqRes, statRes, compRes] = await Promise.all([
         fetch("/api/application-data"),
-        fetch("/api/inquiries"),
+        fetch("/api/project-options"),
         fetch("/api/statutory-docs/generate"),
         fetch("/api/completion-docs/generate"),
       ]);
@@ -70,7 +80,7 @@ export default function ApplicationsPage() {
         compRes.json(),
       ]);
       setApplications(appData);
-      setInquiries(inqData);
+      setProjects(inqData);
       setStatutoryTemplates(statData.templates || []);
       setCompletionTemplates(compData.templates || []);
     } catch (error) {
@@ -166,6 +176,7 @@ export default function ApplicationsPage() {
   };
 
   const selectedApp = applications.find((a) => a.inquiry?.id === selectedInquiryId);
+  const selectedProject = projects.find((project) => project.inquiryId === selectedInquiryId);
 
   const handleDeleteApplication = async (id: string) => {
     const confirmDelete = window.confirm("Delete this application data?");
@@ -205,8 +216,11 @@ export default function ApplicationsPage() {
               className="w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
             >
               <option value="">Choose a client inquiry...</option>
-              {inquiries.map((inq) => (
-                <option key={inq.id} value={inq.id}>{inq.title}</option>
+              {projects.map((project) => (
+                <option key={project.inquiryId} value={project.inquiryId}>
+                  {project.clientName} • {project.inquiryTitle}
+                  {project.quotationVersionLabel ? ` • ${project.quotationStage === "FINAL" ? "Final" : "Latest"} v${project.quotationVersionLabel}` : ""}
+                </option>
               ))}
             </select>
             <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3">
@@ -228,6 +242,17 @@ export default function ApplicationsPage() {
                 <div className="flex justify-between"><span className="text-solar-muted">Consumer No:</span><span className="font-semibold">{selectedApp.data.consumerNumber || "N/A"}</span></div>
                 <div className="flex justify-between"><span className="text-solar-muted">System:</span><span className="font-semibold">{selectedApp.data.systemCapacity || "N/A"} kW</span></div>
                 <div className="flex justify-between"><span className="text-solar-muted">Panels:</span><span className="font-semibold">{selectedApp.data.panelCount || "N/A"}</span></div>
+              </div>
+            </div>
+          )}
+
+          {selectedProject?.quotationVersionLabel && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-solar">
+              <h3 className="text-lg font-semibold text-emerald-900">Linked Quotation</h3>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-emerald-800/70">Quotation</span><span className="font-semibold">{selectedProject.quotationTitle || "Quotation"}</span></div>
+                <div className="flex justify-between"><span className="text-emerald-800/70">Version</span><span className="font-semibold">{selectedProject.quotationStage === "FINAL" ? "Final" : "Latest"} v{selectedProject.quotationVersionLabel}</span></div>
+                <div className="flex justify-between"><span className="text-emerald-800/70">System</span><span className="font-semibold">{selectedProject.systemCapacityKw || "N/A"} kW</span></div>
               </div>
             </div>
           )}
@@ -288,7 +313,12 @@ export default function ApplicationsPage() {
               <tbody>
                 {applications.map((app) => (
                   <tr key={app.id} className="border-b border-solar-border/50">
-                    <td className="py-3">{app.inquiry?.title || "Unassigned"}</td>
+                    <td className="py-3">
+                      <div>{app.inquiry?.title || "Unassigned"}</div>
+                      {app.data.quotationVersionLabel && (
+                        <div className="text-xs text-solar-muted">{app.data.quotationTitle || "Quotation"} • v{app.data.quotationVersionLabel}</div>
+                      )}
+                    </td>
                     <td className="py-3">{app.data.applicantName || "N/A"}</td>
                     <td className="py-3">{app.data.systemCapacity || "N/A"} kW</td>
                     <td className="py-3 text-solar-muted">{new Date(app.createdAt).toLocaleDateString()}</td>

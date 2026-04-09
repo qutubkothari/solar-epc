@@ -10,13 +10,43 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { title, status } = body;
+    const { title, status, inquiryId, finalVersionId } = body;
 
     const { db } = await import("@/lib/db");
-    const quotation = await db.quotation.update({
-      where: { id },
-      data: { title, status },
-      include: { client: true },
+    const quotation = await db.$transaction(async (tx) => {
+      if (finalVersionId) {
+        const version = await tx.quotationVersion.findFirst({
+          where: {
+            id: finalVersionId,
+            quotationId: id,
+          },
+        });
+
+        if (!version) {
+          throw new Error("Final version does not belong to this quotation");
+        }
+
+        await tx.quotationVersion.updateMany({
+          where: { quotationId: id },
+          data: { isFinal: false },
+        });
+
+        await tx.quotationVersion.update({
+          where: { id: finalVersionId },
+          data: { isFinal: true },
+        });
+      }
+
+      return tx.quotation.update({
+        where: { id },
+        data: {
+          title: title ?? undefined,
+          status: status ?? undefined,
+          inquiryId: inquiryId === undefined ? undefined : inquiryId || null,
+          finalVersionId: finalVersionId ?? undefined,
+        },
+        include: { client: true, inquiry: true },
+      });
     });
 
     return NextResponse.json(quotation);

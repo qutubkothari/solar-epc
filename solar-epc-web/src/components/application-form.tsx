@@ -8,9 +8,22 @@ type Client = {
   name: string;
 };
 
-type Inquiry = {
-  id: string;
-  title: string;
+type ProjectOption = {
+  inquiryId: string;
+  inquiryTitle: string;
+  clientId: string;
+  clientName: string;
+  clientEmail?: string | null;
+  clientPhone?: string | null;
+  clientAddress?: string | null;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationId?: string | null;
+  quotationTitle?: string | null;
+  quotationVersionId?: string | null;
+  quotationVersionLabel?: string | null;
+  systemCapacityKw?: number | null;
+  panelCount?: number | null;
+  inverterCapacityKw?: number | null;
 };
 
 type ApplicationFormProps = {
@@ -26,7 +39,7 @@ type ApplicationFormProps = {
 
 export function ApplicationForm({ onClose, onSuccess, applicationId, initialData }: ApplicationFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -53,11 +66,33 @@ export function ApplicationForm({ onClose, onSuccess, applicationId, initialData
       .then((res) => res.json())
       .then((data) => setClients(data))
       .catch(() => setClients([]));
-    fetch("/api/inquiries")
+    fetch("/api/project-options")
       .then((res) => res.json())
-      .then((data) => setInquiries(data))
-      .catch(() => setInquiries([]));
+      .then((data) => setProjects(data || []))
+      .catch(() => setProjects([]));
   }, []);
+
+  const selectedProject = projects.find((project) => project.inquiryId === formData.inquiryId);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      clientId: selectedProject.clientId,
+      applicantName: prev.applicantName || selectedProject.clientName || "",
+      applicantEmail: prev.applicantEmail || selectedProject.clientEmail || "",
+      applicantPhone: prev.applicantPhone || selectedProject.clientPhone || "",
+      applicantAddress: prev.applicantAddress || selectedProject.clientAddress || "",
+      systemCapacity: prev.systemCapacity || (selectedProject.systemCapacityKw ? String(selectedProject.systemCapacityKw) : ""),
+      panelCount: prev.panelCount || (selectedProject.panelCount ? String(selectedProject.panelCount) : ""),
+      inverterCapacity:
+        prev.inverterCapacity ||
+        (selectedProject.inverterCapacityKw ? String(selectedProject.inverterCapacityKw) : ""),
+    }));
+  }, [selectedProject]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -88,6 +123,10 @@ export function ApplicationForm({ onClose, onSuccess, applicationId, initialData
             panelCount: formData.panelCount,
             inverterCapacity: formData.inverterCapacity,
             notes: formData.notes,
+            quotationId: selectedProject?.quotationId || null,
+            quotationVersionId: selectedProject?.quotationVersionId || null,
+            quotationVersionLabel: selectedProject?.quotationVersionLabel || null,
+            quotationTitle: selectedProject?.quotationTitle || null,
           },
         }),
       });
@@ -137,12 +176,21 @@ export function ApplicationForm({ onClose, onSuccess, applicationId, initialData
                 className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
               >
                 <option value="">Select inquiry (optional)</option>
-                {inquiries.map((inq) => (
-                  <option key={inq.id} value={inq.id}>{inq.title}</option>
+                {projects.map((project) => (
+                  <option key={project.inquiryId} value={project.inquiryId}>
+                    {project.inquiryTitle}
+                    {project.quotationVersionLabel ? ` • ${project.quotationStage === "FINAL" ? "Final" : "Latest"} v${project.quotationVersionLabel}` : ""}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {selectedProject?.quotationVersionLabel && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              Linked quotation: {selectedProject.quotationTitle || "Quotation"} • {selectedProject.quotationStage === "FINAL" ? "Final" : "Latest"} v{selectedProject.quotationVersionLabel}
+            </div>
+          )}
 
           <div className="border-t border-solar-border pt-4">
             <h3 className="text-sm font-semibold text-solar-ink mb-3">Applicant Details</h3>

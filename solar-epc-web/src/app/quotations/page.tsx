@@ -32,14 +32,26 @@ type Quotation = {
   title: string;
   status: string;
   clientId: string;
+  inquiryId?: string | null;
+  finalVersionId?: string | null;
   client: {
     name: string;
   };
+  inquiry?: {
+    id: string;
+    title: string;
+  } | null;
   versions: QuotationVersion[];
+};
+
+type Inquiry = {
+  id: string;
+  title: string;
 };
 
 export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [newVersionForQuote, setNewVersionForQuote] = useState<Quotation | null>(null);
@@ -47,7 +59,7 @@ export default function QuotationsPage() {
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
-  const [editData, setEditData] = useState({ title: "", status: "DRAFT" });
+  const [editData, setEditData] = useState({ title: "", status: "DRAFT", inquiryId: "" });
 
   const fetchQuotes = async () => {
     try {
@@ -63,6 +75,10 @@ export default function QuotationsPage() {
 
   useEffect(() => {
     fetchQuotes();
+    fetch("/api/inquiries")
+      .then((res) => res.json())
+      .then((data) => setInquiries(data || []))
+      .catch(() => setInquiries([]));
   }, []);
 
   useEffect(() => {
@@ -70,9 +86,22 @@ export default function QuotationsPage() {
       setEditData({
         title: editingQuote.title || "",
         status: editingQuote.status || "DRAFT",
+        inquiryId: editingQuote.inquiryId || "",
       });
     }
   }, [editingQuote]);
+
+  const handleMarkFinal = async (quoteId: string, versionId: string) => {
+    const res = await fetch(`/api/quotations/${quoteId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ finalVersionId: versionId }),
+    });
+
+    if (res.ok) {
+      fetchQuotes();
+    }
+  };
 
   const handleDeleteQuote = async (id: string) => {
     const confirmDelete = window.confirm("Delete this quotation and all versions?");
@@ -198,19 +227,25 @@ export default function QuotationsPage() {
                         </td>
                         <td className="px-4 py-3 text-solar-muted">{quote.client.name}</td>
                         <td className="px-4 py-3 text-solar-muted">
-                          {quote.versions.length} version(s)
+                          <div>{quote.versions.length} version(s)</div>
+                          <div className="text-[11px] text-solar-muted/80">{quote.inquiry?.title || "No inquiry linked"}</div>
                         </td>
                         <td className="px-4 py-3 font-medium text-solar-ink">
                           {formatCurrency(Number(latestVersion?.grandTotal || 0))}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            quote.status === "WON" ? "bg-green-100 text-green-800" :
-                            quote.status === "LOST" ? "bg-red-100 text-red-800" :
-                            "bg-solar-sky text-solar-forest"
-                          }`}>
-                            {quote.status}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              quote.status === "WON" ? "bg-green-100 text-green-800" :
+                              quote.status === "LOST" ? "bg-red-100 text-red-800" :
+                              "bg-solar-sky text-solar-forest"
+                            }`}>
+                              {quote.status}
+                            </span>
+                            {quote.finalVersionId && (
+                              <span className="text-[11px] text-solar-muted">Final version selected</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex flex-wrap gap-2">
@@ -263,6 +298,14 @@ export default function QuotationsPage() {
                               >
                                 PDF
                               </button>
+                              {!version.isFinal && (
+                                <button
+                                  onClick={() => handleMarkFinal(quote.id, version.id)}
+                                  className="text-xs text-solar-ink hover:underline"
+                                >
+                                  Mark Final
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -359,9 +402,11 @@ export default function QuotationsPage() {
         <SolarQuotationForm
           quotationId={newVersionForQuote.id}
           defaultClientId={newVersionForQuote.clientId}
+          defaultInquiryId={newVersionForQuote.inquiryId || ""}
           defaultTitle={newVersionForQuote.title}
           defaultVersion={getNextVersion(newVersionForQuote)}
           clientName={newVersionForQuote.client.name}
+          inquiryTitle={newVersionForQuote.inquiry?.title || ""}
           onClose={() => setNewVersionForQuote(null)}
           onSuccess={() => {
             fetchQuotes();
@@ -398,6 +443,21 @@ export default function QuotationsPage() {
                 <option value="APPROVED">Approved</option>
                 <option value="WON">Won (Order Received)</option>
                 <option value="LOST">Lost</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-solar-ink">Inquiry / Project</label>
+              <select
+                value={editData.inquiryId}
+                onChange={(event) => setEditData({ ...editData, inquiryId: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
+              >
+                <option value="">Select inquiry</option>
+                {inquiries.map((inquiry) => (
+                  <option key={inquiry.id} value={inquiry.id}>
+                    {inquiry.title}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex gap-2">
