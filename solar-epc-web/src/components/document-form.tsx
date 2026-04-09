@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 
 type Inquiry = {
-  id: string;
-  title: string;
+  inquiryId: string;
+  inquiryTitle: string;
+  clientName: string;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationVersionLabel?: string | null;
 };
 
 type DocumentFormProps = {
@@ -32,7 +35,7 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess, docId, initi
   });
 
   useEffect(() => {
-    fetch("/api/inquiries")
+    fetch("/api/project-options")
       .then((res) => res.json())
       .then((data) => setInquiries(data))
       .catch(() => setInquiries([]));
@@ -82,8 +85,9 @@ export function DocumentForm({ title, endpoint, onClose, onSuccess, docId, initi
             >
               <option value="">Select inquiry</option>
               {inquiries.map((inquiry) => (
-                <option key={inquiry.id} value={inquiry.id}>
-                  {inquiry.title}
+                <option key={inquiry.inquiryId} value={inquiry.inquiryId}>
+                  {inquiry.clientName} • {inquiry.inquiryTitle}
+                  {inquiry.quotationVersionLabel ? ` • ${inquiry.quotationStage === "FINAL" ? "Final" : "Latest"} v${inquiry.quotationVersionLabel}` : ""}
                 </option>
               ))}
             </select>

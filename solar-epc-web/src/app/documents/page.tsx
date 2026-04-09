@@ -16,17 +16,33 @@ type CompletionDoc = {
   };
 };
 
+type ProjectOption = {
+  inquiryId: string;
+  inquiryTitle: string;
+  clientName: string;
+  quotationStage: "FINAL" | "LATEST" | "NONE";
+  quotationVersionLabel?: string | null;
+};
+
 export default function DocumentsPage() {
   const [packs, setPacks] = useState<CompletionDoc[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPack, setEditingPack] = useState<CompletionDoc | null>(null);
 
   const fetchDocs = async () => {
     try {
-      const res = await fetch("/api/completion-docs");
-      const data = await res.json();
-      setPacks(data);
+      const [docsRes, projectsRes] = await Promise.all([
+        fetch("/api/completion-docs"),
+        fetch("/api/project-options"),
+      ]);
+      const [docsData, projectsData] = await Promise.all([
+        docsRes.json(),
+        projectsRes.json(),
+      ]);
+      setPacks(docsData);
+      setProjects(projectsData || []);
     } catch (error) {
       console.error("Failed to fetch completion docs:", error);
     } finally {
@@ -46,6 +62,8 @@ export default function DocumentsPage() {
       fetchDocs();
     }
   };
+
+  const getProjectMeta = (inquiryId: string) => projects.find((project) => project.inquiryId === inquiryId);
 
   return (
     <div className="space-y-6">
@@ -72,6 +90,9 @@ export default function DocumentsPage() {
         ) : (
           <div className="space-y-4">
             {packs.map((pack) => (
+              (() => {
+                const projectMeta = getProjectMeta(pack.inquiryId);
+                return (
               <div
                 key={pack.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
@@ -81,6 +102,11 @@ export default function DocumentsPage() {
                   <p className="text-xs text-solar-muted">
                     Project: {pack.inquiry?.title || "Unassigned"} • Updated {formatDate(pack.createdAt)}
                   </p>
+                  {projectMeta?.quotationVersionLabel && (
+                    <p className="text-xs text-solar-muted">
+                      Linked quotation: {projectMeta.quotationStage === "FINAL" ? "Final" : "Latest"} v{projectMeta.quotationVersionLabel}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-solar-sky px-3 py-1 text-xs font-semibold text-solar-forest">
@@ -106,6 +132,8 @@ export default function DocumentsPage() {
                   </button>
                 </div>
               </div>
+                );
+              })()
             ))}
           </div>
         )}
