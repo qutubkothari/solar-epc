@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { ProposalPDF } from "@/components/proposal-pdf";
 
+type ProposalEquipmentSpec = Record<string, unknown>;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,8 +53,8 @@ export async function GET(
       performanceRatio: proposal.performanceRatio ? Number(proposal.performanceRatio) : undefined,
       degradationRate: proposal.degradationRate ? Number(proposal.degradationRate) : undefined,
       systemLifespan: proposal.systemLifespan || undefined,
-      panelSpec: proposal.panelSpec as any,
-      inverterSpec: proposal.inverterSpec as any,
+      panelSpec: proposal.panelSpec as ProposalEquipmentSpec | undefined,
+      inverterSpec: proposal.inverterSpec as ProposalEquipmentSpec | undefined,
       systemCost: proposal.systemCost ? Number(proposal.systemCost) : undefined,
       subsidyAmount: proposal.subsidyAmount ? Number(proposal.subsidyAmount) : undefined,
       netCost: proposal.netCost ? Number(proposal.netCost) : undefined,

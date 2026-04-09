@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/alt-text */
+
 import {
   Document,
   Page,
@@ -5,23 +7,12 @@ import {
   View,
   StyleSheet,
   Image,
-  Font,
 } from "@react-pdf/renderer";
-
-// Register fonts for better appearance
-Font.register({
-  family: "Inter",
-  fonts: [
-    { src: "https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2" },
-    { src: "https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hiA.woff2", fontWeight: 600 },
-    { src: "https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiA.woff2", fontWeight: 700 },
-  ],
-});
 
 const styles = StyleSheet.create({
   page: {
     padding: 40,
-    fontFamily: "Inter",
+    fontFamily: "Helvetica",
     fontSize: 10,
     lineHeight: 1.6,
   },
@@ -176,6 +167,15 @@ const styles = StyleSheet.create({
   },
 });
 
+type ProposalEquipmentSpec = {
+  brand?: string;
+  model?: string;
+  wattage?: string | number;
+  quantity?: string | number;
+  warranty?: string;
+  capacity?: string | number;
+};
+
 type ProposalPDFProps = {
   proposal: {
     proposalNumber: string;
@@ -197,8 +197,8 @@ type ProposalPDFProps = {
     performanceRatio?: number;
     degradationRate?: number;
     systemLifespan?: number;
-    panelSpec?: any;
-    inverterSpec?: any;
+    panelSpec?: ProposalEquipmentSpec;
+    inverterSpec?: ProposalEquipmentSpec;
     systemCost?: number;
     subsidyAmount?: number;
     netCost?: number;
