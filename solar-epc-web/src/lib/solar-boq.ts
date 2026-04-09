@@ -25,6 +25,11 @@ export type SolarBoqContext = {
   numberOfModules: number;
 };
 
+export type SolarBoqDisplayParts = {
+  itemType: string;
+  ratingOrCapacity: string;
+};
+
 export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
   {
     sequence: 1,
@@ -157,6 +162,184 @@ const normalize = (value?: string | null) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+const EXACT_HEAD_BY_NORMALIZED = Object.fromEntries(
+  SOLAR_BOQ_SEQUENCE.map((row) => [normalize(row.itemHead), row.itemHead])
+) as Record<string, string>;
+
+const DIRECT_CATEGORY_HEAD_MAP: Record<string, string> = {
+  "solar module": "SOLAR MODULE",
+  "solar modules": "SOLAR MODULE",
+  "solar inverter": "SOLAR INVERTER",
+  inverters: "SOLAR INVERTER",
+  "solar structure": "SOLAR STRUCTURE",
+  "module mounting structure": "SOLAR STRUCTURE",
+  "mounting structure": "SOLAR STRUCTURE",
+  "solar structure accessories": "SOLAR STRUCTURE Accessories",
+  "electrical protection panels": "ELECTRICAL PROTECTION Panels",
+  acdb: "ELECTRICAL PROTECTION Panels",
+  dcdb: "ELECTRICAL PROTECTION Panels",
+  "ac cable": "AC CABLE",
+  "ac cable 2": "AC CABLE",
+  "dc cable": "DC CABLE",
+  "electrical installations": "ELECTRICAL INSTALLATIONS",
+  conduits: "ELECTRICAL INSTALLATIONS",
+  conduite: "ELECTRICAL INSTALLATIONS",
+  "cable tray": "ELECTRICAL INSTALLATIONS",
+  "pv installations": "PV INSTALLATIONS",
+  connectors: "PV INSTALLATIONS",
+  "mc4 connector": "PV INSTALLATIONS",
+  "civil work": "CIVIL WORK",
+  "civil works": "CIVIL WORK",
+  charges: "CHARGES",
+  miscellaneous: "MISCELLANEOUS",
+};
+
+const includesAny = (haystack: string, terms: string[]) => terms.some((term) => haystack.includes(term));
+
+export const resolveBoqItemHead = (item: SolarBoqItem) => {
+  const category = normalize(item.category);
+  const name = normalize(item.name);
+  const description = normalize(item.description);
+  const haystack = [category, name, description, normalize(item.brand)].join(" ");
+
+  if (EXACT_HEAD_BY_NORMALIZED[category]) {
+    return EXACT_HEAD_BY_NORMALIZED[category];
+  }
+
+  if (category === "walkway" || category === "walk way") {
+    return includesAny(haystack, ["c clamp", "m clamp", "fitting"]) ? "WALKWAY FITTINGS" : "WALKWAY";
+  }
+
+  if (category === "earthing") {
+    if (includesAny(haystack, ["module to module", "ring lug", "4 sqmm"])) {
+      return "MODULE TO MODULE EARTHING CU.CABLE";
+    }
+    if (includesAny(haystack, ["chemical bag", "pit cover", "clamp", "lug"])) {
+      return "EARTHING ACCESSORIES";
+    }
+    if (includesAny(haystack, ["electrode", "earth road", "earth rod", "pipe in pipe", "pipe in strip", "solid electrode", "boaring"])) {
+      return "EARTHING SOLUTION";
+    }
+    if (includesAny(haystack, ["cable", "strip", "wire", "flex cable"])) {
+      return "EARTHING CONNECTIVITY";
+    }
+  }
+
+  if (category === "cables") {
+    if (includesAny(haystack, ["module to module", "ring lug", "4 sqmm"])) {
+      return "MODULE TO MODULE EARTHING CU.CABLE";
+    }
+    if (includesAny(haystack, ["dc cable", "dc 1c", "pv cable"])) {
+      return "DC CABLE";
+    }
+    if (includesAny(haystack, ["ac cable", "ac 2 core", "ac 4 core", "ac 3 5 core", "aluminium armoured cable", "copper cable"])) {
+      return "AC CABLE";
+    }
+    if (includesAny(haystack, ["earthing", "earth strip", "earth cable"])) {
+      return "EARTHING CONNECTIVITY";
+    }
+  }
+
+  if (category === "lightning arrestor") {
+    return "ELECTRICAL PROTECTION ITEMS";
+  }
+
+  if (category === "la cable strip") {
+    return "LIGHTNING ARRESTOR ACCESSORIES";
+  }
+
+  if (category === "isolation") {
+    return "ELECTRICAL PROTECTION ITEMS";
+  }
+
+  if (category === "boq item") {
+    if (includesAny(haystack, ["structure", "mono rail", "hdgi", "rail"])) {
+      return "SOLAR STRUCTURE";
+    }
+    if (includesAny(haystack, ["charge", "commissioning", "transport", "ifp"])) {
+      return "CHARGES";
+    }
+  }
+
+  if (category === "other") {
+    if (includesAny(haystack, ["ancore", "anchor", "base plate", "j boult", "j hook", "wedge"])) {
+      return "SOLAR STRUCTURE Accessories";
+    }
+    if (includesAny(haystack, ["charge", "commissioning", "transport", "ifp", "fire", "safety"])) {
+      return "CHARGES";
+    }
+    if (includesAny(haystack, ["isolator", "isolation", "lightning arrestor"])) {
+      return "ELECTRICAL PROTECTION ITEMS";
+    }
+    if (includesAny(haystack, ["pvc pipe", "conduit"])) {
+      return "ELECTRICAL INSTALLATIONS";
+    }
+    if (includesAny(haystack, ["miss"])) {
+      return "MISCELLANEOUS";
+    }
+  }
+
+  if (DIRECT_CATEGORY_HEAD_MAP[category]) {
+    return DIRECT_CATEGORY_HEAD_MAP[category];
+  }
+
+  if (includesAny(haystack, ["mc4 connector", "mc4 connectors"])) {
+    return "PV INSTALLATIONS";
+  }
+
+  return null;
+};
+
+const cleanName = (value?: string | null) => (value || "").replace(/\s+/g, " ").trim();
+
+const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description">) => {
+  const text = `${cleanName(item.name)} ${cleanName(item.description)}`;
+  const patterns = [
+    /(\d+(?:\.\d+)?)\s*WP\b/i,
+    /(\d+(?:\.\d+)?)\s*KW\b/i,
+    /(\d+(?:\.\d+)?)\s*KVA\b/i,
+    /(\d+(?:\.\d+)?)\s*VOLT\b/i,
+    /(\d+(?:\.\d+)?\s*[XC]\s*\d+(?:\.\d+)?\s*SQMM)\b/i,
+    /(\d+(?:\.\d+)?\s*MM\s*X\s*\d+(?:\.\d+)?\s*MTR)\b/i,
+    /(\d+(?:\.\d+)?\s*MM)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[0].replace(/\s+/g, " ").trim();
+    }
+  }
+
+  return "";
+};
+
+export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => {
+  const resolvedHead = resolveBoqItemHead(item);
+  const rawName = cleanName(item.name);
+  const ratingOrCapacity = extractRatingOrCapacity(item);
+
+  if (resolvedHead === "SOLAR MODULE") {
+    return {
+      itemType: rawName.replace(/^\d+(?:\.\d+)?\s*WP\s*/i, "").trim() || rawName,
+      ratingOrCapacity,
+    };
+  }
+
+  if (resolvedHead === "SOLAR INVERTER") {
+    const normalizedName = rawName.replace(/^INV\s*-\s*/i, "").trim();
+    return {
+      itemType: normalizedName || rawName,
+      ratingOrCapacity,
+    };
+  }
+
+  return {
+    itemType: rawName,
+    ratingOrCapacity,
+  };
+};
+
 export const inferSelectionUnit = (item: SolarBoqItem) => {
   if (item.pricingUnit === "RS_PER_WATT") {
     return "WP";
@@ -215,16 +398,5 @@ export const getDefaultQuantity = (
 };
 
 export const getBoqRowItems = (items: SolarBoqItem[], row: SolarBoqRowConfig) => {
-  const aliases = row.categoryAliases.map(normalize);
-  const includes = (row.includeTerms || []).map(normalize);
-  const excludes = (row.excludeTerms || []).map(normalize);
-
-  return items.filter((item) => {
-    const category = normalize(item.category);
-    const haystack = [item.name, item.description, item.category, item.brand].map(normalize).join(" ");
-    const aliasMatch = aliases.includes(category);
-    const includeMatch = includes.length === 0 || includes.some((term) => haystack.includes(term));
-    const excludeMatch = excludes.some((term) => haystack.includes(term));
-    return (aliasMatch || includeMatch) && !excludeMatch;
-  });
+  return items.filter((item) => resolveBoqItemHead(item) === row.itemHead);
 };

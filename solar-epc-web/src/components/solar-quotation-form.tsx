@@ -6,6 +6,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
 import {
   extractWattageFromItem,
+  getBoqDisplayParts,
   getBoqRowItems,
   getDefaultQuantity,
   inferSelectionUnit,
@@ -243,8 +244,15 @@ export function SolarQuotationForm({
       const baseTotal = resolvedRate * entry.quantity;
       const taxTotal = baseTotal * entry.taxPercent;
       const grandTotal = baseTotal + taxTotal;
-      const brandPart = entry.item.brand ? ` | ${entry.item.brand}` : "";
-      const lineDescription = `${entry.row.itemHead} | ${entry.item.name}${brandPart} | ${entry.selectionUnit}`;
+      const display = getBoqDisplayParts(entry.item);
+      const lineDescription = [
+        entry.row.itemHead,
+        display.itemType || entry.item.name,
+        display.ratingOrCapacity,
+        entry.selectionUnit,
+      ]
+        .filter(Boolean)
+        .join(" | ");
 
       return {
         sequence: entry.row.sequence,
@@ -560,8 +568,19 @@ export function SolarQuotationForm({
                         <SearchableSelect
                           options={rowItems.map((item) => ({
                             value: item.id,
-                            label: item.name,
-                            subtitle: `${item.brand || item.category || "BOQ Item"} • ${formatCurrency(Number(item.unitPrice || 0))}${isPercentageItem(item) ? " of subtotal" : ` / ${inferSelectionUnit(item)}`}`,
+                            label: (() => {
+                              const display = getBoqDisplayParts(item);
+                              return display.ratingOrCapacity
+                                ? `${display.itemType} - ${display.ratingOrCapacity}`
+                                : display.itemType;
+                            })(),
+                            subtitle: [
+                              item.brand || "",
+                              formatCurrency(Number(item.unitPrice || 0)) +
+                                (isPercentageItem(item) ? " of subtotal" : ` / ${inferSelectionUnit(item)}`),
+                            ]
+                              .filter(Boolean)
+                              .join(" • "),
                           }))}
                           value={row?.itemId || ""}
                           onChange={(value) => handleSelectItem(config.sequence, value)}
@@ -573,6 +592,10 @@ export function SolarQuotationForm({
                         <div>{selectionUnit}</div>
                         {selectedItem && (
                           <div className="mt-1 text-xs text-gray-500">
+                            {(() => {
+                              const display = getBoqDisplayParts(selectedItem);
+                              return display.ratingOrCapacity ? `${display.ratingOrCapacity} • ` : "";
+                            })()}
                             Rate {formatCurrency(Number(resolved?.rawRate || selectedItem.unitPrice || 0))}
                             {isPercentageItem(selectedItem) ? " as %" : ` / ${selectionUnit}`}
                           </div>

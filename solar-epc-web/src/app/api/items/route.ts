@@ -7,6 +7,9 @@ export async function GET() {
   try {
     const { db } = await import("@/lib/db");
     const items = await db.item.findMany({
+      where: {
+        isActive: true,
+      },
       orderBy: {
         name: "asc",
       },
