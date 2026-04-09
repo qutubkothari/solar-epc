@@ -32,10 +32,17 @@ export async function POST(
       lineTotal: number;
     }> = items
       .filter((line: { itemId: string }) => line.itemId)
-      .map((line: { itemId: string; quantity: number; marginPercent?: number; taxPercent?: number }) => {
+      .map((line: {
+        itemId: string;
+        quantity: number;
+        rate?: number;
+        description?: string;
+        marginPercent?: number;
+        taxPercent?: number;
+      }) => {
         const item = itemRecords.find((record) => record.id === line.itemId);
         const quantity = Number(line.quantity || 1);
-        const rate = Number(item?.unitPrice || 0);
+        const rate = Number(line.rate ?? item?.unitPrice ?? 0);
         const marginPercent = Number(line.marginPercent ?? item?.marginPercent ?? 0);
         const taxPercent = Number(line.taxPercent ?? item?.taxPercent ?? 0);
         const marginAmount = rate * (marginPercent / 100);
@@ -44,7 +51,7 @@ export async function POST(
 
         return {
           itemId: line.itemId,
-          description: item?.description || null,
+          description: line.description || item?.description || null,
           quantity,
           rate,
           marginPercent,

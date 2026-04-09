@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -37,9 +37,12 @@ export async function GET(
       return NextResponse.json({ error: "No versions found for this quotation" }, { status: 404 });
     }
 
-    const version = quotation.versions[0];
+    const versionId = new URL(request.url).searchParams.get("version");
+    const version = versionId
+      ? quotation.versions.find((entry) => entry.id === versionId) || quotation.versions[0]
+      : quotation.versions[0];
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]);
+    let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -76,7 +79,7 @@ export async function GET(
 
     if (version.items && version.items.length > 0) {
       version.items.forEach((line) => {
-        const itemName = line.item.name || 'Unknown Item';
+        const itemName = line.description || line.item.name || 'Unknown Item';
         const qty = Number(line.quantity).toFixed(2);
         const rate = formatCurrency(Number(line.rate));
         const total = formatCurrency(Number(line.lineTotal));
@@ -92,7 +95,7 @@ export async function GET(
         
         // Add page if needed
         if (y < 150) {
-          const newPage = pdfDoc.addPage([595, 842]);
+          page = pdfDoc.addPage([595, 842]);
           y = 800;
         }
       });

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { SolarQuotationForm } from "@/components/solar-quotation-form";
 import { ModalShell } from "@/components/modal-shell";
-import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
 
 type QuotationVersion = {
@@ -19,6 +18,8 @@ type QuotationVersion = {
   items: {
     id: string;
     quantity: number;
+    rate?: number;
+    description?: string | null;
     lineTotal: number;
     item: {
       name: string;
@@ -45,8 +46,6 @@ export default function QuotationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
-  const [compareA, setCompareA] = useState<QuotationVersion | null>(null);
-  const [compareB, setCompareB] = useState<QuotationVersion | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [editData, setEditData] = useState({ title: "", status: "DRAFT" });
 
@@ -111,8 +110,6 @@ export default function QuotationsPage() {
     );
   });
 
-  const selectedQuote = quotes.find((quote) => quote.id === selectedQuoteId);
-  
   // Calculate next version for a quotation
   const getNextVersion = (quote: Quotation | null) => {
     if (!quote) return "1.0";
@@ -134,159 +131,6 @@ export default function QuotationsPage() {
     return `${max.major}.${max.minor + 1}`;
   };
   
-  const compareReady = Boolean(compareA && compareB);
-  const compareDiff = compareReady
-    ? Number(compareA?.grandTotal || 0) - Number(compareB?.grandTotal || 0)
-    : 0;
-  const compareLines = compareReady
-    ? (() => {
-        const map = new Map<
-          string,
-          {
-            name: string;
-            qtyA: number;
-            totalA: number;
-            qtyB: number;
-            totalB: number;
-          }
-        >();
-
-        (compareA?.items || []).forEach((line) => {
-          const key = line.item.name;
-          const entry = map.get(key) || {
-            name: key,
-            qtyA: 0,
-            totalA: 0,
-            qtyB: 0,
-            totalB: 0,
-          };
-          entry.qtyA += Number(line.quantity || 0);
-          entry.totalA += Number(line.lineTotal || 0);
-          map.set(key, entry);
-        });
-
-        (compareB?.items || []).forEach((line) => {
-          const key = line.item.name;
-          const entry = map.get(key) || {
-            name: key,
-            qtyA: 0,
-            totalA: 0,
-            qtyB: 0,
-            totalB: 0,
-          };
-          entry.qtyB += Number(line.quantity || 0);
-          entry.totalB += Number(line.lineTotal || 0);
-          map.set(key, entry);
-        });
-
-        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-      })()
-    : [];
-
-  const exportComparisonCsv = () => {
-    if (!compareReady || !compareA || !compareB) return;
-    const headers = [
-      "Item",
-      "Qty A",
-      "Total A",
-      "Qty B",
-      "Total B",
-      "Delta (A-B)",
-    ];
-    const rows = compareLines.map((line) => [
-      line.name,
-      line.qtyA,
-      line.totalA.toFixed(2),
-      line.qtyB,
-      line.totalB.toFixed(2),
-      (line.totalA - line.totalB).toFixed(2),
-    ]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `quotation-compare-${compareA.version}-vs-${compareB.version}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
-
-  const printComparison = () => {
-    if (!compareReady || !compareA || !compareB) return;
-    const rows = compareLines
-      .map(
-        (line) => `
-          <tr>
-            <td>${line.name}</td>
-            <td>${line.qtyA || "—"}</td>
-            <td>${line.totalA ? formatCurrency(line.totalA) : "—"}</td>
-            <td>${line.qtyB || "—"}</td>
-            <td>${line.totalB ? formatCurrency(line.totalB) : "—"}</td>
-            <td>${formatCurrency(line.totalA - line.totalB)}</td>
-          </tr>
-        `
-      )
-      .join("");
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Quotation Comparison</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; }
-            h1 { font-size: 18px; margin-bottom: 8px; }
-            h2 { font-size: 14px; margin: 0 0 16px; color: #4b5563; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
-            th { background: #f3f4f6; }
-            .summary { margin-top: 16px; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <h1>Quotation Comparison</h1>
-          <h2>Option A: ${compareA.version} ${compareA.brand ? `• ${compareA.brand}` : ""}</h2>
-          <h2>Option B: ${compareB.version} ${compareB.brand ? `• ${compareB.brand}` : ""}</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qty A</th>
-                <th>Total A</th>
-                <th>Qty B</th>
-                <th>Total B</th>
-                <th>Delta (A-B)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-          <div class="summary">
-            <strong>Difference (A - B):</strong> ${formatCurrency(compareDiff)}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
-
-  const handleComparePick = (version: QuotationVersion) => {
-    if (!compareA || (compareA && compareB)) {
-      setCompareA(version);
-      setCompareB(null);
-      return;
-    }
-    if (compareA && !compareB && compareA.id !== version.id) {
-      setCompareB(version);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -445,110 +289,10 @@ export default function QuotationsPage() {
       {compareVersion && (
         <ModalShell
           title="Version Comparison"
-          subtitle={compareReady ? "Compare two options" : `Version ${compareVersion.version} summary`}
+          subtitle={`Version ${compareVersion.version} summary`}
           onClose={() => setCompareVersion(null)}
           size="2xl"
         >
-          {compareReady ? (
-            <div className="space-y-4 text-sm text-solar-ink">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
-                  <p className="text-xs text-solar-muted">Option A</p>
-                  <p className="text-sm font-semibold">
-                    {compareA?.version} {compareA?.brand ? `• ${compareA.brand}` : ""}
-                  </p>
-                  <div className="mt-2 flex justify-between">
-                    <span>Total</span>
-                    <span className="font-semibold">{formatCurrency(Number(compareA?.grandTotal || 0))}</span>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-solar-border bg-solar-sand px-4 py-3">
-                  <p className="text-xs text-solar-muted">Option B</p>
-                  <p className="text-sm font-semibold">
-                    {compareB?.version} {compareB?.brand ? `• ${compareB.brand}` : ""}
-                  </p>
-                  <div className="mt-2 flex justify-between">
-                    <span>Total</span>
-                    <span className="font-semibold">{formatCurrency(Number(compareB?.grandTotal || 0))}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-xl border border-solar-border">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-solar-sand text-[11px] uppercase tracking-wider text-solar-muted">
-                    <tr>
-                      <th className="px-3 py-2">Item</th>
-                      <th className="px-3 py-2">Qty A</th>
-                      <th className="px-3 py-2">Total A</th>
-                      <th className="px-3 py-2">Qty B</th>
-                      <th className="px-3 py-2">Total B</th>
-                      <th className="px-3 py-2">Delta (A-B)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {compareLines.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-3 py-3 text-center text-solar-muted"
-                        >
-                          No line items to compare.
-                        </td>
-                      </tr>
-                    ) : (
-                      compareLines.map((line) => {
-                        const delta = line.totalA - line.totalB;
-                        return (
-                          <tr key={line.name} className="border-t border-solar-border">
-                            <td className="px-3 py-2 font-medium text-solar-ink">{line.name}</td>
-                            <td className="px-3 py-2 text-solar-muted">{line.qtyA || "—"}</td>
-                            <td className="px-3 py-2 text-solar-muted">
-                              {line.totalA ? formatCurrency(line.totalA) : "—"}
-                            </td>
-                            <td className="px-3 py-2 text-solar-muted">{line.qtyB || "—"}</td>
-                            <td className="px-3 py-2 text-solar-muted">
-                              {line.totalB ? formatCurrency(line.totalB) : "—"}
-                            </td>
-                            <td
-                              className={`px-3 py-2 font-semibold ${
-                                delta >= 0 ? "text-solar-forest" : "text-red-600"
-                              }`}
-                            >
-                              {formatCurrency(delta)}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-between rounded-xl border border-solar-border bg-white px-4 py-3">
-                <span className="font-semibold">Difference (A - B)</span>
-                <span className={`font-semibold ${compareDiff >= 0 ? "text-solar-forest" : "text-red-600"}`}>
-                  {formatCurrency(compareDiff)}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={exportComparisonCsv}
-                  className="rounded-xl border border-solar-border bg-white px-4 py-2 text-xs font-semibold text-solar-ink"
-                >
-                  Export CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={printComparison}
-                  className="rounded-xl bg-solar-forest px-4 py-2 text-xs font-semibold text-white"
-                >
-                  Print Comparison
-                </button>
-              </div>
-            </div>
-          ) : (
             <div className="space-y-4 text-sm text-solar-ink">
               {/* Items Table */}
               <div className="overflow-hidden rounded-xl border border-solar-border">
@@ -565,9 +309,9 @@ export default function QuotationsPage() {
                     {compareVersion.items?.length ? (
                       compareVersion.items.map((item) => (
                         <tr key={item.id} className="border-t border-solar-border">
-                          <td className="px-3 py-2 text-solar-ink">{item.item.name}</td>
+                          <td className="px-3 py-2 text-solar-ink">{item.description || item.item.name}</td>
                           <td className="px-3 py-2 text-right text-solar-muted">{Number(item.quantity)}</td>
-                          <td className="px-3 py-2 text-right text-solar-muted">{formatCurrency(Number(item.lineTotal) / Number(item.quantity))}</td>
+                          <td className="px-3 py-2 text-right text-solar-muted">{formatCurrency(Number(item.rate || 0))}</td>
                           <td className="px-3 py-2 text-right font-medium text-solar-ink">{formatCurrency(Number(item.lineTotal))}</td>
                         </tr>
                       ))
@@ -599,7 +343,6 @@ export default function QuotationsPage() {
                 </div>
               </div>
             </div>
-          )}
           <div className="mt-6 flex gap-2">
             <button
               onClick={() => setCompareVersion(null)}
