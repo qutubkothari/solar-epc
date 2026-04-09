@@ -151,3 +151,6 @@ solar-epc-web/prisma.config.ts.bak
 
 # Excel temp files
 ~$*.xlsx
+
+# Generated sample quotation files
+sample-quotation*.pdf
