@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const PAGE_WIDTH = 595;
+const PAGE_HEIGHT = 842;
+const MARGIN = 32;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const FOOTER_TOP = 42;
+const FOOTER_Y = 22;
+const HEADER_HEIGHT = 110;
 
 type QuoteLine = {
   title: string;
@@ -13,11 +21,13 @@ type QuoteLine = {
   amount: number;
 };
 
-const PAGE_WIDTH = 595;
-const PAGE_HEIGHT = 842;
-const MARGIN = 40;
-const FOOTER_TOP = 44;
-const FOOTER_Y = 22;
+type Column = {
+  key: "title" | "detail" | "quantity" | "rate" | "amount";
+  label: string;
+  x: number;
+  width: number;
+  align?: "left" | "right";
+};
 
 export async function GET(
   request: Request,
@@ -63,20 +73,22 @@ export async function GET(
     const pdfDoc = await PDFDocument.create();
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const pages: Array<ReturnType<typeof pdfDoc.addPage>> = [];
+    const pages: PDFPage[] = [];
 
-    const sanitizeText = (value: string) =>
+    const sanitizeText = (value: string | null | undefined) =>
       (value || "")
         .replace(/₹/g, "Rs.")
         .replace(/©/g, "(c)")
         .replace(/[^\u0000-\u007F]/g, "")
+        .replace(/\s+/g, " ")
         .trim();
 
-    const asColor = (hex?: string | null, fallback = "#0F172A") => {
+    const parseColor = (hex?: string | null, fallback = "#0F172A") => {
       const normalized = (hex || fallback).replace("#", "");
       if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
         return rgb(0.06, 0.09, 0.16);
       }
+
       return rgb(
         parseInt(normalized.slice(0, 2), 16) / 255,
         parseInt(normalized.slice(2, 4), 16) / 255,
@@ -84,31 +96,38 @@ export async function GET(
       );
     };
 
-    const primary = asColor(companySettings?.primaryColor, "#F59E0B");
-    const secondary = asColor(companySettings?.secondaryColor, "#059669");
-    const accent = asColor(companySettings?.accentColor, "#0F172A");
-    const muted = rgb(0.42, 0.46, 0.53);
-    const border = rgb(0.86, 0.89, 0.93);
+    const primary = parseColor(companySettings?.primaryColor, "#F59E0B");
+    const secondary = parseColor(companySettings?.secondaryColor, "#059669");
+    const accent = parseColor(companySettings?.accentColor, "#0F172A");
+    const muted = rgb(0.39, 0.45, 0.54);
+    const border = rgb(0.87, 0.9, 0.94);
     const softFill = rgb(0.98, 0.99, 1);
-    const paleFill = rgb(0.96, 0.97, 0.98);
+    const paleFill = rgb(0.95, 0.97, 0.99);
     const white = rgb(1, 1, 1);
+    const subtleLine = rgb(0.92, 0.94, 0.97);
 
-    const drawText = (
-      page: ReturnType<typeof pdfDoc.addPage>,
-      text: string,
-      x: number,
-      y: number,
-      size = 10,
-      bold = false,
-      color = accent
-    ) => {
-      page.drawText(sanitizeText(text), {
-        x,
-        y,
-        size,
-        font: bold ? boldFont : regularFont,
-        color,
-      });
+    const measureWidth = (text: string, size: number, font: PDFFont) => font.widthOfTextAtSize(text, size);
+
+    const splitLongToken = (token: string, maxWidth: number, size: number, font: PDFFont) => {
+      if (measureWidth(token, size, font) <= maxWidth) {
+        return [token];
+      }
+
+      const parts: string[] = [];
+      let current = "";
+      for (const char of token) {
+        const next = `${current}${char}`;
+        if (current && measureWidth(next, size, font) > maxWidth) {
+          parts.push(current);
+          current = char;
+        } else {
+          current = next;
+        }
+      }
+      if (current) {
+        parts.push(current);
+      }
+      return parts;
     };
 
     const wrapText = (text: string, maxWidth: number, size: number, bold = false) => {
@@ -118,19 +137,22 @@ export async function GET(
       }
 
       const font = bold ? boldFont : regularFont;
-      const words = safe.split(/\s+/);
+      const tokens = safe
+        .split(/\s+/)
+        .flatMap((token) => splitLongToken(token, maxWidth, size, font));
+
       const lines: string[] = [];
       let current = "";
 
-      for (const word of words) {
-        const next = current ? `${current} ${word}` : word;
-        if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      for (const token of tokens) {
+        const next = current ? `${current} ${token}` : token;
+        if (measureWidth(next, size, font) <= maxWidth) {
           current = next;
         } else {
           if (current) {
             lines.push(current);
           }
-          current = word;
+          current = token;
         }
       }
 
@@ -141,8 +163,75 @@ export async function GET(
       return lines.length ? lines : [safe];
     };
 
+    const bulletizeDescription = (text: string, maxWidth: number, size: number) => {
+      const safe = sanitizeText(text);
+      if (!safe) {
+        return ["-"];
+      }
+
+      const rawPoints = safe
+        .split(/(?<=[.;:])\s+|\s+\|\s+/)
+        .map((part) => sanitizeText(part))
+        .filter(Boolean);
+
+      const points = rawPoints.length ? rawPoints : [safe];
+      const lines: string[] = [];
+
+      for (const point of points) {
+        const wrapped = wrapText(point, maxWidth - 12, size);
+        wrapped.forEach((line, index) => {
+          lines.push(index === 0 ? `- ${line}` : `  ${line}`);
+        });
+      }
+
+      return lines.slice(0, 10);
+    };
+
+    const drawText = (
+      page: PDFPage,
+      text: string,
+      x: number,
+      y: number,
+      size = 10,
+      bold = false,
+      color = accent
+    ) => {
+      const safe = sanitizeText(text);
+      if (!safe) {
+        return;
+      }
+
+      page.drawText(safe, {
+        x,
+        y,
+        size,
+        font: bold ? boldFont : regularFont,
+        color,
+      });
+    };
+
+    const drawRightAligned = (
+      page: PDFPage,
+      text: string,
+      x: number,
+      width: number,
+      y: number,
+      size = 9,
+      bold = false,
+      color = accent
+    ) => {
+      const safe = sanitizeText(text);
+      if (!safe) {
+        return;
+      }
+
+      const font = bold ? boldFont : regularFont;
+      const textWidth = measureWidth(safe, size, font);
+      drawText(page, safe, x + width - textWidth - 6, y, size, bold, color);
+    };
+
     const drawWrapped = (
-      page: ReturnType<typeof pdfDoc.addPage>,
+      page: PDFPage,
       text: string,
       x: number,
       y: number,
@@ -167,29 +256,29 @@ export async function GET(
       }).format(new Date(value));
 
     const resolveLogo = async () => {
-      const logo = companySettings?.companyLogo;
-      if (!logo) {
+      const source = companySettings?.companyLogo;
+      if (!source) {
         return null;
       }
 
       try {
-        if (logo.startsWith("data:image/")) {
-          const [meta, data] = logo.split(",", 2);
+        if (source.startsWith("data:image/")) {
+          const [meta, data] = source.split(",", 2);
           const bytes = Buffer.from(data, "base64");
           return meta.includes("png") ? pdfDoc.embedPng(bytes) : pdfDoc.embedJpg(bytes);
         }
 
-        const baseUrl = new URL(request.url);
-        const absoluteUrl = logo.startsWith("http")
-          ? logo
-          : new URL(logo, `${baseUrl.protocol}//${baseUrl.host}`).toString();
-        const response = await fetch(absoluteUrl);
+        const url = source.startsWith("http")
+          ? source
+          : new URL(source, new URL(request.url).origin).toString();
+        const response = await fetch(url);
         if (!response.ok) {
           return null;
         }
+
         const bytes = await response.arrayBuffer();
         const contentType = response.headers.get("content-type") || "";
-        return contentType.includes("png") || absoluteUrl.toLowerCase().endsWith(".png")
+        return contentType.includes("png") || url.toLowerCase().endsWith(".png")
           ? pdfDoc.embedPng(bytes)
           : pdfDoc.embedJpg(bytes);
       } catch {
@@ -197,9 +286,42 @@ export async function GET(
       }
     };
 
-    const logo = await resolveLogo();
+    const embeddedLogo = await resolveLogo();
 
-    const drawFooter = (page: ReturnType<typeof pdfDoc.addPage>, pageNumber: number, totalPages: number) => {
+    const drawFallbackLogo = (page: PDFPage) => {
+      page.drawRectangle({
+        x: MARGIN,
+        y: PAGE_HEIGHT - 80,
+        width: 44,
+        height: 44,
+        color: white,
+        opacity: 0.12,
+        borderColor: white,
+        borderWidth: 1,
+      });
+      page.drawRectangle({
+        x: MARGIN + 6,
+        y: PAGE_HEIGHT - 74,
+        width: 32,
+        height: 32,
+        color: white,
+        opacity: 0.08,
+      });
+
+      const initials =
+        sanitizeText(companySettings?.companyName || "Hi Tech")
+          .split(/[^A-Za-z0-9]+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0])
+          .join("")
+          .toUpperCase() || "HT";
+
+      drawText(page, initials, MARGIN + 10, PAGE_HEIGHT - 63, 16, true, white);
+      drawText(page, "SOLAR", MARGIN + 52, PAGE_HEIGHT - 78, 7, true, rgb(0.93, 0.95, 0.98));
+    };
+
+    const drawFooter = (page: PDFPage, pageNumber: number, totalPages: number) => {
       page.drawLine({
         start: { x: MARGIN, y: FOOTER_TOP },
         end: { x: PAGE_WIDTH - MARGIN, y: FOOTER_TOP },
@@ -209,10 +331,7 @@ export async function GET(
 
       const footerText = sanitizeText(companySettings?.footerText || "Generated by Solar EPC Workspace");
       drawText(page, footerText, MARGIN, FOOTER_Y, 8, false, muted);
-
-      const pageLabel = `Page ${pageNumber} of ${totalPages}`;
-      const labelWidth = regularFont.widthOfTextAtSize(pageLabel, 8);
-      drawText(page, pageLabel, PAGE_WIDTH - MARGIN - labelWidth, FOOTER_Y, 8, false, muted);
+      drawText(page, `Page ${pageNumber} of ${totalPages}`, PAGE_WIDTH - MARGIN - 52, FOOTER_Y, 8, false, muted);
     };
 
     const createPage = () => {
@@ -221,79 +340,66 @@ export async function GET(
 
       page.drawRectangle({
         x: 0,
-        y: PAGE_HEIGHT - 114,
+        y: PAGE_HEIGHT - HEADER_HEIGHT,
         width: PAGE_WIDTH,
-        height: 114,
+        height: HEADER_HEIGHT,
         color: accent,
       });
       page.drawRectangle({
         x: 0,
-        y: PAGE_HEIGHT - 120,
+        y: PAGE_HEIGHT - HEADER_HEIGHT - 4,
         width: PAGE_WIDTH,
-        height: 6,
+        height: 4,
         color: primary,
       });
 
-      if (logo) {
-        const scaled = logo.scale(1);
-        const ratio = Math.min(62 / scaled.width, 46 / scaled.height);
-        page.drawImage(logo, {
+      if (embeddedLogo) {
+        const scaled = embeddedLogo.scale(1);
+        const ratio = Math.min(48 / scaled.width, 48 / scaled.height);
+        page.drawImage(embeddedLogo, {
           x: MARGIN,
-          y: PAGE_HEIGHT - 88,
+          y: PAGE_HEIGHT - 82,
           width: scaled.width * ratio,
           height: scaled.height * ratio,
         });
       } else {
-        page.drawRectangle({
-          x: MARGIN,
-          y: PAGE_HEIGHT - 88,
-          width: 54,
-          height: 54,
-          color: white,
-          opacity: 0.12,
-          borderColor: white,
-          borderWidth: 1,
-        });
-        const initials = (companySettings?.companyName || "HS")
-          .split(/\s+/)
-          .map((part) => part[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase();
-        drawText(page, initials, MARGIN + 14, PAGE_HEIGHT - 68, 22, true, white);
+        drawFallbackLogo(page);
       }
 
-      drawText(page, companySettings?.companyName || "Hi-Tech Solar", MARGIN + 72, PAGE_HEIGHT - 50, 22, true, white);
+      drawText(page, companySettings?.companyName || "Hi-Tech Solar", MARGIN + 64, PAGE_HEIGHT - 50, 20, true, white);
       if (companySettings?.companyTagline) {
-        drawText(page, companySettings.companyTagline, MARGIN + 72, PAGE_HEIGHT - 68, 10, false, rgb(0.9, 0.93, 0.97));
+        drawText(page, companySettings.companyTagline, MARGIN + 64, PAGE_HEIGHT - 66, 9, false, rgb(0.89, 0.92, 0.97));
       }
 
-      const contactLine = [
-        companySettings?.contactPhone || "",
-        companySettings?.contactEmail || "",
-        companySettings?.website || "",
-      ].filter(Boolean).join("  |  ");
-      if (contactLine) {
-        drawText(page, contactLine, MARGIN + 72, PAGE_HEIGHT - 86, 9, false, rgb(0.88, 0.91, 0.95));
+      const contactBits = [companySettings?.contactPhone, companySettings?.contactEmail, companySettings?.website]
+        .map((value) => sanitizeText(value))
+        .filter(Boolean)
+        .join(" | ");
+      if (contactBits) {
+        drawText(page, contactBits, MARGIN + 64, PAGE_HEIGHT - 82, 8, false, rgb(0.88, 0.91, 0.95));
       }
 
-      return { page, y: PAGE_HEIGHT - 138 };
+      return { page, y: PAGE_HEIGHT - HEADER_HEIGHT - 18 };
     };
 
-    const lines: QuoteLine[] = version.items.map((line) => ({
-      title: sanitizeText(line.item.category || line.item.name || "BOQ Item"),
-      detail: sanitizeText(line.description || line.item.description || line.item.name || ""),
-      quantity: Number(line.quantity || 0),
-      rate: Number(line.rate || 0),
-      amount: Number(line.lineTotal || 0),
+    const lines: QuoteLine[] = version.items.map((item) => ({
+      title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
+      detail: sanitizeText(item.description || item.item.description || item.item.name || ""),
+      quantity: Number(item.quantity || 0),
+      rate: Number(item.rate || 0),
+      amount: Number(item.lineTotal || 0),
     }));
 
     const companyRows = [
+      companySettings?.companyName || "Hi-Tech Solar",
       companySettings?.contactAddress || "",
       companySettings?.taxId ? `GSTIN: ${companySettings.taxId}` : "",
-    ].filter(Boolean);
+    ]
+      .map((value) => sanitizeText(value))
+      .filter(Boolean);
 
     const clientRows = [
+      quotation.client.name,
       quotation.client.contactName ? `Contact: ${quotation.client.contactName}` : "",
       quotation.client.email ? `Email: ${quotation.client.email}` : "",
       quotation.client.phone || quotation.client.mobile
@@ -303,124 +409,195 @@ export async function GET(
         ? `Address: ${quotation.client.address || quotation.client.billingAddress}`
         : "",
       quotation.client.taxId ? `GSTIN: ${quotation.client.taxId}` : "",
-    ].filter(Boolean);
+    ]
+      .map((value) => sanitizeText(value))
+      .filter(Boolean);
 
     let { page, y } = createPage();
 
+    const metaHeight = 64;
     page.drawRectangle({
       x: MARGIN,
-      y: y - 92,
-      width: PAGE_WIDTH - MARGIN * 2,
-      height: 92,
+      y: y - metaHeight,
+      width: CONTENT_WIDTH,
+      height: metaHeight,
       color: white,
       borderColor: border,
       borderWidth: 1,
     });
     page.drawRectangle({
       x: MARGIN,
-      y: y - 92,
-      width: 168,
-      height: 92,
+      y: y - metaHeight,
+      width: 150,
+      height: metaHeight,
       color: paleFill,
     });
 
-    drawText(page, "SOLAR EPC QUOTATION", MARGIN + 14, y - 26, 16, true, accent);
-    drawText(page, quotation.title, MARGIN + 14, y - 46, 10, false, muted);
-    drawText(page, `Version ${version.version || "1.0"}`, MARGIN + 14, y - 66, 10, true, secondary);
+    drawText(page, "SOLAR EPC QUOTATION", MARGIN + 12, y - 22, 15, true, accent);
+    drawText(page, quotation.title, MARGIN + 12, y - 40, 9, false, muted);
+    drawText(page, `Version ${version.version || "1.0"}`, MARGIN + 170, y - 20, 9, true, secondary);
+    drawText(page, `Quote Ref: ${quotation.id.slice(-8).toUpperCase()}`, MARGIN + 170, y - 37, 9, false, accent);
+    drawText(page, `Issued: ${formatDate(version.createdAt)}`, MARGIN + 170, y - 52, 9, false, muted);
     if (version.brand) {
-      drawText(page, version.brand, MARGIN + 92, y - 66, 10, false, muted);
+      drawText(page, `Brand: ${version.brand}`, PAGE_WIDTH - MARGIN - 140, y - 20, 9, true, accent);
     }
 
-    const companyX = MARGIN + 184;
-    drawText(page, "From", companyX, y - 24, 9, true, muted);
-    drawText(page, companySettings?.companyName || "Hi-Tech Solar", companyX, y - 40, 12, true, accent);
-    let companyCursor = y - 55;
-    companyRows.forEach((row) => {
-      companyCursor -= drawWrapped(page, row, companyX, companyCursor, 148, 8, false, muted, 11);
-    });
+    y -= metaHeight + 14;
 
-    const clientX = PAGE_WIDTH - MARGIN - 150;
-    drawText(page, "Bill To", clientX, y - 24, 9, true, muted);
-    drawText(page, quotation.client.name, clientX, y - 40, 12, true, accent);
-    let clientCursor = y - 55;
-    clientRows.forEach((row) => {
-      clientCursor -= drawWrapped(page, row, clientX, clientCursor, 110, 8, false, muted, 11);
-    });
-    drawText(page, `Quote Ref: ${quotation.id.slice(-8).toUpperCase()}`, clientX, y - 78, 8, true, muted);
-    drawText(page, `Issued: ${formatDate(version.createdAt)}`, clientX, y - 89, 8, false, muted);
-    y -= 120;
+    const cardGap = 12;
+    const cardWidth = (CONTENT_WIDTH - cardGap) / 2;
+    const companyLineCount = companyRows.reduce((count, row) => count + wrapText(row, cardWidth - 20, 8).length, 0);
+    const clientLineCount = clientRows.reduce((count, row) => count + wrapText(row, cardWidth - 20, 8).length, 0);
+    const cardHeight = Math.max(76, 28 + Math.max(companyLineCount, clientLineCount) * 11);
 
-    const drawTableHeader = (targetPage: ReturnType<typeof pdfDoc.addPage>, topY: number) => {
+    const drawInfoCard = (title: string, rows: string[], x: number) => {
+      page.drawRectangle({
+        x,
+        y: y - cardHeight,
+        width: cardWidth,
+        height: cardHeight,
+        color: white,
+        borderColor: border,
+        borderWidth: 1,
+      });
+      page.drawRectangle({
+        x,
+        y: y - 24,
+        width: cardWidth,
+        height: 24,
+        color: softFill,
+      });
+      drawText(page, title, x + 10, y - 16, 9, true, secondary);
+
+      let cursorY = y - 38;
+      rows.forEach((row, index) => {
+        const isHeading = index === 0;
+        const consumed = drawWrapped(
+          page,
+          row,
+          x + 10,
+          cursorY,
+          cardWidth - 20,
+          isHeading ? 9 : 8,
+          isHeading,
+          isHeading ? accent : muted,
+          11
+        );
+        cursorY -= consumed + 1;
+      });
+    };
+
+    drawInfoCard("From", companyRows, MARGIN);
+    drawInfoCard("Bill To", clientRows, MARGIN + cardWidth + cardGap);
+    y -= cardHeight + 18;
+
+    const columns: Column[] = [
+      { key: "title", label: "Item Head", x: MARGIN, width: 92 },
+      { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
+      { key: "quantity", label: "Qty", x: MARGIN + 317, width: 42, align: "right" },
+      { key: "rate", label: "Rate", x: MARGIN + 359, width: 74, align: "right" },
+      { key: "amount", label: "Amount", x: MARGIN + 433, width: 98, align: "right" },
+    ];
+
+    const drawTableHeader = (targetPage: PDFPage, topY: number) => {
       targetPage.drawRectangle({
         x: MARGIN,
         y: topY - 24,
-        width: PAGE_WIDTH - MARGIN * 2,
+        width: CONTENT_WIDTH,
         height: 24,
         color: primary,
       });
-      drawText(targetPage, "Item Head", MARGIN + 10, topY - 16, 10, true, white);
-      drawText(targetPage, "Description", MARGIN + 120, topY - 16, 10, true, white);
-      drawText(targetPage, "Qty", 378, topY - 16, 10, true, white);
-      drawText(targetPage, "Rate", 438, topY - 16, 10, true, white);
-      drawText(targetPage, "Amount", 498, topY - 16, 10, true, white);
+
+      columns.forEach((column) => {
+        if (column.align === "right") {
+          drawRightAligned(targetPage, column.label, column.x, column.width, topY - 16, 9, true, white);
+        } else {
+          drawText(targetPage, column.label, column.x + 6, topY - 16, 9, true, white);
+        }
+      });
     };
 
     drawTableHeader(page, y);
-    y -= 32;
+    y -= 28;
 
-    for (const line of lines) {
-      const detailLines = wrapText(line.detail, 235, 8).slice(0, 4);
-      const rowHeight = Math.max(32, 18 + detailLines.length * 10);
+    lines.forEach((line, index) => {
+      const titleLines = wrapText(line.title, 80, 8.5, true).slice(0, 4);
+      const detailLines = bulletizeDescription(line.detail, 213, 7.5);
+      const lineCount = Math.max(titleLines.length, detailLines.length, 1);
+      const rowHeight = 12 + lineCount * 10;
 
       if (y - rowHeight < FOOTER_TOP + 16) {
         ({ page, y } = createPage());
         drawTableHeader(page, y);
-        y -= 32;
+        y -= 28;
       }
 
       page.drawRectangle({
         x: MARGIN,
         y: y - rowHeight,
-        width: PAGE_WIDTH - MARGIN * 2,
+        width: CONTENT_WIDTH,
         height: rowHeight,
-        color: white,
-        borderColor: border,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
         borderWidth: 1,
       });
 
-      drawText(page, line.title, MARGIN + 10, y - 14, 9, true, accent);
-      detailLines.forEach((detail, index) => {
-        drawText(page, detail, MARGIN + 120, y - 14 - index * 10, 8, false, muted);
+      columns.slice(1).forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y: y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
       });
-      drawText(page, line.quantity.toLocaleString("en-IN", { maximumFractionDigits: 2 }), 378, y - 14, 9, false, accent);
-      drawText(page, formatCurrency(line.rate), 438, y - 14, 9, false, accent);
-      drawText(page, formatCurrency(line.amount), 498, y - 14, 9, true, accent);
+
+      titleLines.forEach((titleLine, titleIndex) => {
+        drawText(page, titleLine, columns[0].x + 6, y - 14 - titleIndex * 10, 8.5, true, accent);
+      });
+
+      detailLines.forEach((detailLine, detailIndex) => {
+        drawText(page, detailLine, columns[1].x + 6, y - 14 - detailIndex * 10, 7.5, false, muted);
+      });
+
+      drawRightAligned(
+        page,
+        line.quantity.toLocaleString("en-IN", { maximumFractionDigits: 2 }),
+        columns[2].x,
+        columns[2].width,
+        y - 14,
+        8,
+        false,
+        accent
+      );
+      drawRightAligned(page, formatCurrency(line.rate), columns[3].x, columns[3].width, y - 14, 8, false, accent);
+      drawRightAligned(page, formatCurrency(line.amount), columns[4].x, columns[4].width, y - 14, 8.5, true, accent);
 
       y -= rowHeight;
-    }
+    });
 
-    const summaryHeight = 106;
+    const summaryWidth = 210;
+    const summaryHeight = 102;
     if (y - summaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage());
     }
 
     page.drawRectangle({
-      x: PAGE_WIDTH - MARGIN - 200,
+      x: PAGE_WIDTH - MARGIN - summaryWidth,
       y: y - summaryHeight,
-      width: 200,
+      width: summaryWidth,
       height: summaryHeight,
-      color: softFill,
+      color: white,
       borderColor: border,
       borderWidth: 1,
     });
     page.drawRectangle({
-      x: PAGE_WIDTH - MARGIN - 200,
+      x: PAGE_WIDTH - MARGIN - summaryWidth,
       y: y - 24,
-      width: 200,
+      width: summaryWidth,
       height: 24,
       color: secondary,
     });
-    drawText(page, "Commercial Summary", PAGE_WIDTH - MARGIN - 186, y - 16, 10, true, white);
+    drawText(page, "Commercial Summary", PAGE_WIDTH - MARGIN - summaryWidth + 10, y - 16, 10, true, white);
 
     const summaryRows = [
       ["Subtotal", formatCurrency(Number(version.subtotal || 0))],
@@ -431,89 +608,90 @@ export async function GET(
     let summaryY = y - 40;
     summaryRows.forEach(([label, value], index) => {
       const emphasized = index === summaryRows.length - 1;
-      drawText(page, label, PAGE_WIDTH - MARGIN - 184, summaryY, 10, emphasized, accent);
-      const valueWidth = (emphasized ? boldFont : regularFont).widthOfTextAtSize(sanitizeText(value), 10);
-      drawText(
+      drawText(page, label, PAGE_WIDTH - MARGIN - summaryWidth + 10, summaryY, 9.5, emphasized, accent);
+      drawRightAligned(
         page,
         value,
-        PAGE_WIDTH - MARGIN - 14 - valueWidth,
+        PAGE_WIDTH - MARGIN - summaryWidth + 94,
+        summaryWidth - 104,
         summaryY,
-        10,
+        9.5,
         emphasized,
         emphasized ? secondary : accent
       );
-      summaryY -= 17;
+      summaryY -= 16;
     });
-    y -= summaryHeight + 18;
+    y -= summaryHeight + 16;
 
     const terms = [
       "Price validity: 15 days from the quotation issue date unless revised in writing.",
-      "Payment terms: 70% against material dispatch and 30% against successful installation / handover.",
-      "Delivery and execution timelines are subject to site readiness, statutory approvals, and material availability.",
-      "Any civil, electrical, or statutory scope outside the listed BOQ will be charged additionally after approval.",
-      "Taxes are included as shown above. Final billing will reflect the applicable GST at the time of invoicing.",
+      "Payment terms: 70% against material dispatch and 30% against successful installation and handover.",
+      "Execution timelines depend on site readiness, approvals, and material availability.",
+      "Any civil, electrical, or statutory scope outside the listed BOQ will be billed separately after approval.",
+      "Taxes are included as shown above and final billing will follow the applicable GST at invoicing.",
     ];
 
-    const termsHeight = 128;
+    const termLines = terms.flatMap((term) => bulletizeDescription(term, CONTENT_WIDTH - 22, 8.5));
+    const termsHeight = 34 + termLines.length * 11;
     if (y - termsHeight < FOOTER_TOP + 12) {
       ({ page, y } = createPage());
     }
 
-    drawText(page, "Terms and Conditions", MARGIN, y, 13, true, accent);
+    drawText(page, "Terms and Conditions", MARGIN, y, 12.5, true, accent);
     y -= 16;
     page.drawRectangle({
       x: MARGIN,
-      y: y - 94,
-      width: PAGE_WIDTH - MARGIN * 2,
-      height: 94,
+      y: y - (termsHeight - 18),
+      width: CONTENT_WIDTH,
+      height: termsHeight - 18,
       color: white,
       borderColor: border,
       borderWidth: 1,
     });
 
     let termsY = y - 14;
-    terms.forEach((term, index) => {
-      drawText(page, `${index + 1}.`, MARGIN + 10, termsY, 9, true, secondary);
-      const consumed = drawWrapped(page, term, MARGIN + 26, termsY, PAGE_WIDTH - MARGIN * 2 - 40, 9, false, muted, 12);
-      termsY -= consumed + 2;
+    termLines.forEach((line) => {
+      drawText(page, line, MARGIN + 10, termsY, 8.5, false, muted);
+      termsY -= 11;
     });
     y -= termsHeight;
 
-    const authHeight = 92;
+    const authHeight = 86;
     if (y - authHeight < FOOTER_TOP + 12) {
       ({ page, y } = createPage());
     }
 
-    drawText(page, "Authorization", MARGIN, y, 13, true, accent);
+    drawText(page, "Authorization", MARGIN, y, 12.5, true, accent);
     y -= 16;
     page.drawRectangle({
       x: MARGIN,
-      y: y - 76,
-      width: PAGE_WIDTH - MARGIN * 2,
-      height: 76,
+      y: y - 70,
+      width: CONTENT_WIDTH,
+      height: 70,
       color: white,
       borderColor: border,
       borderWidth: 1,
     });
-    page.drawLine({
-      start: { x: MARGIN + 20, y: y - 46 },
-      end: { x: MARGIN + 210, y: y - 46 },
-      thickness: 1,
-      color: border,
-    });
-    page.drawLine({
-      start: { x: PAGE_WIDTH - MARGIN - 210, y: y - 46 },
-      end: { x: PAGE_WIDTH - MARGIN - 20, y: y - 46 },
-      thickness: 1,
-      color: border,
-    });
-    drawText(page, "Client Acceptance", MARGIN + 20, y - 58, 9, true, muted);
-    drawText(page, `For ${companySettings?.companyName || "Hi-Tech Solar"}`, PAGE_WIDTH - MARGIN - 210, y - 58, 9, true, muted);
-    drawText(page, "Signature / Date", MARGIN + 20, y - 70, 8, false, muted);
-    drawText(page, "Authorized Signatory", PAGE_WIDTH - MARGIN - 210, y - 70, 8, false, muted);
 
-    pages.forEach((entry, index) => {
-      drawFooter(entry, index + 1, pages.length);
+    page.drawLine({
+      start: { x: MARGIN + 20, y: y - 40 },
+      end: { x: MARGIN + 220, y: y - 40 },
+      thickness: 1,
+      color: border,
+    });
+    page.drawLine({
+      start: { x: PAGE_WIDTH - MARGIN - 220, y: y - 40 },
+      end: { x: PAGE_WIDTH - MARGIN - 20, y: y - 40 },
+      thickness: 1,
+      color: border,
+    });
+    drawText(page, "Client Acceptance", MARGIN + 20, y - 54, 8.5, true, muted);
+    drawText(page, `For ${companySettings?.companyName || "Hi-Tech Solar"}`, PAGE_WIDTH - MARGIN - 220, y - 54, 8.5, true, muted);
+    drawText(page, "Signature / Date", MARGIN + 20, y - 66, 7.5, false, muted);
+    drawText(page, "Authorized Signatory", PAGE_WIDTH - MARGIN - 220, y - 66, 7.5, false, muted);
+
+    pages.forEach((currentPage, index) => {
+      drawFooter(currentPage, index + 1, pages.length);
     });
 
     const pdfBytes = await pdfDoc.save();
