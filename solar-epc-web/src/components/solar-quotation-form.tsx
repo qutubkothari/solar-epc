@@ -51,6 +51,14 @@ type ResolvedRow = {
   isPercentageCharge: boolean;
 };
 
+const percentToDecimal = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return value > 1 ? value / 100 : value;
+};
+
 type SolarQuotationFormProps = {
   onClose: () => void;
   onSuccess: () => void;
@@ -239,10 +247,10 @@ export function SolarQuotationForm({
 
     return draftRows.map((entry) => {
       const resolvedRate = entry.isPercentageCharge
-        ? baseSubtotal * (entry.rawRate / 100)
+        ? baseSubtotal * percentToDecimal(entry.rawRate)
         : entry.rawRate;
       const baseTotal = resolvedRate * entry.quantity;
-      const taxTotal = baseTotal * entry.taxPercent;
+      const taxTotal = baseTotal * percentToDecimal(entry.taxPercent);
       const grandTotal = baseTotal + taxTotal;
       const display = getBoqDisplayParts(entry.item);
       const lineDescription = [

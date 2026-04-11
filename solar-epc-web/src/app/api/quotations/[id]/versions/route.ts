@@ -3,6 +3,14 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const percentToDecimal = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return value > 1 ? value / 100 : value;
+};
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -45,8 +53,8 @@ export async function POST(
         const rate = Number(line.rate ?? item?.unitPrice ?? 0);
         const marginPercent = Number(line.marginPercent ?? item?.marginPercent ?? 0);
         const taxPercent = Number(line.taxPercent ?? item?.taxPercent ?? 0);
-        const marginAmount = rate * (marginPercent / 100);
-        const taxAmount = rate * (taxPercent / 100);
+        const marginAmount = rate * percentToDecimal(marginPercent);
+        const taxAmount = rate * percentToDecimal(taxPercent);
         const lineTotal = (rate + marginAmount + taxAmount) * quantity;
 
         return {
@@ -66,12 +74,12 @@ export async function POST(
     );
     const marginTotal = lineItems.reduce(
       (sum: number, line) =>
-        sum + Number(line.rate) * (Number(line.marginPercent) / 100) * Number(line.quantity),
+        sum + Number(line.rate) * percentToDecimal(Number(line.marginPercent)) * Number(line.quantity),
       0
     );
     const taxTotal = lineItems.reduce(
       (sum: number, line) =>
-        sum + Number(line.rate) * (Number(line.taxPercent) / 100) * Number(line.quantity),
+        sum + Number(line.rate) * percentToDecimal(Number(line.taxPercent)) * Number(line.quantity),
       0
     );
     const grandTotal = subtotal + marginTotal + taxTotal;
