@@ -400,7 +400,7 @@ export async function GET(
 
     const lines: QuoteLine[] = version.items.map((item) => ({
       title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
-      detail: sanitizeText(item.description || item.item.description || item.item.name || ""),
+      detail: sanitizeText(item.item.description || item.description || item.item.name || ""),
       quantity: Number(item.quantity || 0),
       rate: Number(item.rate || 0),
       amount: Number(item.lineTotal || 0),
