@@ -100,6 +100,8 @@ const calculatedPanelClassName = "rounded-md border border-amber-300 bg-amber-50
 
 const readOnlyFieldClassName = "w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900";
 
+const PAYMENT_TOTAL_TOLERANCE = 0.01;
+
 const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: string }> = [
   { key: "overview", label: "Overview", description: "Client, quotation, and proposal basics" },
   { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
@@ -344,9 +346,29 @@ export function SolarQuotationForm({
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
+  const hasInvalidPaymentTotal = Math.abs(paymentStageTotal - 100) > PAYMENT_TOTAL_TOLERANCE;
+  const incompleteScopeRows = documentData.scopeOfWorkRows
+    .map((row, index) => ({
+      index,
+      row,
+      isIncomplete: !row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim(),
+    }))
+    .filter((entry) => entry.isIncomplete);
+  const hasValidationIssues = hasInvalidPaymentTotal || incompleteScopeRows.length > 0;
   const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
   const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
+  const getTabIssueCount = (tabKey: QuotationFormTab) => {
+    if (tabKey === "payment") {
+      return hasInvalidPaymentTotal ? 1 : 0;
+    }
+
+    if (tabKey === "scope") {
+      return incompleteScopeRows.length;
+    }
+
+    return 0;
+  };
 
   const handleSelectItem = (sequence: number, itemId: string) => {
     const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
@@ -519,6 +541,18 @@ export function SolarQuotationForm({
       return;
     }
 
+    if (hasInvalidPaymentTotal) {
+      setActiveTab("payment");
+      setErrorMessage(`Payment stages must total 100%. Current total is ${paymentStageTotal.toFixed(2)}%.`);
+      return;
+    }
+
+    if (incompleteScopeRows.length > 0) {
+      setActiveTab("scope");
+      setErrorMessage(`Complete all scope rows before saving. ${incompleteScopeRows.length} row(s) are incomplete.`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -602,6 +636,7 @@ export function SolarQuotationForm({
         <div className="grid gap-2 rounded-xl border border-solar-border bg-white p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {FORM_TABS.map((tab) => {
             const isActive = activeTab === tab.key;
+            const issueCount = getTabIssueCount(tab.key);
             return (
               <button
                 key={tab.key}
@@ -610,7 +645,9 @@ export function SolarQuotationForm({
                 className={`rounded-xl border px-3 py-3 text-left transition ${
                   isActive
                     ? "border-solar-amber bg-solar-sand shadow-sm"
-                    : "border-solar-border bg-white hover:border-solar-amber/50"
+                    : issueCount > 0
+                      ? "border-red-200 bg-red-50 hover:border-red-300"
+                      : "border-solar-border bg-white hover:border-solar-amber/50"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -618,6 +655,11 @@ export function SolarQuotationForm({
                     {FORM_TABS.findIndex((entry) => entry.key === tab.key) + 1}
                   </span>
                   <div className="text-sm font-semibold text-solar-ink">{tab.label}</div>
+                  {issueCount > 0 && (
+                    <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                      {issueCount}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 hidden text-[11px] text-solar-muted xl:block">{tab.description}</div>
               </button>
@@ -1132,6 +1174,11 @@ export function SolarQuotationForm({
               Total {paymentStageTotal.toFixed(2)}%
             </div>
           </div>
+          {hasInvalidPaymentTotal && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Payment stages must total exactly 100% before saving this quotation.
+            </div>
+          )}
           <div className="space-y-3">
             {documentData.paymentStages.map((stage, index) => (
               <div key={`${stage.label}-${index}`} className="rounded-lg border border-cyan-200 bg-white p-4">
@@ -1247,9 +1294,21 @@ export function SolarQuotationForm({
               Add Scope Row
             </button>
           </div>
+          {incompleteScopeRows.length > 0 && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Complete all fields for every scope row before saving. Incomplete rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.
+            </div>
+          )}
           <div className="space-y-3">
             {documentData.scopeOfWorkRows.map((row, index) => (
-              <div key={`${row.srNo}-${index}`} className="rounded-lg border border-indigo-200 bg-white p-4">
+              <div
+                key={`${row.srNo}-${index}`}
+                className={`rounded-lg border bg-white p-4 ${
+                  incompleteScopeRows.some((entry) => entry.index === index)
+                    ? "border-red-200"
+                    : "border-indigo-200"
+                }`}
+              >
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-indigo-950">Scope Row {index + 1}</div>
                   {documentData.scopeOfWorkRows.length > 1 && (
@@ -1347,6 +1406,11 @@ export function SolarQuotationForm({
             <div className="text-xs font-medium uppercase tracking-wide text-solar-muted">
               Step {activeTabIndex + 1} of {FORM_TABS.length}
             </div>
+            {hasValidationIssues && (
+              <div className="text-xs font-medium text-red-700">
+                Resolve payment and scope warnings before saving.
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1377,7 +1441,7 @@ export function SolarQuotationForm({
             </button>
             <button
               type="submit"
-              disabled={loading || resolvedRows.length === 0}
+              disabled={loading || resolvedRows.length === 0 || hasValidationIssues}
               className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Quotation" : isNewVersion ? "Create Version" : "Create Quotation"}
