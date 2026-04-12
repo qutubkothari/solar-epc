@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
+import { createDefaultQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
 import {
   extractWattageFromItem,
   getBoqDisplayParts,
@@ -104,10 +105,15 @@ export function SolarQuotationForm({
     version: defaultVersion || "1.0",
     brand: "",
   });
-  const [systemConfig, setSystemConfig] = useState({
-    systemCapacityKw: 15,
-    moduleWattage: 630,
-  });
+  const [documentData, setDocumentData] = useState<QuotationDocumentData>(() =>
+    createDefaultQuotationDocumentData({
+      preparedFor: defaultTitle || inquiryTitle || "",
+      moduleWattage: 630,
+      numberOfModules: 24,
+      totalWatts: 15120,
+      totalKw: 15.12,
+    })
+  );
   const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() => createInitialRows());
 
   useEffect(() => {
@@ -172,11 +178,27 @@ export function SolarQuotationForm({
     });
   }, [formData.inquiryId, inquiries]);
 
-  const systemCapacityWatts = systemConfig.systemCapacityKw * 1000;
-  const safeModuleWattage = Math.max(systemConfig.moduleWattage || 1, 1);
-  const numberOfModules = Math.ceil(systemCapacityWatts / safeModuleWattage);
+  useEffect(() => {
+    if (!formData.title && !inquiryTitle) {
+      return;
+    }
+
+    setDocumentData((prev) =>
+      prev.preparedFor ? prev : { ...prev, preparedFor: inquiryTitle || formData.title }
+    );
+  }, [formData.title, inquiryTitle]);
+
+  const safeModuleWattage = Math.max(documentData.moduleWattage || 1, 1);
+  const numberOfModules = Math.max(Number(documentData.numberOfModules || 0), 0);
   const actualSystemWatts = numberOfModules * safeModuleWattage;
   const actualSystemKw = actualSystemWatts / 1000;
+
+  const setDocumentField = <K extends keyof QuotationDocumentData>(
+    key: K,
+    value: QuotationDocumentData[K]
+  ) => {
+    setDocumentData((prev) => ({ ...prev, [key]: value }));
+  };
 
   useEffect(() => {
     setBoqRows((prev) => {
@@ -317,7 +339,7 @@ export function SolarQuotationForm({
     if (sequence === 1 && selectedItem) {
       const wattage = extractWattageFromItem(selectedItem);
       if (wattage) {
-        setSystemConfig((prev) => ({ ...prev, moduleWattage: wattage }));
+        setDocumentField("moduleWattage", wattage);
       }
     }
   };
@@ -366,8 +388,16 @@ export function SolarQuotationForm({
         version: formData.version,
         brand: formData.brand,
         systemCapacityKw: actualSystemKw,
-        moduleWattage: systemConfig.moduleWattage,
+        moduleWattage: documentData.moduleWattage,
         numberOfModules,
+        documentData: {
+          ...documentData,
+          preparedFor: documentData.preparedFor || formData.title,
+          moduleWattage: documentData.moduleWattage,
+          numberOfModules,
+          totalWatts: actualSystemWatts,
+          totalKw: Number(actualSystemKw.toFixed(2)),
+        },
         items: resolvedRows.map((row) => ({
           itemId: row.itemId,
           quantity: row.quantity,
@@ -498,47 +528,223 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-          <h3 className="mb-4 text-lg font-semibold text-blue-900">Solar System Configuration</h3>
-          <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-emerald-900">Proposal Details</h3>
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">System Capacity (kW)</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Prepared For</label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={systemConfig.systemCapacityKw}
-                onChange={(event) =>
-                  setSystemConfig((prev) => ({
-                    ...prev,
-                    systemCapacityKw: Number(event.target.value || 0),
-                  }))
-                }
+                type="text"
+                value={documentData.preparedFor}
+                onChange={(event) => setDocumentField("preparedFor", event.target.value)}
+                placeholder="Plant / project / prepared for"
                 className="w-full rounded-md border border-gray-300 px-3 py-2"
               />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Contact Person</label>
+              <input
+                type="text"
+                value={documentData.customerContactPerson}
+                onChange={(event) => setDocumentField("customerContactPerson", event.target.value)}
+                placeholder="Customer contact person"
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Type of Consumer</label>
+              <select
+                value={documentData.consumerType}
+                onChange={(event) => setDocumentField("consumerType", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              >
+                <option value="LT Consumer">LT Consumer</option>
+                <option value="HT Consumer">HT Consumer</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Consumer Number</label>
+              <input
+                type="text"
+                value={documentData.consumerNumber}
+                onChange={(event) => setDocumentField("consumerNumber", event.target.value)}
+                placeholder="Consumer number"
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Prepared By</label>
+              <input
+                type="text"
+                value={documentData.preparedBy}
+                onChange={(event) => setDocumentField("preparedBy", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Validity (Days)</label>
+              <input
+                type="number"
+                min="1"
+                value={documentData.validityDays}
+                onChange={(event) => setDocumentField("validityDays", Number(event.target.value || 0))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-blue-900">Solar System Configuration</h3>
+          <div className="grid gap-4 md:grid-cols-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Module Wattage (W)</label>
               <input
                 type="number"
                 min="0"
-                value={systemConfig.moduleWattage}
+                value={documentData.moduleWattage}
                 onChange={(event) =>
-                  setSystemConfig((prev) => ({
-                    ...prev,
-                    moduleWattage: Number(event.target.value || 0),
-                  }))
+                  setDocumentField("moduleWattage", Number(event.target.value || 0))
+                }
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">No. of Modules</label>
+              <input
+                type="number"
+                min="0"
+                value={documentData.numberOfModules}
+                onChange={(event) =>
+                  setDocumentField("numberOfModules", Number(event.target.value || 0))
                 }
                 className="w-full rounded-md border border-gray-300 px-3 py-2"
               />
             </div>
             <div className="rounded-md border-2 border-blue-300 bg-white p-3">
-              <div className="text-xs text-gray-600">No. of Modules</div>
-              <div className="text-2xl font-bold text-blue-600">{numberOfModules}</div>
+              <div className="text-xs text-gray-600">Total WP</div>
+              <div className="text-2xl font-bold text-blue-600">{actualSystemWatts.toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border-2 border-blue-300 bg-white p-3">
+              <div className="text-xs text-gray-600">Total KW</div>
+              <div className="text-2xl font-bold text-blue-600">{actualSystemKw.toFixed(2)}</div>
             </div>
           </div>
           <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {systemConfig.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
+            <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {documentData.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-violet-900">Technical & Commercial Defaults</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">System Type</label>
+              <input
+                type="text"
+                value={documentData.systemType}
+                onChange={(event) => setDocumentField("systemType", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Project Completion Timeline</label>
+              <input
+                type="text"
+                value={documentData.projectCompletionTimeline}
+                onChange={(event) => setDocumentField("projectCompletionTimeline", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Required Area Factor (sqft / kW)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={documentData.requiredAreaFactorSqftPerKw}
+                onChange={(event) => setDocumentField("requiredAreaFactorSqftPerKw", Number(event.target.value || 0))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Expected Generation Units / kW / Day</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={documentData.expectedGenerationUnitsPerKw}
+                onChange={(event) => setDocumentField("expectedGenerationUnitsPerKw", Number(event.target.value || 0))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Structure Height South</label>
+              <input
+                type="text"
+                value={documentData.structureHeightSouth}
+                onChange={(event) => setDocumentField("structureHeightSouth", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Structure Height North</label>
+              <input
+                type="text"
+                value={documentData.structureHeightNorth}
+                onChange={(event) => setDocumentField("structureHeightNorth", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Array Layout</label>
+              <input
+                type="text"
+                value={documentData.arrayLayout}
+                onChange={(event) => setDocumentField("arrayLayout", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Monitoring System</label>
+              <input
+                type="text"
+                value={documentData.monitoringSystem}
+                onChange={(event) => setDocumentField("monitoringSystem", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Approvals & Compliance</label>
+              <input
+                type="text"
+                value={documentData.approvalsCompliance}
+                onChange={(event) => setDocumentField("approvalsCompliance", event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">GEDA / Registration Charges</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={documentData.gedaRegistrationCharges}
+                onChange={(event) => setDocumentField("gedaRegistrationCharges", Number(event.target.value || 0))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Net Metering Charges</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={documentData.netMeteringCharges}
+                onChange={(event) => setDocumentField("netMeteringCharges", Number(event.target.value || 0))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              />
+            </div>
           </div>
         </div>
 

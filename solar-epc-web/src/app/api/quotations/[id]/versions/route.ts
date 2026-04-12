@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createDefaultQuotationDocumentData, normalizeQuotationDocumentData } from "@/lib/quotation-document";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,14 @@ export async function POST(
     const itemRecords = await db.item.findMany({
       where: { id: { in: itemIds } },
     });
+
+    const documentData = body.documentData
+      ? normalizeQuotationDocumentData(body.documentData)
+      : createDefaultQuotationDocumentData({
+          moduleWattage: Number(body.moduleWattage ?? 0) || undefined,
+          numberOfModules: Number(body.numberOfModules ?? 0) || undefined,
+          totalKw: Number(body.systemCapacityKw ?? 0) || undefined,
+        });
 
     const lineItems: Array<{
       itemId: string;
@@ -97,6 +106,7 @@ export async function POST(
           quotationId: id,
           version,
           brand,
+          documentData,
           isFinal,
           subtotal,
           marginTotal,

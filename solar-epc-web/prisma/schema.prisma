@@ -199,6 +199,7 @@ model QuotationVersion {
   quotationId   String
   version       String
   brand         String?
+  documentData  Json?
   isFinal       Boolean  @default(false)
   subtotal      Decimal  @default(0)
   taxTotal      Decimal  @default(0)

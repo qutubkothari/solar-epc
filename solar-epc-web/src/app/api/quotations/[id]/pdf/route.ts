@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { formatCurrency } from "@/lib/format";
+import { getBoqDisplayParts } from "@/lib/solar-boq";
+import { normalizeQuotationDocumentData } from "@/lib/quotation-document";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -398,6 +400,9 @@ export async function GET(
       return { page, y: PAGE_HEIGHT - headerHeight - 18 };
     };
 
+    const versionDocumentData = (version as typeof version & { documentData?: unknown }).documentData;
+    const documentData = normalizeQuotationDocumentData(versionDocumentData);
+
     const lines: QuoteLine[] = version.items.map((item) => ({
       title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
       detail: sanitizeText(item.item.description || item.description || item.item.name || ""),
@@ -405,6 +410,97 @@ export async function GET(
       rate: Number(item.rate || 0),
       amount: Number(item.lineTotal || 0),
     }));
+
+    const findVersionItem = (head: string, includesText?: string) =>
+      version.items.find((entry) => {
+        const category = sanitizeText(entry.item.category || "").toUpperCase();
+        const haystack = sanitizeText(`${entry.item.name} ${entry.item.description || ""} ${entry.description || ""}`).toUpperCase();
+        return category === head.toUpperCase() && (!includesText || haystack.includes(includesText.toUpperCase()));
+      });
+
+    const moduleItem = findVersionItem("SOLAR MODULE");
+    const inverterItem = findVersionItem("SOLAR INVERTER");
+    const structureItem = findVersionItem("SOLAR STRUCTURE");
+    const acdbItem = findVersionItem("ELECTRICAL PROTECTION Panels", "ACDB");
+    const dcdbItem = findVersionItem("ELECTRICAL PROTECTION Panels", "DCDB");
+    const lightningItem = findVersionItem("ELECTRICAL PROTECTION ITEMS", "LIGHTNING") || findVersionItem("LIGHTNING ARRESTOR ACCESSORIES");
+    const earthingItem = findVersionItem("EARTHING SOLUTION");
+
+    const asSolarBoqItem = (entry: NonNullable<typeof moduleItem>["item"]) => ({
+      ...entry,
+      unitPrice: Number(entry.unitPrice || 0),
+      taxPercent: Number(entry.taxPercent || 0),
+      marginPercent: Number(entry.marginPercent || 0),
+    });
+
+    const moduleDisplay = moduleItem ? getBoqDisplayParts(asSolarBoqItem(moduleItem.item)) : null;
+    const inverterDisplay = inverterItem ? getBoqDisplayParts(asSolarBoqItem(inverterItem.item)) : null;
+    const structureDisplay = structureItem ? getBoqDisplayParts(asSolarBoqItem(structureItem.item)) : null;
+
+    const systemInstallationCost = Number(version.subtotal || 0);
+    const taxTotalValue = Number(version.taxTotal || 0);
+    const additionalChargesTotal =
+      Number(documentData.gedaRegistrationCharges || 0) +
+      Number(documentData.netMeteringCharges || 0) +
+      Number(documentData.meterCharges || 0);
+    const proposalGrandTotal = Number(version.grandTotal || 0) + additionalChargesTotal;
+
+    const technicalRows = [
+      ["System Size", `${documentData.totalKw.toFixed(2)} Kwp`, ""],
+      ["System Type", documentData.systemType, inverterDisplay?.itemType || ""],
+      [
+        "Required Area",
+        `${Math.ceil(documentData.totalKw * documentData.requiredAreaFactorSqftPerKw)} Sqft Minimum`,
+        `${documentData.requiredAreaFactorSqftPerKw} sqft per kW`,
+      ],
+      [
+        "Module Type",
+        moduleItem
+          ? `${documentData.moduleWattage}Wp ${moduleDisplay?.itemType || sanitizeText(moduleItem.item.name)}`
+          : `${documentData.moduleWattage}Wp Solar Module`,
+        moduleDisplay?.ratingOrCapacity || "",
+      ],
+      [
+        "Module Make & Rating",
+        moduleItem ? sanitizeText(moduleItem.item.brand || "-") : "-",
+        documentData.moduleWarranty,
+      ],
+      [
+        "Inverter Type",
+        inverterDisplay?.itemType || (inverterItem ? sanitizeText(inverterItem.item.name) : "-"),
+        sanitizeText(inverterItem?.item.description || ""),
+      ],
+      [
+        "Inverter Make & Rating",
+        inverterItem ? sanitizeText(inverterItem.item.brand || "-") : "-",
+        inverterDisplay?.ratingOrCapacity || "",
+      ],
+      ["Inverter Warranty Coverage", documentData.inverterWarranty, ""],
+      [
+        "Type Of Module Mounting Structure",
+        structureDisplay?.itemType || (structureItem ? sanitizeText(structureItem.item.name) : "-"),
+        documentData.structureWindSpeed,
+      ],
+      [
+        "Structure Height",
+        `${documentData.structureHeightSouth} at South, ${documentData.structureHeightNorth} at North`,
+        "",
+      ],
+      ["Array Layout", documentData.arrayLayout, ""],
+      ["Type of ACDB Box", sanitizeText(acdbItem?.item.name || "-") || "-", sanitizeText(acdbItem?.item.description || "")],
+      ["Type of DCDB Box", sanitizeText(dcdbItem?.item.name || "-") || "-", sanitizeText(dcdbItem?.item.description || "")],
+      ["Type of Lightning Arrestor", sanitizeText(lightningItem?.item.name || "-") || "-", sanitizeText(lightningItem?.item.description || "")],
+      ["Type of Earthing Road", sanitizeText(earthingItem?.item.brand || earthingItem?.item.name || "-") || "-", sanitizeText(earthingItem?.item.description || "")],
+      ["Monitoring System", documentData.monitoringSystem, ""],
+      ["Net Metering Provision", documentData.netMeteringProvision, ""],
+      [
+        "Expected Generation (Unit/Day)",
+        `${Math.round(documentData.totalKw * documentData.expectedGenerationUnitsPerKw)}`,
+        `${documentData.expectedGenerationUnitsPerKw} units/day/kW`,
+      ],
+      ["Approvals & Compliance", documentData.approvalsCompliance, ""],
+      ["Project Completion Timeline", documentData.projectCompletionTimeline, ""],
+    ];
 
     const companyRows = [
       companySettings?.companyName || "Hi-Tech Solar",
@@ -528,6 +624,97 @@ export async function GET(
     drawInfoCard("Bill To", clientRows, MARGIN + cardWidth + cardGap);
     y -= cardHeight + 18;
 
+    const executiveSummary = sanitizeText(
+      `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
+    );
+
+    const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.5);
+    const executiveSummaryHeight = 38 + summaryLines.length * 11;
+    if (y - executiveSummaryHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Executive Summary", MARGIN, y, 12.5, true, accent);
+    y -= 16;
+    page.drawRectangle({
+      x: MARGIN,
+      y: y - (executiveSummaryHeight - 12),
+      width: CONTENT_WIDTH,
+      height: executiveSummaryHeight - 12,
+      color: white,
+      borderColor: border,
+      borderWidth: 1,
+    });
+    summaryLines.forEach((line, index) => {
+      drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.5, false, muted);
+    });
+    y -= executiveSummaryHeight + 10;
+
+    const technicalColumns = [
+      { label: "Parameter", x: MARGIN, width: 150 },
+      { label: "Description", x: MARGIN + 150, width: 220 },
+      { label: "Remarks", x: MARGIN + 370, width: 161 },
+    ];
+
+    const drawTechnicalHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({
+        x: MARGIN,
+        y: topY - 24,
+        width: CONTENT_WIDTH,
+        height: 24,
+        color: secondary,
+      });
+      technicalColumns.forEach((column) => {
+        drawText(targetPage, column.label, column.x + 6, topY - 16, 9, true, white);
+      });
+    };
+
+    drawText(page, "Technical Proposal", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawTechnicalHeader(page, y);
+    y -= 28;
+
+    technicalRows.forEach((row, index) => {
+      const parameterLines = wrapText(row[0], technicalColumns[0].width - 12, 8, true);
+      const descriptionLines = wrapText(row[1], technicalColumns[1].width - 12, 8);
+      const remarkLines = wrapText(row[2] || "-", technicalColumns[2].width - 12, 8);
+      const lineCount = Math.max(parameterLines.length, descriptionLines.length, remarkLines.length, 1);
+      const rowHeight = 12 + lineCount * 10;
+
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "Technical Proposal", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawTechnicalHeader(page, y);
+        y -= 28;
+      }
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      [technicalColumns[1], technicalColumns[2]].forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
+      });
+
+      parameterLines.forEach((line, lineIndex) => drawText(page, line, technicalColumns[0].x + 6, y - 14 - lineIndex * 10, 8, true, accent));
+      descriptionLines.forEach((line, lineIndex) => drawText(page, line, technicalColumns[1].x + 6, y - 14 - lineIndex * 10, 8, false, accent));
+      remarkLines.forEach((line, lineIndex) => drawText(page, line, technicalColumns[2].x + 6, y - 14 - lineIndex * 10, 8, false, muted));
+      y -= rowHeight;
+    });
+
+    y -= 18;
+
     const columns: Column[] = [
       { key: "title", label: "Item Head", x: MARGIN, width: 92 },
       { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
@@ -612,8 +799,8 @@ export async function GET(
       y -= rowHeight;
     });
 
-    const summaryWidth = 210;
-    const summaryHeight = 102;
+    const summaryWidth = 230;
+    const summaryHeight = 134;
     if (y - summaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
@@ -637,10 +824,12 @@ export async function GET(
     drawText(page, "Commercial Summary", PAGE_WIDTH - MARGIN - summaryWidth + 10, y - 16, 10, true, white);
 
     const summaryRows = [
-      ["Subtotal", formatCurrency(Number(version.subtotal || 0))],
-      ["Margin", formatCurrency(Number(version.marginTotal || 0))],
-      ["Tax / GST", formatCurrency(Number(version.taxTotal || 0))],
-      ["Grand Total", formatCurrency(Number(version.grandTotal || 0))],
+      ["System & Installation", formatCurrency(systemInstallationCost)],
+      ["Tax / GST", formatCurrency(taxTotalValue)],
+      ["Registration Charges", formatCurrency(Number(documentData.gedaRegistrationCharges || 0))],
+      ["Net Metering Charges", formatCurrency(Number(documentData.netMeteringCharges || 0))],
+      ["Meter / Modem Charges", formatCurrency(Number(documentData.meterCharges || 0))],
+      ["Grand Total", formatCurrency(proposalGrandTotal)],
     ];
     let summaryY = y - 40;
     summaryRows.forEach(([label, value], index) => {
@@ -659,6 +848,47 @@ export async function GET(
       summaryY -= 16;
     });
     y -= summaryHeight + 16;
+
+    const paymentRows = documentData.paymentStages;
+    const paymentTableHeight = 36 + paymentRows.length * 26;
+    if (y - paymentTableHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Payment Stages", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    page.drawRectangle({ x: MARGIN, y: y - 24, width: CONTENT_WIDTH, height: 24, color: primary });
+    drawText(page, "Stage", MARGIN + 6, y - 16, 8.5, true, white);
+    drawText(page, "Milestone / Remarks", MARGIN + 170, y - 16, 8.5, true, white);
+    drawRightAligned(page, "%", MARGIN + 440, 30, y - 16, 8.5, true, white);
+    drawRightAligned(page, "Amount", MARGIN + 476, 55, y - 16, 8.5, true, white);
+    y -= 28;
+
+    paymentRows.forEach((stage, index) => {
+      const milestone = `${stage.milestone} ${stage.remarks}`.trim();
+      const lines = wrapText(milestone, 258, 7.5);
+      const rowHeight = 12 + Math.max(lines.length, 1) * 10;
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      page.drawLine({ start: { x: MARGIN + 160, y }, end: { x: MARGIN + 160, y: y - rowHeight }, thickness: 1, color: subtleLine });
+      page.drawLine({ start: { x: MARGIN + 430, y }, end: { x: MARGIN + 430, y: y - rowHeight }, thickness: 1, color: subtleLine });
+      page.drawLine({ start: { x: MARGIN + 468, y }, end: { x: MARGIN + 468, y: y - rowHeight }, thickness: 1, color: subtleLine });
+      drawText(page, stage.label, MARGIN + 6, y - 14, 7.8, true, accent);
+      lines.forEach((line, lineIndex) => drawText(page, line, MARGIN + 170, y - 14 - lineIndex * 10, 7.5, false, muted));
+      drawRightAligned(page, `${stage.percentage}%`, MARGIN + 432, 28, y - 14, 7.8, true, accent);
+      drawRightAligned(page, formatCurrency(systemInstallationCost * (stage.percentage / 100)), MARGIN + 474, 55, y - 14, 7.8, true, accent);
+      y -= rowHeight;
+    });
+
+    y -= 18;
 
     const terms = [
       "Price validity: 15 days from the quotation issue date unless revised in writing.",
@@ -692,6 +922,46 @@ export async function GET(
       termsY -= 11;
     });
     y -= termsHeight;
+
+    const bankCardHeight = 124;
+    const docsCardHeight = 124;
+    if (y - Math.max(bankCardHeight, docsCardHeight) < FOOTER_TOP + 12) {
+      ({ page, y } = createPage(true));
+    }
+
+    const sectionGap = 12;
+    const sectionWidth = (CONTENT_WIDTH - sectionGap) / 2;
+    const bankRows = [
+      `Bank Name: ${documentData.bankDetails.bankName}`,
+      `A/C Name: ${documentData.bankDetails.accountName}`,
+      `A/C Number: ${documentData.bankDetails.accountNumber}`,
+      `A/C Type: ${documentData.bankDetails.accountType}`,
+      `IFSC Code: ${documentData.bankDetails.ifscCode}`,
+      `Branch: ${documentData.bankDetails.branch}`,
+    ];
+
+    const drawBoxSection = (title: string, rows: string[], x: number, height: number) => {
+      page.drawRectangle({ x, y: y - height, width: sectionWidth, height, color: white, borderColor: border, borderWidth: 1 });
+      page.drawRectangle({ x, y: y - 24, width: sectionWidth, height: 24, color: paleFill });
+      drawText(page, title, x + 10, y - 16, 9.5, true, accent);
+      let rowY = y - 38;
+      rows.forEach((row) => {
+        const wrapped = wrapText(row, sectionWidth - 20, 8);
+        wrapped.forEach((line) => {
+          drawText(page, line, x + 10, rowY, 8, false, muted);
+          rowY -= 10;
+        });
+      });
+    };
+
+    drawBoxSection("Bank Details", bankRows, MARGIN, bankCardHeight);
+    drawBoxSection(
+      "Required Documents",
+      documentData.requiredDocuments.map((row) => `- ${row}`),
+      MARGIN + sectionWidth + sectionGap,
+      docsCardHeight
+    );
+    y -= Math.max(bankCardHeight, docsCardHeight) + 18;
 
     const authHeight = 86;
     if (y - authHeight < FOOTER_TOP + 12) {
