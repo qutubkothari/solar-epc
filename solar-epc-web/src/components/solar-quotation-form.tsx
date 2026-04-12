@@ -56,6 +56,8 @@ type ResolvedRow = {
   isPercentageCharge: boolean;
 };
 
+type QuotationFormTab = "overview" | "technical" | "boq" | "payment" | "scope";
+
 const percentToDecimal = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) {
     return 0;
@@ -98,6 +100,22 @@ const calculatedPanelClassName = "rounded-md border border-amber-300 bg-amber-50
 
 const readOnlyFieldClassName = "w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900";
 
+const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: string }> = [
+  { key: "overview", label: "Overview", description: "Client, quotation, and proposal basics" },
+  { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
+  { key: "boq", label: "BOQ & Pricing", description: "Workbook BOQ builder and totals" },
+  { key: "payment", label: "Payment & Banking", description: "Payment stages and bank details" },
+  { key: "scope", label: "Scope & Documents", description: "Scope preview and required documents" },
+];
+
+const SCOPE_OF_WORK_ITEMS = [
+  "Engineering and design with site survey, feasibility review, layout, and structural planning.",
+  "Procurement of modules, inverters, structures, cables, ACDB, DCDB, earthing, and protection materials.",
+  "Installation of MMS, modules, inverter systems, AC/DC cabling, earthing, and lightning protection.",
+  "Testing, commissioning, synchronization, and coordination for approvals and handover.",
+  "Operator handover support, documentation, and post-installation assistance.",
+];
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -120,6 +138,7 @@ export function SolarQuotationForm({
   const [items, setItems] = useState<SolarBoqItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<QuotationFormTab>("overview");
   const [formData, setFormData] = useState({
     clientId: defaultClientId || "",
     inquiryId: defaultInquiryId || "",
@@ -332,6 +351,7 @@ export function SolarQuotationForm({
   const subtotal = resolvedRows.reduce((sum, row) => sum + row.baseTotal, 0);
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
+  const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
 
   const handleSelectItem = (sequence: number, itemId: string) => {
     const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
@@ -383,6 +403,66 @@ export function SolarQuotationForm({
           : row
       )
     );
+  };
+
+  const updatePaymentStage = (
+    index: number,
+    key: "label" | "milestone" | "percentage" | "remarks",
+    value: string
+  ) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      paymentStages: prev.paymentStages.map((stage, stageIndex) =>
+        stageIndex === index
+          ? {
+              ...stage,
+              [key]: key === "percentage" ? Number(value || 0) : value,
+            }
+          : stage
+      ),
+    }));
+  };
+
+  const addPaymentStage = () => {
+    setDocumentData((prev) => ({
+      ...prev,
+      paymentStages: [
+        ...prev.paymentStages,
+        {
+          label: `Stage ${prev.paymentStages.length + 1}`,
+          milestone: "",
+          percentage: 0,
+          remarks: "",
+        },
+      ],
+    }));
+  };
+
+  const removePaymentStage = (index: number) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      paymentStages: prev.paymentStages.filter((_, stageIndex) => stageIndex !== index),
+    }));
+  };
+
+  const updateBankField = (key: keyof QuotationDocumentData["bankDetails"], value: string) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      bankDetails: {
+        ...prev.bankDetails,
+        [key]: value,
+      },
+    }));
+  };
+
+  const updateRequiredDocuments = (value: string) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      requiredDocuments: value
+        .split(/\r?\n/)
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -484,6 +564,46 @@ export function SolarQuotationForm({
           </div>
         </div>
 
+        <div className="grid gap-3 rounded-xl border border-solar-border bg-white p-3 md:grid-cols-5">
+          {FORM_TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-xl border px-3 py-3 text-left transition ${
+                  isActive
+                    ? "border-solar-amber bg-solar-sand shadow-sm"
+                    : "border-solar-border bg-white hover:border-solar-amber/50"
+                }`}
+              >
+                <div className="text-sm font-semibold text-solar-ink">{tab.label}</div>
+                <div className="mt-1 text-[11px] text-solar-muted">{tab.description}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-3 rounded-xl border border-solar-border bg-solar-sand/40 p-4 md:grid-cols-4">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-solar-muted">Title</div>
+            <div className="text-sm font-semibold text-solar-ink">{formData.title || "New quotation"}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-solar-muted">Client</div>
+            <div className="text-sm font-semibold text-solar-ink">{clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected"}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-solar-muted">System Size</div>
+            <div className="text-sm font-semibold text-solar-ink">{actualSystemKw.toFixed(2)} kWp</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-solar-muted">Current Total</div>
+            <div className="text-sm font-semibold text-solar-ink">{formatCurrency(grandTotal)}</div>
+          </div>
+        </div>
+
         {errorMessage && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4">
             <p className="text-sm text-red-800">{errorMessage}</p>
@@ -497,6 +617,8 @@ export function SolarQuotationForm({
           </div>
         )}
 
+        {activeTab === "overview" && (
+        <>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -646,7 +768,11 @@ export function SolarQuotationForm({
             </div>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === "technical" && (
+        <>
         <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
           <h3 className="mb-4 text-lg font-semibold text-blue-900">Solar System Configuration</h3>
           <div className="grid gap-4 md:grid-cols-4">
@@ -800,9 +926,69 @@ export function SolarQuotationForm({
                 className={userInputClassName}
               />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Meter / Modem Charges</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={documentData.meterCharges}
+                onChange={(event) => setDocumentField("meterCharges", Number(event.target.value || 0))}
+                className={userInputClassName}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Net Metering Provision</label>
+              <textarea
+                value={documentData.netMeteringProvision}
+                onChange={(event) => setDocumentField("netMeteringProvision", event.target.value)}
+                rows={2}
+                className={userInputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Module Warranty</label>
+              <input
+                type="text"
+                value={documentData.moduleWarranty}
+                onChange={(event) => setDocumentField("moduleWarranty", event.target.value)}
+                className={userInputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Inverter Warranty</label>
+              <input
+                type="text"
+                value={documentData.inverterWarranty}
+                onChange={(event) => setDocumentField("inverterWarranty", event.target.value)}
+                className={userInputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Structure Wind Speed</label>
+              <input
+                type="text"
+                value={documentData.structureWindSpeed}
+                onChange={(event) => setDocumentField("structureWindSpeed", event.target.value)}
+                className={userInputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Free Operation & Maintenance</label>
+              <input
+                type="text"
+                value={documentData.freeOperationMaintenance}
+                onChange={(event) => setDocumentField("freeOperationMaintenance", event.target.value)}
+                className={userInputClassName}
+              />
+            </div>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === "boq" && (
+        <>
         <div className="overflow-hidden rounded-lg border border-gray-200">
           <div className="border-b bg-gray-50 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-800">BOQ Builder</h3>
@@ -891,6 +1077,145 @@ export function SolarQuotationForm({
             </table>
           </div>
         </div>
+        </>
+        )}
+
+        {activeTab === "payment" && (
+        <>
+        <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-cyan-900">Payment Stages</h3>
+              <p className="text-xs text-cyan-800">These stages flow into the quotation payment schedule.</p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${paymentStageTotal === 100 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+              Total {paymentStageTotal.toFixed(2)}%
+            </div>
+          </div>
+          <div className="space-y-3">
+            {documentData.paymentStages.map((stage, index) => (
+              <div key={`${stage.label}-${index}`} className="rounded-lg border border-cyan-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-solar-ink">Stage {index + 1}</div>
+                  {documentData.paymentStages.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePaymentStage(index)}
+                      className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Label</label>
+                    <input
+                      type="text"
+                      value={stage.label}
+                      onChange={(event) => updatePaymentStage(index, "label", event.target.value)}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Percentage</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={stage.percentage}
+                      onChange={(event) => updatePaymentStage(index, "percentage", event.target.value)}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Milestone</label>
+                    <textarea
+                      value={stage.milestone}
+                      onChange={(event) => updatePaymentStage(index, "milestone", event.target.value)}
+                      rows={2}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
+                    <textarea
+                      value={stage.remarks}
+                      onChange={(event) => updatePaymentStage(index, "remarks", event.target.value)}
+                      rows={2}
+                      className={userInputClassName}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addPaymentStage}
+            className="mt-4 rounded-md border border-solar-border bg-white px-4 py-2 text-sm font-medium text-solar-ink"
+          >
+            Add Payment Stage
+          </button>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-slate-900">Bank Details</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Bank Name</label>
+              <input type="text" value={documentData.bankDetails.bankName} onChange={(event) => updateBankField("bankName", event.target.value)} className={userInputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Account Name</label>
+              <input type="text" value={documentData.bankDetails.accountName} onChange={(event) => updateBankField("accountName", event.target.value)} className={userInputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Account Number</label>
+              <input type="text" value={documentData.bankDetails.accountNumber} onChange={(event) => updateBankField("accountNumber", event.target.value)} className={userInputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Account Type</label>
+              <input type="text" value={documentData.bankDetails.accountType} onChange={(event) => updateBankField("accountType", event.target.value)} className={userInputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">IFSC Code</label>
+              <input type="text" value={documentData.bankDetails.ifscCode} onChange={(event) => updateBankField("ifscCode", event.target.value)} className={userInputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Branch</label>
+              <input type="text" value={documentData.bankDetails.branch} onChange={(event) => updateBankField("branch", event.target.value)} className={userInputClassName} />
+            </div>
+          </div>
+        </div>
+        </>
+        )}
+
+        {activeTab === "scope" && (
+        <>
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-indigo-900">Scope of Work</h3>
+          <div className="space-y-2 text-sm text-indigo-950">
+            {SCOPE_OF_WORK_ITEMS.map((item) => (
+              <div key={item} className="rounded-md border border-indigo-100 bg-white px-3 py-2">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+          <h3 className="mb-4 text-lg font-semibold text-rose-900">Required Documents</h3>
+          <label className="mb-1 block text-sm font-medium text-gray-700">One document per line</label>
+          <textarea
+            value={documentData.requiredDocuments.join("\n")}
+            onChange={(event) => updateRequiredDocuments(event.target.value)}
+            rows={10}
+            className={userInputClassName}
+          />
+        </div>
+        </>
+        )}
 
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <div className="grid gap-2 text-sm md:grid-cols-2">
