@@ -982,10 +982,12 @@ export function SolarQuotationForm({
     setErrorMessage(null);
 
     if (!formData.clientId) {
+      setActiveTab("overview");
       return;
     }
 
     if (!formData.title) {
+      setActiveTab("overview");
       return;
     }
 
@@ -995,6 +997,7 @@ export function SolarQuotationForm({
     }
 
     if (resolvedRows.length === 0) {
+      setActiveTab("boq");
       return;
     }
 
@@ -2483,9 +2486,9 @@ export function SolarQuotationForm({
             <div className="text-xs font-medium uppercase tracking-wide text-solar-muted">
               Step {activeTabIndex + 1} of {FORM_TABS.length}
             </div>
-            {hasValidationIssues && (
+            {hasValidationIssues && validationErrorMessage && (
               <div className="text-xs font-medium text-red-700">
-                Resolve payment, bank, scope, and document warnings before saving.
+                {validationErrorMessage}
               </div>
             )}
             <div className="flex gap-2">
@@ -2518,7 +2521,7 @@ export function SolarQuotationForm({
             </button>
             <button
               type="submit"
-              disabled={loading || resolvedRows.length === 0 || hasValidationIssues}
+              disabled={loading || resolvedRows.length === 0}
               className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Quotation" : isNewVersion ? "Create Version" : "Create Quotation"}
