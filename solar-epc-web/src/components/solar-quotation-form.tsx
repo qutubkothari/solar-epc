@@ -111,6 +111,18 @@ const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: stri
   { key: "preview", label: "Preview", description: "Final quotation summary before save" },
 ];
 
+const BANK_DETAIL_FIELDS: Array<{
+  key: keyof QuotationDocumentData["bankDetails"];
+  label: string;
+}> = [
+  { key: "bankName", label: "Bank Name" },
+  { key: "accountName", label: "Account Name" },
+  { key: "accountNumber", label: "Account Number" },
+  { key: "accountType", label: "Account Type" },
+  { key: "ifscCode", label: "IFSC Code" },
+  { key: "branch", label: "Branch" },
+];
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -359,6 +371,7 @@ export function SolarQuotationForm({
     }))
     .filter((entry) => entry.isIncomplete);
   const hasInvalidPaymentTotal = Math.abs(paymentStageTotal - 100) > PAYMENT_TOTAL_TOLERANCE;
+  const missingBankFields = BANK_DETAIL_FIELDS.filter(({ key }) => !documentData.bankDetails[key].trim());
   const incompleteScopeRows = documentData.scopeOfWorkRows
     .map((row, index) => ({
       index,
@@ -366,8 +379,19 @@ export function SolarQuotationForm({
       isIncomplete: !row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim(),
     }))
     .filter((entry) => entry.isIncomplete);
-  const totalValidationIssueCount = incompletePaymentStages.length + incompleteScopeRows.length + (hasInvalidPaymentTotal ? 1 : 0);
-  const hasValidationIssues = hasInvalidPaymentTotal || incompletePaymentStages.length > 0 || incompleteScopeRows.length > 0;
+  const missingRequiredDocuments = documentData.requiredDocuments.length === 0;
+  const totalValidationIssueCount =
+    incompletePaymentStages.length +
+    incompleteScopeRows.length +
+    missingBankFields.length +
+    (hasInvalidPaymentTotal ? 1 : 0) +
+    (missingRequiredDocuments ? 1 : 0);
+  const hasValidationIssues =
+    hasInvalidPaymentTotal ||
+    incompletePaymentStages.length > 0 ||
+    incompleteScopeRows.length > 0 ||
+    missingBankFields.length > 0 ||
+    missingRequiredDocuments;
   const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
   const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
@@ -375,11 +399,11 @@ export function SolarQuotationForm({
   const selectedInquiryLabel = inquiryTitle || inquiries.find((entry) => entry.id === formData.inquiryId)?.title || "Not linked";
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
     if (tabKey === "payment") {
-      return incompletePaymentStages.length + (hasInvalidPaymentTotal ? 1 : 0);
+      return incompletePaymentStages.length + missingBankFields.length + (hasInvalidPaymentTotal ? 1 : 0);
     }
 
     if (tabKey === "scope") {
-      return incompleteScopeRows.length;
+      return incompleteScopeRows.length + (missingRequiredDocuments ? 1 : 0);
     }
 
     if (tabKey === "preview") {
@@ -572,9 +596,21 @@ export function SolarQuotationForm({
       return;
     }
 
+    if (missingBankFields.length > 0) {
+      setActiveTab("payment");
+      setErrorMessage(`Complete all bank details before saving. Missing: ${missingBankFields.map((field) => field.label).join(", ")}.`);
+      return;
+    }
+
     if (incompleteScopeRows.length > 0) {
       setActiveTab("scope");
       setErrorMessage(`Complete all scope rows before saving. ${incompleteScopeRows.length} row(s) are incomplete.`);
+      return;
+    }
+
+    if (missingRequiredDocuments) {
+      setActiveTab("scope");
+      setErrorMessage("Add at least one required document before saving.");
       return;
     }
 
@@ -1284,31 +1320,36 @@ export function SolarQuotationForm({
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          {missingBankFields.length > 0 && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Complete all bank details before saving. Missing: {missingBankFields.map((field) => field.label).join(", ")}.
+            </div>
+          )}
           <h3 className="mb-4 text-lg font-semibold text-slate-900">Bank Details</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Bank Name</label>
-              <input type="text" value={documentData.bankDetails.bankName} onChange={(event) => updateBankField("bankName", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.bankName} onChange={(event) => updateBankField("bankName", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "bankName") ? "ring-2 ring-red-300" : ""}`} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Account Name</label>
-              <input type="text" value={documentData.bankDetails.accountName} onChange={(event) => updateBankField("accountName", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.accountName} onChange={(event) => updateBankField("accountName", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "accountName") ? "ring-2 ring-red-300" : ""}`} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Account Number</label>
-              <input type="text" value={documentData.bankDetails.accountNumber} onChange={(event) => updateBankField("accountNumber", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.accountNumber} onChange={(event) => updateBankField("accountNumber", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "accountNumber") ? "ring-2 ring-red-300" : ""}`} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Account Type</label>
-              <input type="text" value={documentData.bankDetails.accountType} onChange={(event) => updateBankField("accountType", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.accountType} onChange={(event) => updateBankField("accountType", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "accountType") ? "ring-2 ring-red-300" : ""}`} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">IFSC Code</label>
-              <input type="text" value={documentData.bankDetails.ifscCode} onChange={(event) => updateBankField("ifscCode", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.ifscCode} onChange={(event) => updateBankField("ifscCode", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "ifscCode") ? "ring-2 ring-red-300" : ""}`} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Branch</label>
-              <input type="text" value={documentData.bankDetails.branch} onChange={(event) => updateBankField("branch", event.target.value)} className={userInputClassName} />
+              <input type="text" value={documentData.bankDetails.branch} onChange={(event) => updateBankField("branch", event.target.value)} className={`${userInputClassName} ${missingBankFields.some((field) => field.key === "branch") ? "ring-2 ring-red-300" : ""}`} />
             </div>
           </div>
         </div>
@@ -1403,12 +1444,17 @@ export function SolarQuotationForm({
 
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
           <h3 className="mb-4 text-lg font-semibold text-rose-900">Required Documents</h3>
+          {missingRequiredDocuments && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Add at least one required document before saving.
+            </div>
+          )}
           <label className="mb-1 block text-sm font-medium text-gray-700">One document per line</label>
           <textarea
             value={documentData.requiredDocuments.join("\n")}
             onChange={(event) => updateRequiredDocuments(event.target.value)}
             rows={10}
-            className={userInputClassName}
+            className={`${userInputClassName} ${missingRequiredDocuments ? "ring-2 ring-red-300" : ""}`}
           />
         </div>
         </>
@@ -1424,9 +1470,13 @@ export function SolarQuotationForm({
               {incompletePaymentStages.length > 0 && (
                 <div>Incomplete payment stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.</div>
               )}
+              {missingBankFields.length > 0 && (
+                <div>Missing bank details: {missingBankFields.map((field) => field.label).join(", ")}.</div>
+              )}
               {incompleteScopeRows.length > 0 && (
                 <div>Incomplete scope rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.</div>
               )}
+              {missingRequiredDocuments && <div>Required documents list is empty.</div>}
             </div>
           </div>
         )}
@@ -1541,19 +1591,27 @@ export function SolarQuotationForm({
               <h3 className="text-lg font-semibold text-rose-900">Documents & Bank Details</h3>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-900">{documentData.requiredDocuments.length} docs</span>
             </div>
-            <div className="rounded-md border border-rose-100 bg-white p-3 text-sm text-slate-700">
+            <div className={`rounded-md border bg-white p-3 text-sm text-slate-700 ${missingBankFields.length > 0 ? "border-red-200" : "border-rose-100"}`}>
               <div><strong>Bank:</strong> {documentData.bankDetails.bankName}</div>
               <div className="mt-1"><strong>Account Name:</strong> {documentData.bankDetails.accountName}</div>
               <div className="mt-1"><strong>Account Number:</strong> {documentData.bankDetails.accountNumber}</div>
               <div className="mt-1"><strong>IFSC:</strong> {documentData.bankDetails.ifscCode}</div>
               <div className="mt-1"><strong>Branch:</strong> {documentData.bankDetails.branch}</div>
             </div>
+            {missingBankFields.length > 0 && (
+              <div className="mt-3 text-sm text-red-700">Missing bank fields: {missingBankFields.map((field) => field.label).join(", ")}.</div>
+            )}
             <div className="mt-3 space-y-2 text-sm text-rose-950">
               {documentData.requiredDocuments.slice(0, 6).map((document) => (
                 <div key={document} className="rounded-md border border-rose-100 bg-white px-3 py-2">
                   {document}
                 </div>
               ))}
+              {missingRequiredDocuments && (
+                <div className="rounded-md border border-red-200 bg-white px-3 py-2 text-red-700">
+                  No required documents added yet.
+                </div>
+              )}
               {documentData.requiredDocuments.length > 6 && (
                 <div className="text-xs font-medium text-rose-900">+ {documentData.requiredDocuments.length - 6} more document(s)</div>
               )}
@@ -1594,7 +1652,7 @@ export function SolarQuotationForm({
             </div>
             {hasValidationIssues && (
               <div className="text-xs font-medium text-red-700">
-                Resolve payment and scope warnings before saving.
+                Resolve payment, bank, scope, and document warnings before saving.
               </div>
             )}
             <div className="flex gap-2">
