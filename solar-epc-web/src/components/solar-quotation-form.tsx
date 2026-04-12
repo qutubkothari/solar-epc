@@ -57,7 +57,7 @@ type ResolvedRow = {
   isPercentageCharge: boolean;
 };
 
-type QuotationFormTab = "overview" | "technical" | "boq" | "payment" | "scope" | "preview";
+type QuotationFormTab = "overview" | "boq" | "technical" | "masters" | "payment" | "scope" | "preview";
 
 const percentToDecimal = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) {
@@ -108,6 +108,7 @@ const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: stri
   { key: "overview", label: "Overview", description: "Client, quotation, and proposal basics" },
   { key: "boq", label: "BOQ & Pricing", description: "Workbook BOQ builder and totals" },
   { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
+  { key: "masters", label: "Masters", description: "Generation settings and master inputs" },
   { key: "payment", label: "Payment & Banking", description: "Payment stages and bank details" },
   { key: "scope", label: "Scope & Documents", description: "Editable scope matrix and required documents" },
   { key: "preview", label: "Preview", description: "Final quotation summary before save" },
@@ -613,6 +614,117 @@ export function SolarQuotationForm({
       </div>
       <div className={`mt-4 ${calculatedPanelClassName}`}>
         <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {documentData.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
+      </div>
+    </div>
+  );
+
+  const generationSettingsPanel = (
+    <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-rose-900">Generation Settings</h3>
+          <p className="text-xs text-rose-800">Monthly generation settings from Generation Table.docx. Red cells are inputs, amber values are calculated.</p>
+        </div>
+        <div className="w-full max-w-[220px]">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Electricity Tariff - Year 1</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={documentData.electricityTariffYear1}
+            onChange={(event) => setDocumentField("electricityTariffYear1", Number(event.target.value || 0))}
+            className={userInputClassName}
+          />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-rose-200 bg-white">
+        <div className="max-h-[420px] overflow-auto">
+          <table className="min-w-[760px] table-fixed divide-y divide-rose-100">
+            <thead className="sticky top-0 bg-rose-50 text-[11px] uppercase tracking-wide text-rose-900">
+              <tr>
+                <th className="w-24 px-3 py-2 text-left">Month</th>
+                <th className="w-28 px-3 py-2 text-right">Unit / Day</th>
+                <th className="w-20 px-3 py-2 text-right">Days</th>
+                <th className="w-32 px-3 py-2 text-right">kWh</th>
+                <th className="w-36 px-3 py-2 text-right">INR</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-rose-100 text-sm">
+              {generationRows.map((row, index) => (
+                <tr key={row.month}>
+                  <td className="px-3 py-2 font-medium text-slate-900">{row.month}</td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={row.unitsPerDay}
+                      onChange={(event) => updateGenerationRow(index, event.target.value)}
+                      className="w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{row.days}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatDecimal(row.kwh)}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatCurrency(row.amount)}</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-amber-50 text-sm font-semibold text-amber-950">
+              <tr>
+                <td className="px-3 py-3">Total / Avg</td>
+                <td className="px-3 py-3 text-right">{formatDecimal(averageGenerationUnitsPerKw)}</td>
+                <td className="px-3 py-3 text-right">365</td>
+                <td className="px-3 py-3 text-right">{formatDecimal(annualGenerationKwh)}</td>
+                <td className="px-3 py-3 text-right">{formatCurrency(annualGenerationSavings)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Solar Roof Top Size</div>
+          <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)} kW</div>
+          <div className="mt-1 text-[11px] text-amber-700">Calculated from module count and wattage</div>
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Generation / Day</div>
+          <div className="text-2xl font-bold text-amber-900">{formatDecimal(indicativeGenerationPerDay, 0)} Unit</div>
+          <div className="mt-1 text-[11px] text-amber-700">System size x rounded average units/day</div>
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Yearly Saving</div>
+          <div className="text-2xl font-bold text-amber-900">{formatCurrency(annualGenerationSavings)}</div>
+          <div className="mt-1 text-[11px] text-amber-700">Sum of monthly savings</div>
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">1st Year Generation</div>
+          <div className="text-2xl font-bold text-amber-900">{formatDecimal(annualGenerationKwh, 0)} kWh</div>
+          <div className="mt-1 text-[11px] text-amber-700">Sum of monthly generation</div>
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">25 Year Saving</div>
+          <div className="text-2xl font-bold text-amber-900">{formatCurrency(twentyFiveYearSavings)}</div>
+          <div className="mt-1 text-[11px] text-amber-700">Yearly saving x 25</div>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <label className="mb-1 block text-sm font-medium text-gray-700">Generation Disclaimer / Note</label>
+        <textarea
+          value={documentData.generationDisclaimer}
+          onChange={(event) => setDocumentField("generationDisclaimer", event.target.value)}
+          rows={2}
+          className={userInputClassName}
+        />
       </div>
     </div>
   );
@@ -1381,115 +1493,6 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-rose-900">Generation Settings</h3>
-              <p className="text-xs text-rose-800">Monthly generation settings from Generation Table.docx. Red cells are inputs, amber values are calculated.</p>
-            </div>
-            <div className="w-full max-w-[220px]">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Electricity Tariff - Year 1</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={documentData.electricityTariffYear1}
-                onChange={(event) => setDocumentField("electricityTariffYear1", Number(event.target.value || 0))}
-                className={userInputClassName}
-              />
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-lg border border-rose-200 bg-white">
-            <div className="max-h-[420px] overflow-auto">
-              <table className="min-w-[760px] table-fixed divide-y divide-rose-100">
-                <thead className="sticky top-0 bg-rose-50 text-[11px] uppercase tracking-wide text-rose-900">
-                  <tr>
-                    <th className="w-24 px-3 py-2 text-left">Month</th>
-                    <th className="w-28 px-3 py-2 text-right">Unit / Day</th>
-                    <th className="w-20 px-3 py-2 text-right">Days</th>
-                    <th className="w-32 px-3 py-2 text-right">kWh</th>
-                    <th className="w-36 px-3 py-2 text-right">INR</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-rose-100 text-sm">
-                  {generationRows.map((row, index) => (
-                    <tr key={row.month}>
-                      <td className="px-3 py-2 font-medium text-slate-900">{row.month}</td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row.unitsPerDay}
-                          onChange={(event) => updateGenerationRow(index, event.target.value)}
-                          className="w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{row.days}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatDecimal(row.kwh)}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatCurrency(row.amount)}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-amber-50 text-sm font-semibold text-amber-950">
-                  <tr>
-                    <td className="px-3 py-3">Total / Avg</td>
-                    <td className="px-3 py-3 text-right">{formatDecimal(averageGenerationUnitsPerKw)}</td>
-                    <td className="px-3 py-3 text-right">365</td>
-                    <td className="px-3 py-3 text-right">{formatDecimal(annualGenerationKwh)}</td>
-                    <td className="px-3 py-3 text-right">{formatCurrency(annualGenerationSavings)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Solar Roof Top Size</div>
-              <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)} kW</div>
-              <div className="mt-1 text-[11px] text-amber-700">Calculated from module count and wattage</div>
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Generation / Day</div>
-              <div className="text-2xl font-bold text-amber-900">{formatDecimal(indicativeGenerationPerDay, 0)} Unit</div>
-              <div className="mt-1 text-[11px] text-amber-700">System size x rounded average units/day</div>
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Yearly Saving</div>
-              <div className="text-2xl font-bold text-amber-900">{formatCurrency(annualGenerationSavings)}</div>
-              <div className="mt-1 text-[11px] text-amber-700">Sum of monthly savings</div>
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">1st Year Generation</div>
-              <div className="text-2xl font-bold text-amber-900">{formatDecimal(annualGenerationKwh, 0)} kWh</div>
-              <div className="mt-1 text-[11px] text-amber-700">Sum of monthly generation</div>
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">25 Year Saving</div>
-              <div className="text-2xl font-bold text-amber-900">{formatCurrency(twentyFiveYearSavings)}</div>
-              <div className="mt-1 text-[11px] text-amber-700">Yearly saving x 25</div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Generation Disclaimer / Note</label>
-            <textarea
-              value={documentData.generationDisclaimer}
-              onChange={(event) => setDocumentField("generationDisclaimer", event.target.value)}
-              rows={2}
-              className={userInputClassName}
-            />
-          </div>
-        </div>
-
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1897,6 +1900,12 @@ export function SolarQuotationForm({
             </table>
           </div>
         </div>
+        </>
+        )}
+
+        {activeTab === "masters" && (
+        <>
+        {generationSettingsPanel}
         </>
         )}
 
