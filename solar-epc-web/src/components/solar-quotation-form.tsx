@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
-import { createDefaultQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
+import {
+  createDefaultQuotationDocumentData,
+  normalizeQuotationDocumentData,
+  type QuotationDocumentData,
+} from "@/lib/quotation-document";
 import {
   extractWattageFromItem,
   getBoqDisplayParts,
@@ -64,10 +68,14 @@ type SolarQuotationFormProps = {
   onClose: () => void;
   onSuccess: () => void;
   quotationId?: string;
+  editVersionId?: string;
   defaultClientId?: string;
   defaultInquiryId?: string;
   defaultTitle?: string;
   defaultVersion?: string;
+  defaultBrand?: string;
+  initialDocumentData?: QuotationDocumentData;
+  initialBoqRows?: BoqDraftRow[];
   clientName?: string;
   inquiryTitle?: string;
 };
@@ -94,14 +102,19 @@ export function SolarQuotationForm({
   onClose,
   onSuccess,
   quotationId,
+  editVersionId,
   defaultClientId,
   defaultInquiryId,
   defaultTitle,
   defaultVersion,
+  defaultBrand,
+  initialDocumentData,
+  initialBoqRows,
   clientName,
   inquiryTitle,
 }: SolarQuotationFormProps) {
-  const isNewVersion = Boolean(quotationId);
+  const isEditing = Boolean(quotationId && editVersionId);
+  const isNewVersion = Boolean(quotationId && !editVersionId);
   const [clients, setClients] = useState<Client[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [items, setItems] = useState<SolarBoqItem[]>([]);
@@ -112,18 +125,22 @@ export function SolarQuotationForm({
     inquiryId: defaultInquiryId || "",
     title: defaultTitle || "",
     version: defaultVersion || "1.0",
-    brand: "",
+    brand: defaultBrand || "",
   });
   const [documentData, setDocumentData] = useState<QuotationDocumentData>(() =>
-    createDefaultQuotationDocumentData({
-      preparedFor: defaultTitle || inquiryTitle || "",
-      moduleWattage: 630,
-      numberOfModules: 24,
-      totalWatts: 15120,
-      totalKw: 15.12,
-    })
+    initialDocumentData
+      ? normalizeQuotationDocumentData(initialDocumentData)
+      : createDefaultQuotationDocumentData({
+          preparedFor: defaultTitle || inquiryTitle || "",
+          moduleWattage: 630,
+          numberOfModules: 24,
+          totalWatts: 15120,
+          totalKw: 15.12,
+        })
   );
-  const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() => createInitialRows());
+  const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() =>
+    initialBoqRows && initialBoqRows.length > 0 ? initialBoqRows : createInitialRows()
+  );
 
   useEffect(() => {
     fetch("/api/clients")
@@ -417,22 +434,26 @@ export function SolarQuotationForm({
         })),
       };
 
-      const url = quotationId ? `/api/quotations/${quotationId}/versions` : "/api/quotations";
+      const url = isEditing
+        ? `/api/quotations/${quotationId}`
+        : quotationId
+          ? `/api/quotations/${quotationId}/versions`
+          : "/api/quotations";
       const response = await fetch(url, {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(isEditing ? { ...payload, versionId: editVersionId } : payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create quotation");
+        throw new Error(errorData.error || (isEditing ? "Failed to update quotation" : "Failed to create quotation"));
       }
 
       onSuccess();
       onClose();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create quotation");
+      setErrorMessage(error instanceof Error ? error.message : isEditing ? "Failed to update quotation" : "Failed to create quotation");
     } finally {
       setLoading(false);
     }
@@ -441,8 +462,14 @@ export function SolarQuotationForm({
   return (
     <ModalShell
       onClose={onClose}
-      title={isNewVersion ? `New Version ${formData.version}` : "New Solar EPC Quotation"}
-      subtitle={isNewVersion && clientName ? `For ${clientName}` : "BOQ sequence aligned with the shared workbook"}
+      title={isEditing ? `Edit Quotation ${formData.version}` : isNewVersion ? `New Version ${formData.version}` : "New Solar EPC Quotation"}
+      subtitle={
+        isEditing
+          ? "Update the current quotation BOQ and proposal details"
+          : isNewVersion && clientName
+            ? `For ${clientName}`
+            : "BOQ sequence aligned with the shared workbook"
+      }
       size="xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -475,7 +502,7 @@ export function SolarQuotationForm({
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Client <span className="text-red-500">*</span>
             </label>
-            {isNewVersion ? (
+            {isNewVersion || isEditing ? (
               <div className={readOnlyFieldClassName}>
                 {clientName || "Loading..."}
               </div>
@@ -531,12 +558,16 @@ export function SolarQuotationForm({
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Version</label>
-            <input
-              type="text"
-              value={formData.version}
-              onChange={(event) => setFormData((prev) => ({ ...prev, version: event.target.value }))}
-              className={userInputClassName}
-            />
+            {isEditing ? (
+              <div className={readOnlyFieldClassName}>{formData.version}</div>
+            ) : (
+              <input
+                type="text"
+                value={formData.version}
+                onChange={(event) => setFormData((prev) => ({ ...prev, version: event.target.value }))}
+                className={userInputClassName}
+              />
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Offer Label / Brand</label>
@@ -898,7 +929,7 @@ export function SolarQuotationForm({
             disabled={loading || resolvedRows.length === 0}
             className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
           >
-            {loading ? "Creating..." : isNewVersion ? "Create Version" : "Create Quotation"}
+            {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Quotation" : isNewVersion ? "Create Version" : "Create Quotation"}
           </button>
         </div>
       </form>

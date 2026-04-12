@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { SolarQuotationForm } from "@/components/solar-quotation-form";
 import { ModalShell } from "@/components/modal-shell";
 import { formatCurrency } from "@/lib/format";
+import { normalizeQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
+import { resolveBoqItemHead } from "@/lib/solar-boq";
 
 type QuotationVersion = {
   id: string;
   version: string;
   brand?: string | null;
+  documentData?: QuotationDocumentData | null;
   grandTotal: number;
   isFinal: boolean;
   subtotal: number;
@@ -22,7 +25,16 @@ type QuotationVersion = {
     description?: string | null;
     lineTotal: number;
     item: {
+      id: string;
       name: string;
+      description?: string | null;
+      brand?: string | null;
+      unitPrice?: number;
+      taxPercent?: number;
+      marginPercent?: number;
+      uom?: string | null;
+      category?: string | null;
+      pricingUnit?: string | null;
     };
   }[];
 };
@@ -44,14 +56,8 @@ type Quotation = {
   versions: QuotationVersion[];
 };
 
-type Inquiry = {
-  id: string;
-  title: string;
-};
-
 export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [newVersionForQuote, setNewVersionForQuote] = useState<Quotation | null>(null);
@@ -59,7 +65,6 @@ export default function QuotationsPage() {
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<QuotationVersion | null>(null);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
-  const [editData, setEditData] = useState({ title: "", status: "DRAFT", inquiryId: "" });
 
   const fetchQuotes = async () => {
     try {
@@ -75,21 +80,7 @@ export default function QuotationsPage() {
 
   useEffect(() => {
     fetchQuotes();
-    fetch("/api/inquiries")
-      .then((res) => res.json())
-      .then((data) => setInquiries(data || []))
-      .catch(() => setInquiries([]));
   }, []);
-
-  useEffect(() => {
-    if (editingQuote) {
-      setEditData({
-        title: editingQuote.title || "",
-        status: editingQuote.status || "DRAFT",
-        inquiryId: editingQuote.inquiryId || "",
-      });
-    }
-  }, [editingQuote]);
 
   const handleMarkFinal = async (quoteId: string, versionId: string) => {
     const res = await fetch(`/api/quotations/${quoteId}`, {
@@ -112,20 +103,6 @@ export default function QuotationsPage() {
       if (selectedQuoteId === id) {
         setSelectedQuoteId(null);
       }
-    }
-  };
-
-  const handleEditSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!editingQuote) return;
-    const res = await fetch(`/api/quotations/${editingQuote.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editData),
-    });
-    if (res.ok) {
-      fetchQuotes();
-      setEditingQuote(null);
     }
   };
 
@@ -159,6 +136,67 @@ export default function QuotationsPage() {
     }, parsed[0]);
     return `${max.major}.${max.minor + 1}`;
   };
+
+  const editingVersion = useMemo(() => editingQuote?.versions?.[0] || null, [editingQuote]);
+
+  const editingBoqRows = useMemo(() => {
+    if (!editingVersion) {
+      return undefined;
+    }
+
+    const rowsByHead = new Map(
+      editingVersion.items.map((entry) => [
+        resolveBoqItemHead({
+          id: entry.item.id,
+          name: entry.item.name,
+          description: entry.item.description || null,
+          brand: entry.item.brand || null,
+          unitPrice: Number(entry.item.unitPrice || 0),
+          taxPercent: Number(entry.item.taxPercent || 0),
+          marginPercent: Number(entry.item.marginPercent || 0),
+          uom: entry.item.uom || null,
+          category: entry.item.category || null,
+          pricingUnit: entry.item.pricingUnit || null,
+        }),
+        entry,
+      ])
+    );
+
+    return [
+      ...Array.from({ length: 20 }, (_, index) => index + 1).map((sequence) => {
+        const itemHead = [
+          "SOLAR MODULE",
+          "SOLAR INVERTER",
+          "SOLAR STRUCTURE",
+          "SOLAR STRUCTURE Accessories",
+          "ELECTRICAL PROTECTION Panels",
+          "AC CABLE",
+          "DC CABLE",
+          "ELECTRICAL PROTECTION ITEMS",
+          "LIGHTNING ARRESTOR ACCESSORIES",
+          "EARTHING SOLUTION",
+          "EARTHING CONNECTIVITY",
+          "EARTHING ACCESSORIES",
+          "MODULE TO MODULE EARTHING CU.CABLE",
+          "ELECTRICAL INSTALLATIONS",
+          "WALKWAY",
+          "WALKWAY FITTINGS",
+          "PV INSTALLATIONS",
+          "CIVIL WORK",
+          "MISCELLANEOUS",
+          "CHARGES",
+        ][sequence - 1];
+        const matched = rowsByHead.get(itemHead);
+        return {
+          sequence,
+          itemHead,
+          itemId: matched?.item.id || "",
+          quantity: Number(matched?.quantity || 0),
+          quantityTouched: false,
+        };
+      }),
+    ];
+  }, [editingVersion]);
   
   return (
     <div className="space-y-6">
@@ -415,68 +453,25 @@ export default function QuotationsPage() {
         />
       )}
 
-      {editingQuote && (
-        <ModalShell
-          title="Edit Quotation"
-          subtitle="Update quotation title and status."
+      {editingQuote && editingVersion && (
+        <SolarQuotationForm
+          quotationId={editingQuote.id}
+          editVersionId={editingVersion.id}
+          defaultClientId={editingQuote.clientId}
+          defaultInquiryId={editingQuote.inquiryId || ""}
+          defaultTitle={editingQuote.title}
+          defaultVersion={editingVersion.version}
+          defaultBrand={editingVersion.brand || ""}
+          initialDocumentData={normalizeQuotationDocumentData(editingVersion.documentData)}
+          initialBoqRows={editingBoqRows}
+          clientName={editingQuote.client.name}
+          inquiryTitle={editingQuote.inquiry?.title || ""}
           onClose={() => setEditingQuote(null)}
-          size="md"
-        >
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-solar-ink">Title</label>
-              <input
-                value={editData.title}
-                onChange={(event) => setEditData({ ...editData, title: event.target.value })}
-                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-solar-ink">Status</label>
-              <select
-                value={editData.status}
-                onChange={(event) => setEditData({ ...editData, status: event.target.value })}
-                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-              >
-                <option value="DRAFT">Draft</option>
-                <option value="FINAL">Final</option>
-                <option value="APPROVED">Approved</option>
-                <option value="WON">Won (Order Received)</option>
-                <option value="LOST">Lost</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-solar-ink">Inquiry / Project</label>
-              <select
-                value={editData.inquiryId}
-                onChange={(event) => setEditData({ ...editData, inquiryId: event.target.value })}
-                className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-              >
-                <option value="">Select inquiry</option>
-                {inquiries.map((inquiry) => (
-                  <option key={inquiry.id} value={inquiry.id}>
-                    {inquiry.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingQuote(null)}
-                className="flex-1 rounded-xl border border-solar-border bg-white py-2 text-sm font-semibold text-solar-ink"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white"
-              >
-                Save
-              </button>
-            </div>
-          </form>
-        </ModalShell>
+          onSuccess={() => {
+            fetchQuotes();
+            setEditingQuote(null);
+          }}
+        />
       )}
     </div>
   );

@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
+import { createDefaultQuotationDocumentData, normalizeQuotationDocumentData } from "@/lib/quotation-document";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const percentToDecimal = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return value > 1 ? value / 100 : value;
+};
 
 export async function PUT(
   request: Request,
@@ -10,7 +19,7 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { title, status, inquiryId, finalVersionId } = body;
+    const { title, status, inquiryId, finalVersionId, versionId, items, brand } = body;
 
     const { db } = await import("@/lib/db");
     const quotation = await db.$transaction(async (tx) => {
@@ -34,6 +43,106 @@ export async function PUT(
         await tx.quotationVersion.update({
           where: { id: finalVersionId },
           data: { isFinal: true },
+        });
+      }
+
+      if (versionId) {
+        const existingVersion = await tx.quotationVersion.findFirst({
+          where: {
+            id: versionId,
+            quotationId: id,
+          },
+        });
+
+        if (!existingVersion) {
+          throw new Error("Quotation version not found for update");
+        }
+
+        const safeItems = Array.isArray(items) ? items : [];
+        const itemIds = safeItems.map((item: { itemId: string }) => item.itemId).filter(Boolean);
+        const itemRecords = await tx.item.findMany({
+          where: { id: { in: itemIds } },
+        });
+
+        const documentData = body.documentData
+          ? normalizeQuotationDocumentData(body.documentData)
+          : createDefaultQuotationDocumentData({
+              moduleWattage: Number(body.moduleWattage ?? 0) || undefined,
+              numberOfModules: Number(body.numberOfModules ?? 0) || undefined,
+              totalKw: Number(body.systemCapacityKw ?? 0) || undefined,
+            });
+
+        const lineItems: Array<{
+          itemId: string;
+          description: string | null;
+          quantity: number;
+          rate: number;
+          marginPercent: number;
+          taxPercent: number;
+          lineTotal: number;
+        }> = safeItems
+          .filter((line: { itemId: string }) => line.itemId)
+          .map((line: {
+            itemId: string;
+            quantity: number;
+            rate?: number;
+            description?: string;
+            marginPercent?: number;
+            taxPercent?: number;
+          }) => {
+            const item = itemRecords.find((record) => record.id === line.itemId);
+            const quantity = Number(line.quantity || 1);
+            const rate = Number(line.rate ?? item?.unitPrice ?? 0);
+            const marginPercent = Number(line.marginPercent ?? item?.marginPercent ?? 0);
+            const taxPercent = Number(line.taxPercent ?? item?.taxPercent ?? 0);
+            const marginAmount = rate * percentToDecimal(marginPercent);
+            const taxAmount = rate * percentToDecimal(taxPercent);
+            const lineTotal = (rate + marginAmount + taxAmount) * quantity;
+
+            return {
+              itemId: line.itemId,
+              description: line.description || item?.description || null,
+              quantity,
+              rate,
+              marginPercent,
+              taxPercent,
+              lineTotal,
+            };
+          });
+
+        const subtotal = lineItems.reduce(
+          (sum: number, line) => sum + Number(line.rate) * Number(line.quantity),
+          0
+        );
+        const marginTotal = lineItems.reduce(
+          (sum: number, line) =>
+            sum + Number(line.rate) * percentToDecimal(Number(line.marginPercent)) * Number(line.quantity),
+          0
+        );
+        const taxTotal = lineItems.reduce(
+          (sum: number, line) =>
+            sum + Number(line.rate) * percentToDecimal(Number(line.taxPercent)) * Number(line.quantity),
+          0
+        );
+        const grandTotal = subtotal + marginTotal + taxTotal;
+
+        await tx.quotationItem.deleteMany({
+          where: { quotationVersionId: versionId },
+        });
+
+        await tx.quotationVersion.update({
+          where: { id: versionId },
+          data: {
+            brand: brand ?? undefined,
+            documentData,
+            subtotal,
+            marginTotal,
+            taxTotal,
+            grandTotal,
+            items: {
+              create: lineItems,
+            },
+          },
         });
       }
 
