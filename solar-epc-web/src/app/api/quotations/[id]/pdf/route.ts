@@ -13,8 +13,8 @@ const MARGIN = 32;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const FOOTER_TOP = 42;
 const FOOTER_Y = 22;
-const FIRST_PAGE_HEADER_HEIGHT = 110;
-const CONTINUATION_HEADER_HEIGHT = 74;
+const FIRST_PAGE_HEADER_HEIGHT = 136;
+const CONTINUATION_HEADER_HEIGHT = 100;
 
 type QuoteLine = {
   title: string;
@@ -350,11 +350,13 @@ export async function GET(
       const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       pages.push(page);
       const headerHeight = isContinuation ? CONTINUATION_HEADER_HEIGHT : FIRST_PAGE_HEADER_HEIGHT;
+      const subHeaderHeight = 24;
       const logoSize = isContinuation ? 34 : 48;
-      const logoY = PAGE_HEIGHT - (isContinuation ? 58 : 82);
-      const titleY = PAGE_HEIGHT - (isContinuation ? 38 : 50);
-      const subtitleY = PAGE_HEIGHT - (isContinuation ? 51 : 66);
-      const contactY = PAGE_HEIGHT - (isContinuation ? 62 : 82);
+      const logoY = PAGE_HEIGHT - (isContinuation ? 72 : 96);
+      const titleY = PAGE_HEIGHT - (isContinuation ? 44 : 56);
+      const subtitleY = PAGE_HEIGHT - (isContinuation ? 57 : 72);
+      const contactY = PAGE_HEIGHT - (isContinuation ? 68 : 88);
+      const subHeaderY = PAGE_HEIGHT - headerHeight;
 
       page.drawRectangle({
         x: 0,
@@ -368,6 +370,19 @@ export async function GET(
         y: PAGE_HEIGHT - headerHeight - 4,
         width: PAGE_WIDTH,
         height: 4,
+        color: primary,
+      });
+      page.drawRectangle({
+        x: 0,
+        y: subHeaderY,
+        width: PAGE_WIDTH,
+        height: subHeaderHeight,
+        color: paleFill,
+      });
+      page.drawLine({
+        start: { x: 0, y: subHeaderY + subHeaderHeight },
+        end: { x: PAGE_WIDTH, y: subHeaderY + subHeaderHeight },
+        thickness: 1,
         color: primary,
       });
 
@@ -396,6 +411,19 @@ export async function GET(
       if (contactBits && !isContinuation) {
         drawText(page, contactBits, MARGIN + 56, contactY, 8, false, rgb(0.88, 0.91, 0.95));
       }
+
+      drawText(page, "Quotation", MARGIN, subHeaderY + 8, 9, true, accent);
+      drawWrapped(page, quotation.title, MARGIN + 68, subHeaderY + 8, 280, 9, true, accent, 10);
+      drawRightAligned(
+        page,
+        `Version ${sanitizeText(version.version || "1.0")} | ${formatDate(version.createdAt)}`,
+        PAGE_WIDTH - MARGIN - 170,
+        170,
+        subHeaderY + 8,
+        8,
+        false,
+        muted
+      );
 
       return { page, y: PAGE_HEIGHT - headerHeight - 18 };
     };
