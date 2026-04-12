@@ -56,7 +56,7 @@ type ResolvedRow = {
   isPercentageCharge: boolean;
 };
 
-type QuotationFormTab = "overview" | "technical" | "boq" | "payment" | "scope";
+type QuotationFormTab = "overview" | "technical" | "boq" | "payment" | "scope" | "preview";
 
 const percentToDecimal = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) {
@@ -108,6 +108,7 @@ const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: stri
   { key: "boq", label: "BOQ & Pricing", description: "Workbook BOQ builder and totals" },
   { key: "payment", label: "Payment & Banking", description: "Payment stages and bank details" },
   { key: "scope", label: "Scope & Documents", description: "Editable scope matrix and required documents" },
+  { key: "preview", label: "Preview", description: "Final quotation summary before save" },
 ];
 
 export function SolarQuotationForm({
@@ -365,10 +366,13 @@ export function SolarQuotationForm({
       isIncomplete: !row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim(),
     }))
     .filter((entry) => entry.isIncomplete);
+  const totalValidationIssueCount = incompletePaymentStages.length + incompleteScopeRows.length + (hasInvalidPaymentTotal ? 1 : 0);
   const hasValidationIssues = hasInvalidPaymentTotal || incompletePaymentStages.length > 0 || incompleteScopeRows.length > 0;
   const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
   const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
+  const selectedClientLabel = clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected";
+  const selectedInquiryLabel = inquiryTitle || inquiries.find((entry) => entry.id === formData.inquiryId)?.title || "Not linked";
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
     if (tabKey === "payment") {
       return incompletePaymentStages.length + (hasInvalidPaymentTotal ? 1 : 0);
@@ -376,6 +380,10 @@ export function SolarQuotationForm({
 
     if (tabKey === "scope") {
       return incompleteScopeRows.length;
+    }
+
+    if (tabKey === "preview") {
+      return totalValidationIssueCount;
     }
 
     return 0;
@@ -691,7 +699,7 @@ export function SolarQuotationForm({
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-solar-muted">Client</div>
-            <div className="text-sm font-semibold text-solar-ink">{clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected"}</div>
+            <div className="text-sm font-semibold text-solar-ink">{selectedClientLabel}</div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-solar-muted">System Size</div>
@@ -1402,6 +1410,155 @@ export function SolarQuotationForm({
             rows={10}
             className={userInputClassName}
           />
+        </div>
+        </>
+        )}
+
+        {activeTab === "preview" && (
+        <>
+        {hasValidationIssues && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <h3 className="text-lg font-semibold text-red-900">Resolve Validation Issues Before Saving</h3>
+            <div className="mt-3 space-y-2 text-sm text-red-800">
+              {hasInvalidPaymentTotal && <div>Payment stages total {paymentStageTotal.toFixed(2)}%. It must equal 100%.</div>}
+              {incompletePaymentStages.length > 0 && (
+                <div>Incomplete payment stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.</div>
+              )}
+              {incompleteScopeRows.length > 0 && (
+                <div>Incomplete scope rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h3 className="mb-4 text-lg font-semibold text-slate-900">Quotation Snapshot</h3>
+            <div className="space-y-3 text-sm text-slate-700">
+              <div className="flex justify-between gap-4"><span>Quotation</span><span className="font-semibold text-slate-900">{formData.title || "New quotation"}</span></div>
+              <div className="flex justify-between gap-4"><span>Client</span><span className="font-semibold text-slate-900">{selectedClientLabel}</span></div>
+              <div className="flex justify-between gap-4"><span>Inquiry</span><span className="font-semibold text-slate-900">{selectedInquiryLabel}</span></div>
+              <div className="flex justify-between gap-4"><span>Version</span><span className="font-semibold text-slate-900">{formData.version}</span></div>
+              <div className="flex justify-between gap-4"><span>Offer Label</span><span className="font-semibold text-slate-900">{formData.brand || "-"}</span></div>
+              <div className="flex justify-between gap-4"><span>Prepared By</span><span className="font-semibold text-slate-900">{documentData.preparedBy || "-"}</span></div>
+              <div className="flex justify-between gap-4"><span>Prepared For</span><span className="font-semibold text-slate-900">{documentData.preparedFor || formData.title || "-"}</span></div>
+              <div className="flex justify-between gap-4"><span>Consumer Type</span><span className="font-semibold text-slate-900">{documentData.consumerType}</span></div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h3 className="mb-4 text-lg font-semibold text-amber-900">System & Pricing Summary</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">System Size</div>
+                <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)} kWp</div>
+                <div className="mt-1 text-[11px] text-amber-700">{numberOfModules} modules x {documentData.moduleWattage}W</div>
+              </div>
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Grand Total</div>
+                <div className="text-2xl font-bold text-amber-900">{formatCurrency(grandTotal)}</div>
+                <div className="mt-1 text-[11px] text-amber-700">Subtotal {formatCurrency(subtotal)} + GST {formatCurrency(totalGst)}</div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-md border border-amber-300 bg-white p-3 text-sm text-amber-950">
+              <div><strong>Resolved BOQ Rows:</strong> {resolvedRows.length}</div>
+              <div className="mt-1"><strong>Cost / Watt:</strong> {actualSystemWatts > 0 ? formatCurrency(grandTotal / actualSystemWatts) : formatCurrency(0)}</div>
+              <div className="mt-1"><strong>Cost / kW:</strong> {actualSystemKw > 0 ? formatCurrency(grandTotal / actualSystemKw) : formatCurrency(0)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-sky-900">BOQ Summary</h3>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-900">{resolvedRows.length} active rows</span>
+            </div>
+            <div className="space-y-2 text-sm text-sky-950">
+              {resolvedRows.slice(0, 6).map((row) => (
+                <div key={`${row.sequence}-${row.itemId}`} className="rounded-md border border-sky-100 bg-white px-3 py-2">
+                  <div className="font-medium">{row.itemHead}</div>
+                  <div className="text-xs text-slate-600">{row.lineDescription}</div>
+                  <div className="mt-1 text-xs text-slate-700">Qty {row.quantity} | Rate {formatCurrency(row.rate)} | Total {formatCurrency(row.grandTotal)}</div>
+                </div>
+              ))}
+              {resolvedRows.length > 6 && (
+                <div className="text-xs font-medium text-sky-900">+ {resolvedRows.length - 6} more BOQ row(s)</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-cyan-900">Payment Summary</h3>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${hasInvalidPaymentTotal ? "bg-red-100 text-red-700" : "bg-white text-cyan-900"}`}>
+                {paymentStageTotal.toFixed(2)}%
+              </span>
+            </div>
+            <div className="space-y-2 text-sm text-cyan-950">
+              {documentData.paymentStages.map((stage, index) => (
+                <div
+                  key={`${stage.label}-${index}-preview`}
+                  className={`rounded-md border bg-white px-3 py-2 ${
+                    incompletePaymentStages.some((entry) => entry.index === index) ? "border-red-200" : "border-cyan-100"
+                  }`}
+                >
+                  <div className="font-medium">{stage.label || `Stage ${index + 1}`}</div>
+                  <div className="text-xs text-slate-600">{stage.milestone || "Milestone missing"}</div>
+                  <div className="mt-1 text-xs text-slate-700">{Number(stage.percentage || 0).toFixed(2)}% | {stage.remarks || "Remarks missing"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-indigo-900">Scope Summary</h3>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-900">{documentData.scopeOfWorkRows.length} rows</span>
+            </div>
+            <div className="space-y-2 text-sm text-indigo-950">
+              {documentData.scopeOfWorkRows.slice(0, 5).map((row, index) => (
+                <div
+                  key={`${row.srNo}-${index}-preview`}
+                  className={`rounded-md border bg-white px-3 py-2 ${
+                    incompleteScopeRows.some((entry) => entry.index === index) ? "border-red-200" : "border-indigo-100"
+                  }`}
+                >
+                  <div className="font-medium">{row.srNo || `Row ${index + 1}`} - {row.workItem || "Work item missing"}</div>
+                  <div className="text-xs text-slate-700">{row.responsibility || "Responsibility missing"}</div>
+                </div>
+              ))}
+              {documentData.scopeOfWorkRows.length > 5 && (
+                <div className="text-xs font-medium text-indigo-900">+ {documentData.scopeOfWorkRows.length - 5} more scope row(s)</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-rose-900">Documents & Bank Details</h3>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-900">{documentData.requiredDocuments.length} docs</span>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3 text-sm text-slate-700">
+              <div><strong>Bank:</strong> {documentData.bankDetails.bankName}</div>
+              <div className="mt-1"><strong>Account Name:</strong> {documentData.bankDetails.accountName}</div>
+              <div className="mt-1"><strong>Account Number:</strong> {documentData.bankDetails.accountNumber}</div>
+              <div className="mt-1"><strong>IFSC:</strong> {documentData.bankDetails.ifscCode}</div>
+              <div className="mt-1"><strong>Branch:</strong> {documentData.bankDetails.branch}</div>
+            </div>
+            <div className="mt-3 space-y-2 text-sm text-rose-950">
+              {documentData.requiredDocuments.slice(0, 6).map((document) => (
+                <div key={document} className="rounded-md border border-rose-100 bg-white px-3 py-2">
+                  {document}
+                </div>
+              ))}
+              {documentData.requiredDocuments.length > 6 && (
+                <div className="text-xs font-medium text-rose-900">+ {documentData.requiredDocuments.length - 6} more document(s)</div>
+              )}
+            </div>
+          </div>
         </div>
         </>
         )}
