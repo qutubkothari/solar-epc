@@ -292,7 +292,35 @@ export const resolveBoqItemHead = (item: SolarBoqItem) => {
 
 const cleanName = (value?: string | null) => (value || "").replace(/\s+/g, " ").trim();
 
-const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description">) => {
+const normalizeRatingPart = (value: string) =>
+  value
+    .replace(/^rating\s*\/\s*capacity\s*:\s*/i, "")
+    .replace(/^capacity\s*[:-]\s*/i, "")
+    .replace(/^inv\s*-\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractDescriptionRating = (description?: string | null) => {
+  const safeDescription = cleanName(description);
+  if (!safeDescription) {
+    return "";
+  }
+
+  const match = safeDescription.match(/rating\s*\/\s*capacity\s*:\s*([^|]+)/i);
+  return match ? normalizeRatingPart(match[1]) : "";
+};
+
+const extractTrailingSpec = (name: string) => {
+  const parts = name.split(/\s*-\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    return "";
+  }
+
+  const trailing = parts[parts.length - 1];
+  return /\d/.test(trailing) ? normalizeRatingPart(trailing) : "";
+};
+
+const extractFallbackRating = (item: Pick<SolarBoqItem, "name" | "description">) => {
   const text = `${cleanName(item.name)} ${cleanName(item.description)}`;
   const patterns = [
     /(\d+(?:\.\d+)?)\s*TO\s*(\d+(?:\.\d+)?)(?:\s*(?:WP|W|KW|KVA|MM))?\b/i,
@@ -309,11 +337,21 @@ const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description"
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      return match[0].replace(/\s+/g, " ").trim();
+      return normalizeRatingPart(match[0]);
     }
   }
 
   return "";
+};
+
+const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description">) => {
+  const parts = [
+    extractTrailingSpec(cleanName(item.name)),
+    extractDescriptionRating(item.description),
+    extractFallbackRating(item),
+  ].filter(Boolean);
+
+  return Array.from(new Set(parts)).join(" | ");
 };
 
 const stripRatingFromItemType = (value: string, ratingOrCapacity: string) => {
@@ -321,10 +359,17 @@ const stripRatingFromItemType = (value: string, ratingOrCapacity: string) => {
     return value.trim();
   }
 
-  const escapedRating = ratingOrCapacity.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
-  return value
-    .replace(new RegExp(`(?:-|–|—|/)?\\s*${escapedRating}\\s*$`, "i"), "")
-    .replace(new RegExp(`(?:-|–|—|/)\\s*${escapedRating}(?:\\s*(?:-|–|—|/))?`, "i"), " ")
+  let next = value;
+  for (const ratingPart of ratingOrCapacity.split("|").map((part) => part.trim()).filter(Boolean)) {
+    const escapedRating = ratingPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+    next = next
+      .replace(new RegExp(`(?:-|–|—|/)?\\s*${escapedRating}\\s*$`, "i"), "")
+      .replace(new RegExp(`(?:-|–|—|/)\\s*${escapedRating}(?:\\s*(?:-|–|—|/))?`, "i"), " ");
+  }
+
+  return next
+    .replace(/\bINV\b\s*$/i, "")
+    .replace(/\bINV\b\s*[-/|]?\s*/gi, " ")
     .replace(/\s*[-/|]+\s*$/, "")
     .replace(/\s{2,}/g, " ")
     .trim();
