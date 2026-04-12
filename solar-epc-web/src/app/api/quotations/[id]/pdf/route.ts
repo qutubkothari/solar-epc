@@ -544,12 +544,13 @@ export async function GET(
       ["Project Completion Timeline", documentData.projectCompletionTimeline, ""],
     ];
 
-    const scopeMatrixRows = documentData.scopeOfWorkRows.map((row) => [
-      sanitizeText(row.srNo || "-"),
-      sanitizeText(row.workItem || "-"),
-      sanitizeText(row.responsibility || "-"),
-      sanitizeText(row.remarks || "-"),
-    ]);
+    const scopeMatrixRows = documentData.scopeOfWorkRows.map((row) => ({
+      srNo: sanitizeText(row.srNo || "-"),
+      workItem: sanitizeText(row.workItem || "-"),
+      responsibility: sanitizeText(row.responsibility || "-"),
+      remarks: sanitizeText(row.remarks || "-"),
+      isSection: row.responsibility === "Section",
+    }));
 
     const companyRows = [
       companySettings?.companyName || "Hi-Tech Solar",
@@ -916,10 +917,36 @@ export async function GET(
     y -= 28;
 
     scopeMatrixRows.forEach((row, index) => {
-      const srLines = wrapText(row[0], scopeColumns[0].width - 12, 7.5, true);
-      const workLines = wrapText(row[1], scopeColumns[1].width - 12, 7.5);
-      const responsibilityLines = wrapText(row[2], scopeColumns[2].width - 12, 7.5, true);
-      const remarkLines = wrapText(row[3], scopeColumns[3].width - 12, 7.5);
+      if (row.isSection) {
+        const sectionLines = wrapText(`${row.srNo} ${row.workItem}`, CONTENT_WIDTH - 12, 8.2, true);
+        const rowHeight = 12 + Math.max(sectionLines.length, 1) * 10;
+
+        if (y - rowHeight < FOOTER_TOP + 16) {
+          ({ page, y } = createPage(true));
+          drawText(page, "Scope of Work Matrix", MARGIN, y, 12.5, true, accent);
+          y -= 10;
+          drawScopeHeader(page, y);
+          y -= 28;
+        }
+
+        page.drawRectangle({
+          x: MARGIN,
+          y: y - rowHeight,
+          width: CONTENT_WIDTH,
+          height: rowHeight,
+          color: paleFill,
+          borderColor: subtleLine,
+          borderWidth: 1,
+        });
+        sectionLines.forEach((line, lineIndex) => drawText(page, line, MARGIN + 6, y - 14 - lineIndex * 10, 8.2, true, accent));
+        y -= rowHeight;
+        return;
+      }
+
+      const srLines = wrapText(row.srNo, scopeColumns[0].width - 12, 7.5, true);
+      const workLines = wrapText(row.workItem, scopeColumns[1].width - 12, 7.5);
+      const responsibilityLines = wrapText(row.responsibility, scopeColumns[2].width - 12, 7.5, true);
+      const remarkLines = wrapText(row.remarks, scopeColumns[3].width - 12, 7.5);
       const lineCount = Math.max(srLines.length, workLines.length, responsibilityLines.length, remarkLines.length, 1);
       const rowHeight = 12 + lineCount * 10;
 

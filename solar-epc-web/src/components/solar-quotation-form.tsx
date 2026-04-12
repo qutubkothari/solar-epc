@@ -129,6 +129,9 @@ const OVERVIEW_REQUIRED_FIELDS = [
   { key: "preparedBy", label: "Prepared By" },
 ] as const;
 
+const isScopeSectionRow = (row: QuotationDocumentData["scopeOfWorkRows"][number]) =>
+  row.responsibility === "Section";
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -384,7 +387,9 @@ export function SolarQuotationForm({
     .map((row, index) => ({
       index,
       row,
-      isIncomplete: !row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim(),
+      isIncomplete:
+        !isScopeSectionRow(row) &&
+        (!row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim()),
     }))
     .filter((entry) => entry.isIncomplete);
   const missingRequiredDocuments = documentData.requiredDocuments.length === 0;
@@ -1413,11 +1418,15 @@ export function SolarQuotationForm({
                 className={`rounded-lg border bg-white p-4 ${
                   incompleteScopeRows.some((entry) => entry.index === index)
                     ? "border-red-200"
-                    : "border-indigo-200"
+                    : isScopeSectionRow(row)
+                      ? "border-indigo-300 bg-indigo-100"
+                      : "border-indigo-200"
                 }`}
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-indigo-950">Scope Row {index + 1}</div>
+                  <div className="text-sm font-semibold text-indigo-950">
+                    {isScopeSectionRow(row) ? `Section ${row.srNo}` : `Scope Row ${index + 1}`}
+                  </div>
                   {documentData.scopeOfWorkRows.length > 1 && (
                     <button
                       type="button"
@@ -1428,44 +1437,67 @@ export function SolarQuotationForm({
                     </button>
                   )}
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Sr. No.</label>
-                    <input
-                      type="text"
-                      value={row.srNo}
-                      onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
-                      className={userInputClassName}
-                    />
+                {isScopeSectionRow(row) ? (
+                  <div className="grid gap-4 md:grid-cols-[120px_1fr]">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Section No.</label>
+                      <input
+                        type="text"
+                        value={row.srNo}
+                        onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
+                        className={userInputClassName}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Section Title</label>
+                      <input
+                        type="text"
+                        value={row.workItem}
+                        onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
+                        className={userInputClassName}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Responsibility</label>
-                    <input
-                      type="text"
-                      value={row.responsibility}
-                      onChange={(event) => updateScopeRow(index, "responsibility", event.target.value)}
-                      className={userInputClassName}
-                    />
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Sr. No.</label>
+                      <input
+                        type="text"
+                        value={row.srNo}
+                        onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
+                        className={userInputClassName}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Responsibility</label>
+                      <input
+                        type="text"
+                        value={row.responsibility}
+                        onChange={(event) => updateScopeRow(index, "responsibility", event.target.value)}
+                        className={userInputClassName}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Work Item / Activity</label>
+                      <textarea
+                        value={row.workItem}
+                        onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
+                        rows={2}
+                        className={userInputClassName}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
+                      <textarea
+                        value={row.remarks}
+                        onChange={(event) => updateScopeRow(index, "remarks", event.target.value)}
+                        rows={2}
+                        className={userInputClassName}
+                      />
+                    </div>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Work Item / Activity</label>
-                    <textarea
-                      value={row.workItem}
-                      onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
-                      rows={2}
-                      className={userInputClassName}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
-                    <textarea
-                      value={row.remarks}
-                      onChange={(event) => updateScopeRow(index, "remarks", event.target.value)}
-                      rows={2}
-                      className={userInputClassName}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -1652,11 +1684,17 @@ export function SolarQuotationForm({
                 <div
                   key={`${row.srNo}-${index}-preview`}
                   className={`rounded-md border bg-white px-3 py-2 ${
-                    incompleteScopeRows.some((entry) => entry.index === index) ? "border-red-200" : "border-indigo-100"
+                    incompleteScopeRows.some((entry) => entry.index === index)
+                      ? "border-red-200"
+                      : isScopeSectionRow(row)
+                        ? "border-indigo-300 bg-indigo-100"
+                        : "border-indigo-100"
                   }`}
                 >
                   <div className="font-medium">{row.srNo || `Row ${index + 1}`} - {row.workItem || "Work item missing"}</div>
-                  <div className="text-xs text-slate-700">{row.responsibility || "Responsibility missing"}</div>
+                  {!isScopeSectionRow(row) && (
+                    <div className="text-xs text-slate-700">{row.responsibility || "Responsibility missing"}</div>
+                  )}
                 </div>
               ))}
               {documentData.scopeOfWorkRows.length > 5 && (
