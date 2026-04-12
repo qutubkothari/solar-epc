@@ -316,8 +316,24 @@ const extractTrailingSpec = (name: string) => {
     return "";
   }
 
-  const trailing = parts[parts.length - 1];
-  return /\d/.test(trailing) ? normalizeRatingPart(trailing) : "";
+  let specStartIndex = -1;
+
+  for (let index = parts.length - 1; index >= 1; index -= 1) {
+    if (/\d/.test(parts[index])) {
+      specStartIndex = index;
+      continue;
+    }
+
+    if (specStartIndex !== -1) {
+      break;
+    }
+  }
+
+  if (specStartIndex === -1) {
+    return "";
+  }
+
+  return normalizeRatingPart(parts.slice(specStartIndex).join("-"));
 };
 
 const extractFallbackRating = (item: Pick<SolarBoqItem, "name" | "description">) => {
@@ -344,23 +360,24 @@ const extractFallbackRating = (item: Pick<SolarBoqItem, "name" | "description">)
   return "";
 };
 
-const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description">) => {
-  const parts = [
-    extractTrailingSpec(cleanName(item.name)),
-    extractDescriptionRating(item.description),
-    extractFallbackRating(item),
-  ].filter(Boolean);
+const getItemSpecs = (item: Pick<SolarBoqItem, "name" | "description">) => {
+  const trailingSpec = extractTrailingSpec(cleanName(item.name));
+  const descriptionRating = extractDescriptionRating(item.description);
+  const fallbackRating = extractFallbackRating(item);
 
-  return Array.from(new Set(parts)).join(" | ");
+  return {
+    ratingOrCapacity: descriptionRating || trailingSpec || fallbackRating,
+    removableParts: Array.from(new Set([trailingSpec, descriptionRating, fallbackRating].filter(Boolean))),
+  };
 };
 
-const stripRatingFromItemType = (value: string, ratingOrCapacity: string) => {
-  if (!ratingOrCapacity) {
+const stripRatingFromItemType = (value: string, removableParts: string[]) => {
+  if (removableParts.length === 0) {
     return value.trim();
   }
 
   let next = value;
-  for (const ratingPart of ratingOrCapacity.split("|").map((part) => part.trim()).filter(Boolean)) {
+  for (const ratingPart of removableParts) {
     const escapedRating = ratingPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
     next = next
       .replace(new RegExp(`(?:-|–|—|/)?\\s*${escapedRating}\\s*$`, "i"), "")
@@ -378,17 +395,17 @@ const stripRatingFromItemType = (value: string, ratingOrCapacity: string) => {
 export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => {
   const resolvedHead = resolveBoqItemHead(item);
   const rawName = cleanName(item.name);
-  const ratingOrCapacity = extractRatingOrCapacity(item);
+  const { ratingOrCapacity, removableParts } = getItemSpecs(item);
 
   if (resolvedHead === "SOLAR MODULE") {
     return {
-      itemType: stripRatingFromItemType(rawName.replace(/^\d+(?:\.\d+)?\s*WP\s*/i, "").trim(), ratingOrCapacity) || rawName,
+      itemType: stripRatingFromItemType(rawName.replace(/^\d+(?:\.\d+)?\s*WP\s*/i, "").trim(), removableParts) || rawName,
       ratingOrCapacity,
     };
   }
 
   if (resolvedHead === "SOLAR INVERTER") {
-    const normalizedName = stripRatingFromItemType(rawName.replace(/^INV\s*-\s*/i, "").trim(), ratingOrCapacity);
+    const normalizedName = stripRatingFromItemType(rawName.replace(/^INV\s*-\s*/i, "").trim(), removableParts);
     return {
       itemType: normalizedName || rawName,
       ratingOrCapacity,
@@ -396,7 +413,7 @@ export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => 
   }
 
   return {
-    itemType: stripRatingFromItemType(rawName, ratingOrCapacity) || rawName,
+    itemType: stripRatingFromItemType(rawName, removableParts) || rawName,
     ratingOrCapacity,
   };
 };
