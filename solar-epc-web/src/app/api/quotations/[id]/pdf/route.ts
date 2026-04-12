@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { formatCurrency } from "@/lib/format";
 import { buildRoiProjection } from "@/lib/roi-calculation";
+import { getQuotationWriteups } from "@/lib/quotation-writeups";
 import { getBoqDisplayParts } from "@/lib/solar-boq";
 import { normalizeQuotationDocumentData } from "@/lib/quotation-document";
 
@@ -41,7 +42,7 @@ export async function GET(
     const { db } = await import("@/lib/db");
     const { id } = await context.params;
 
-    const [companySettings, quotation] = await Promise.all([
+    const [companySettings, quotation, quotationWriteups] = await Promise.all([
       db.companySettings.findUnique({ where: { id: "default" } }),
       db.quotation.findUnique({
         where: { id },
@@ -59,6 +60,7 @@ export async function GET(
           },
         },
       }),
+      getQuotationWriteups({ activeOnly: true }),
     ]);
 
     if (!quotation) {
@@ -69,9 +71,13 @@ export async function GET(
       return NextResponse.json({ error: "No versions found for this quotation" }, { status: 404 });
     }
 
+    type QuotationVersionEntry = (typeof quotation.versions)[number];
+    type VersionItemEntry = QuotationVersionEntry["items"][number];
+    type QuotationWriteupEntry = (typeof quotationWriteups)[number];
+
     const versionId = new URL(request.url).searchParams.get("version");
     const version = versionId
-      ? quotation.versions.find((entry) => entry.id === versionId) || quotation.versions[0]
+      ? quotation.versions.find((entry: QuotationVersionEntry) => entry.id === versionId) || quotation.versions[0]
       : quotation.versions[0];
 
     const pdfDoc = await PDFDocument.create();
@@ -250,6 +256,51 @@ export async function GET(
         drawText(page, line, x, y - index * lineHeight, size, bold, color);
       });
       return lines.length * lineHeight;
+    };
+
+    const drawWriteupSection = (title: string, content: string) => {
+      const safeTitle = sanitizeText(title);
+      const normalizedContent = content.replace(/\r/g, "").trim();
+      if (!safeTitle || !normalizedContent) {
+        return;
+      }
+
+      const drawSectionHeading = (continuation = false) => {
+        if (y - 24 < FOOTER_TOP + 12) {
+          ({ page, y } = createPage(true));
+        }
+
+        drawText(page, continuation ? `${safeTitle} (cont.)` : safeTitle, MARGIN, y, 12.5, true, accent);
+        y -= 16;
+      };
+
+      drawSectionHeading(false);
+
+      normalizedContent.split("\n").forEach((rawLine) => {
+        const safeLine = rawLine.trim();
+        if (!safeLine) {
+          y -= 4;
+          return;
+        }
+
+        const isSubheading =
+          !safeLine.startsWith("-") &&
+          !/^\d+[.)]/.test(safeLine) &&
+          safeLine.length <= 42 &&
+          !/[.!?]$/.test(safeLine);
+        const wrappedLines = wrapText(safeLine, CONTENT_WIDTH, 8.2, isSubheading);
+        const requiredHeight = wrappedLines.length * 10 + 2;
+
+        if (y - requiredHeight < FOOTER_TOP + 12) {
+          ({ page, y } = createPage(true));
+          drawSectionHeading(true);
+        }
+
+        const consumed = drawWrapped(page, safeLine, MARGIN, y, CONTENT_WIDTH, 8.2, isSubheading, isSubheading ? accent : muted, 10);
+        y -= consumed + 2;
+      });
+
+      y -= 8;
     };
 
     const drawBarChartCard = (
@@ -666,7 +717,7 @@ export async function GET(
     const versionDocumentData = (version as typeof version & { documentData?: unknown }).documentData;
     const documentData = normalizeQuotationDocumentData(versionDocumentData);
 
-    const lines: QuoteLine[] = version.items.map((item) => ({
+    const lines: QuoteLine[] = version.items.map((item: VersionItemEntry) => ({
       title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
       detail: sanitizeText(item.item.description || item.description || item.item.name || ""),
       quantity: Number(item.quantity || 0),
@@ -675,7 +726,7 @@ export async function GET(
     }));
 
     const findVersionItem = (head: string, includesText?: string) =>
-      version.items.find((entry) => {
+      version.items.find((entry: VersionItemEntry) => {
         const category = sanitizeText(entry.item.category || "").toUpperCase();
         const haystack = sanitizeText(`${entry.item.name} ${entry.item.description || ""} ${entry.description || ""}`).toUpperCase();
         return category === head.toUpperCase() && (!includesText || haystack.includes(includesText.toUpperCase()));
@@ -955,8 +1006,11 @@ export async function GET(
     drawInfoCard("Bill To", clientRows, MARGIN + cardWidth + cardGap);
     y -= cardHeight + 18;
 
+    const executiveSummaryWriteup = quotationWriteups.find((entry: QuotationWriteupEntry) => entry.key === "executive-summary");
+    const additionalWriteups = quotationWriteups.filter((entry: QuotationWriteupEntry) => entry.key !== "executive-summary");
     const executiveSummary = sanitizeText(
-      `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
+      executiveSummaryWriteup?.content ||
+        `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
     );
 
     const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.5);
@@ -965,7 +1019,7 @@ export async function GET(
       ({ page, y } = createPage(true));
     }
 
-    drawText(page, "Executive Summary", MARGIN, y, 12.5, true, accent);
+    drawText(page, executiveSummaryWriteup?.title || "Executive Summary", MARGIN, y, 12.5, true, accent);
     y -= 16;
     page.drawRectangle({
       x: MARGIN,
@@ -1837,6 +1891,10 @@ export async function GET(
       docsCardHeight
     );
     y -= Math.max(bankCardHeight, docsCardHeight) + 18;
+
+    additionalWriteups.forEach((writeup: QuotationWriteupEntry) => {
+      drawWriteupSection(writeup.title, writeup.content);
+    });
 
     const authHeight = 86;
     if (y - authHeight < FOOTER_TOP + 12) {

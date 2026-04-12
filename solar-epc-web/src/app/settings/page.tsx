@@ -29,6 +29,17 @@ type TechnicalDataset = {
   createdAt: string;
 };
 
+type QuotationWriteup = {
+  id: string;
+  key: string;
+  title: string;
+  content: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export default function SettingsPage() {
   const [templates, setTemplates] = useState<TemplateState>(() => {
     if (typeof window === "undefined") return DEFAULT_TEMPLATES;
@@ -52,23 +63,29 @@ export default function SettingsPage() {
   });
   const [templatesData, setTemplatesData] = useState<QuotationTemplate[]>([]);
   const [technicalData, setTechnicalData] = useState<TechnicalDataset[]>([]);
+  const [quotationWriteups, setQuotationWriteups] = useState<QuotationWriteup[]>([]);
   const [loadingImports, setLoadingImports] = useState(true);
   const [templatePreview, setTemplatePreview] = useState<QuotationTemplate | null>(null);
   const [technicalPreviewSheet, setTechnicalPreviewSheet] = useState<string | null>(null);
+  const [savingWriteups, setSavingWriteups] = useState(false);
+  const [writeupStatus, setWriteupStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchImportedData = async () => {
       try {
-        const [templateRes, techRes] = await Promise.all([
+        const [templateRes, techRes, writeupRes] = await Promise.all([
           fetch("/api/quotation-templates"),
           fetch("/api/technical-datasets"),
+          fetch("/api/quotation-writeups"),
         ]);
-        const [templateJson, techJson] = await Promise.all([
+        const [templateJson, techJson, writeupJson] = await Promise.all([
           templateRes.json(),
           techRes.json(),
+          writeupRes.json(),
         ]);
         setTemplatesData(Array.isArray(templateJson) ? templateJson : []);
         setTechnicalData(Array.isArray(techJson) ? techJson : []);
+        setQuotationWriteups(Array.isArray(writeupJson) ? writeupJson : []);
       } catch (error) {
         console.error("Failed to fetch imported data:", error);
       } finally {
@@ -140,6 +157,47 @@ export default function SettingsPage() {
     const data = row.data as { values?: Record<string, unknown> };
     const value = data?.values?.[header];
     return value === null || value === undefined || value === "" ? "—" : String(value);
+  };
+
+  const updateWriteup = (key: string, patch: Partial<QuotationWriteup>) => {
+    setQuotationWriteups((prev) =>
+      prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry))
+    );
+  };
+
+  const saveWriteups = async () => {
+    setSavingWriteups(true);
+    setWriteupStatus(null);
+
+    try {
+      const response = await fetch("/api/quotation-writeups", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          quotationWriteups.map((entry) => ({
+            key: entry.key,
+            title: entry.title,
+            content: entry.content,
+            sortOrder: entry.sortOrder,
+            isActive: entry.isActive,
+          }))
+        ),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save quotation writeups");
+      }
+
+      setQuotationWriteups(Array.isArray(data) ? data : []);
+      setWriteupStatus("Quotation writeups saved.");
+    } catch (error) {
+      setWriteupStatus(error instanceof Error ? error.message : "Failed to save quotation writeups");
+    } finally {
+      setSavingWriteups(false);
+    }
   };
 
   return (
@@ -280,6 +338,89 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-solar-ink">Quotation Writeups Master</h3>
+            <p className="mt-1 text-sm text-solar-muted">
+              Maintain the standard writeup sections copied into quotation PDFs.
+            </p>
+          </div>
+          <button
+            onClick={saveWriteups}
+            disabled={savingWriteups || loadingImports}
+            className="rounded-xl border border-solar-border bg-solar-ink px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {savingWriteups ? "Saving..." : "Save Writeups"}
+          </button>
+        </div>
+
+        {writeupStatus && (
+          <div className="mt-4 rounded-xl border border-solar-border bg-solar-sand px-4 py-3 text-sm text-solar-ink">
+            {writeupStatus}
+          </div>
+        )}
+
+        {loadingImports ? (
+          <div className="mt-4 text-sm text-solar-muted">Loading writeups...</div>
+        ) : quotationWriteups.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-solar-border bg-solar-sand px-4 py-6 text-sm text-solar-muted">
+            No quotation writeups found.
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {quotationWriteups.map((writeup) => (
+              <div key={writeup.key} className="rounded-xl border border-solar-border bg-solar-sand p-4">
+                <div className="grid gap-4 md:grid-cols-[1fr,140px,140px]">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-solar-muted">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={writeup.title}
+                      onChange={(event) => updateWriteup(writeup.key, { title: event.target.value })}
+                      className="w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm text-solar-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-solar-muted">
+                      Sort Order
+                    </label>
+                    <input
+                      type="number"
+                      value={writeup.sortOrder}
+                      onChange={(event) => updateWriteup(writeup.key, { sortOrder: Number(event.target.value || 0) })}
+                      className="w-full rounded-xl border border-solar-border bg-white px-3 py-2 text-sm text-solar-ink"
+                    />
+                  </div>
+                  <label className="flex items-end gap-3 rounded-xl border border-solar-border bg-white px-3 py-2 text-sm font-medium text-solar-ink">
+                    <input
+                      type="checkbox"
+                      checked={writeup.isActive}
+                      onChange={(event) => updateWriteup(writeup.key, { isActive: event.target.checked })}
+                    />
+                    Include In PDF
+                  </label>
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-solar-muted">
+                    {writeup.key}
+                  </div>
+                  <textarea
+                    value={writeup.content}
+                    onChange={(event) => updateWriteup(writeup.key, { content: event.target.value })}
+                    rows={Math.max(8, Math.min(20, writeup.content.split("\n").length + 2))}
+                    className="min-h-[180px] w-full rounded-xl border border-solar-border bg-white px-3 py-3 text-sm text-solar-ink"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {templatePreview && (
