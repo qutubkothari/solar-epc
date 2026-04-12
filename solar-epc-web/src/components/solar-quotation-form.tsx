@@ -386,6 +386,49 @@ export function SolarQuotationForm({
       : 0;
   const annualGenerationKwh = generationRows.reduce((sum, row) => sum + row.kwh, 0);
   const annualGenerationSavings = generationRows.reduce((sum, row) => sum + row.amount, 0);
+  const indicativeGenerationPerDay = actualSystemKw * Math.max(Math.round(averageGenerationUnitsPerKw), 0);
+  const twentyFiveYearSavings = annualGenerationSavings * 25;
+  const roiYear1GenerationKwh =
+    actualSystemKw *
+    Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0) *
+    Math.max(365 - Number(documentData.roiShutdownDays || 0), 0);
+  const roiYear1GrossSavings = roiYear1GenerationKwh * Number(documentData.electricityTariffYear1 || 0);
+  const roiOperationMaintenanceCostYear1 =
+    grandTotal * percentToDecimal(documentData.roiOperationMaintenancePercentYear1);
+  const roiProjectionYears = Math.max(Math.round(Number(documentData.roiProjectLifeYears || 0)), 1);
+  const roiTariffEscalation = percentToDecimal(documentData.roiTariffEscalationPercent);
+  const roiOperationMaintenanceEscalation = percentToDecimal(documentData.roiOperationMaintenanceEscalationPercent);
+  const roiAfterYear1Degradation = percentToDecimal(documentData.roiAnnualPowerDegradationAfterYear1Percent);
+  const roiYear3OnwardDegradation = percentToDecimal(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent);
+  let roiLifetimeNetSavings = 0;
+  let roiEstimatedPaybackYears: number | null = null;
+
+  for (let year = 1; year <= roiProjectionYears; year += 1) {
+    const degradationMultiplier =
+      year === 1
+        ? 1
+        : year === 2
+          ? Math.max(1 - roiAfterYear1Degradation, 0)
+          : Math.max(1 - roiAfterYear1Degradation, 0) * Math.pow(Math.max(1 - roiYear3OnwardDegradation, 0), year - 2);
+    const tariffMultiplier = Math.pow(1 + roiTariffEscalation, year - 1);
+    const maintenanceMultiplier = Math.pow(1 + roiOperationMaintenanceEscalation, year - 1);
+    const annualNetSavings =
+      roiYear1GenerationKwh * degradationMultiplier * Number(documentData.electricityTariffYear1 || 0) * tariffMultiplier -
+      roiOperationMaintenanceCostYear1 * maintenanceMultiplier;
+
+    if (
+      roiEstimatedPaybackYears === null &&
+      annualNetSavings > 0 &&
+      roiLifetimeNetSavings < grandTotal &&
+      roiLifetimeNetSavings + annualNetSavings >= grandTotal
+    ) {
+      roiEstimatedPaybackYears = year - 1 + (grandTotal - roiLifetimeNetSavings) / annualNetSavings;
+    }
+
+    roiLifetimeNetSavings += annualNetSavings;
+  }
+
+  const roiYear1NetSavings = roiYear1GrossSavings - roiOperationMaintenanceCostYear1;
   const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => !documentData[key].trim());
   const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
@@ -656,6 +699,46 @@ export function SolarQuotationForm({
             }
           : row
       ),
+    }));
+  };
+
+  const updateInstallationProcedureStep = (
+    index: number,
+    key: "step" | "procedure" | "description" | "timePeriod",
+    value: string
+  ) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      installationProcedureSteps: prev.installationProcedureSteps.map((row, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...row,
+              [key]: value,
+            }
+          : row
+      ),
+    }));
+  };
+
+  const addInstallationProcedureStep = () => {
+    setDocumentData((prev) => ({
+      ...prev,
+      installationProcedureSteps: [
+        ...prev.installationProcedureSteps,
+        {
+          step: `Step-${prev.installationProcedureSteps.length + 1}`,
+          procedure: "",
+          description: "",
+          timePeriod: "",
+        },
+      ],
+    }));
+  };
+
+  const removeInstallationProcedureStep = (index: number) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      installationProcedureSteps: prev.installationProcedureSteps.filter((_, rowIndex) => rowIndex !== index),
     }));
   };
 
@@ -1288,6 +1371,342 @@ export function SolarQuotationForm({
               </table>
             </div>
           </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Solar Roof Top Size</div>
+              <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)} kW</div>
+              <div className="mt-1 text-[11px] text-amber-700">Calculated from module count and wattage</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Generation / Day</div>
+              <div className="text-2xl font-bold text-amber-900">{formatDecimal(indicativeGenerationPerDay, 0)} Unit</div>
+              <div className="mt-1 text-[11px] text-amber-700">System size x rounded average units/day</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Yearly Saving</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(annualGenerationSavings)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Sum of monthly savings</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">1st Year Generation</div>
+              <div className="text-2xl font-bold text-amber-900">{formatDecimal(annualGenerationKwh, 0)} kWh</div>
+              <div className="mt-1 text-[11px] text-amber-700">Sum of monthly generation</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">25 Year Saving</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(twentyFiveYearSavings)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Yearly saving x 25</div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Generation Disclaimer / Note</label>
+            <textarea
+              value={documentData.generationDisclaimer}
+              onChange={(event) => setDocumentField("generationDisclaimer", event.target.value)}
+              rows={2}
+              className={userInputClassName}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-emerald-900">Solar Plant Installation : Procedure &amp; Time frame</h3>
+              <p className="text-xs text-emerald-800">Editable timeline from Quotation format - 5.docx.</p>
+            </div>
+            <button
+              type="button"
+              onClick={addInstallationProcedureStep}
+              className="rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900"
+            >
+              Add Step
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
+            <div className="max-h-[420px] overflow-auto">
+              <table className="min-w-[980px] table-fixed divide-y divide-emerald-100">
+                <thead className="sticky top-0 bg-emerald-50 text-[11px] uppercase tracking-wide text-emerald-900">
+                  <tr>
+                    <th className="w-28 px-3 py-2 text-left">Step</th>
+                    <th className="w-48 px-3 py-2 text-left">Procedure</th>
+                    <th className="px-3 py-2 text-left">Description</th>
+                    <th className="w-44 px-3 py-2 text-left">Time Period</th>
+                    <th className="w-16 px-3 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-100 text-sm">
+                  {documentData.installationProcedureSteps.map((row, index) => (
+                    <tr key={`${row.step}-${index}`}>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={row.step}
+                          onChange={(event) => updateInstallationProcedureStep(index, "step", event.target.value)}
+                          className={userInputClassName}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={row.procedure}
+                          onChange={(event) => updateInstallationProcedureStep(index, "procedure", event.target.value)}
+                          className={userInputClassName}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <textarea
+                          value={row.description}
+                          onChange={(event) => updateInstallationProcedureStep(index, "description", event.target.value)}
+                          rows={2}
+                          className={userInputClassName}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={row.timePeriod}
+                          onChange={(event) => updateInstallationProcedureStep(index, "timePeriod", event.target.value)}
+                          className={userInputClassName}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeInstallationProcedureStep(index)}
+                          className="rounded-md border border-red-200 bg-red-50 px-2 py-2 text-xs font-semibold text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Procedure Note</label>
+            <textarea
+              value={documentData.installationProcedureNote}
+              onChange={(event) => setDocumentField("installationProcedureNote", event.target.value)}
+              rows={3}
+              className={userInputClassName}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-amber-900">Solar Plant ROI Calculator</h3>
+            <p className="text-xs text-amber-800">Input parameters from Format 5 with live calculated payback and lifetime savings.</p>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-amber-200 bg-white">
+            <div className="max-h-[460px] overflow-auto">
+              <table className="min-w-[900px] table-fixed divide-y divide-amber-100 text-sm">
+                <thead className="bg-amber-50 text-[11px] uppercase tracking-wide text-amber-900">
+                  <tr>
+                    <th className="w-64 px-3 py-2 text-left">Parameter</th>
+                    <th className="w-28 px-3 py-2 text-left">Unit</th>
+                    <th className="w-56 px-3 py-2 text-left">Value</th>
+                    <th className="px-3 py-2 text-left">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100">
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Project Capacity</td>
+                    <td className="px-3 py-2 text-slate-700">kW</td>
+                    <td className="px-3 py-2"><div className={readOnlyFieldClassName}>{formatDecimal(actualSystemKw)}</div></td>
+                    <td className="px-3 py-2 text-slate-600">Size of plant</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Installation Cost</td>
+                    <td className="px-3 py-2 text-slate-700">INR</td>
+                    <td className="px-3 py-2"><div className={readOnlyFieldClassName}>{formatCurrency(grandTotal)}</div></td>
+                    <td className="px-3 py-2 text-slate-600">Total EPC cost</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Average Daily Generation</td>
+                    <td className="px-3 py-2 text-slate-700">kWh / kWp / day</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiAverageDailyGenerationUnitsPerKw}
+                        onChange={(event) => setDocumentField("roiAverageDailyGenerationUnitsPerKw", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Based on site data</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Average Yearly Shutdown</td>
+                    <td className="px-3 py-2 text-slate-700">Days</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={documentData.roiShutdownDays}
+                        onChange={(event) => setDocumentField("roiShutdownDays", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Plant or grid-side maintenance downtime</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Electricity Tariff (Year 1)</td>
+                    <td className="px-3 py-2 text-slate-700">INR / kWh</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.electricityTariffYear1}
+                        onChange={(event) => setDocumentField("electricityTariffYear1", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Current grid rate</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Tariff Escalation</td>
+                    <td className="px-3 py-2 text-slate-700">%</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiTariffEscalationPercent}
+                        onChange={(event) => setDocumentField("roiTariffEscalationPercent", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Expected yearly increase</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Annual Power Degradation (After 1st Year)</td>
+                    <td className="px-3 py-2 text-slate-700">%</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiAnnualPowerDegradationAfterYear1Percent}
+                        onChange={(event) => setDocumentField("roiAnnualPowerDegradationAfterYear1Percent", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Module efficiency drop after Year 1</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Annual Power Degradation (From 3rd Year onward)</td>
+                    <td className="px-3 py-2 text-slate-700">%</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiAnnualPowerDegradationFromYear3OnwardPercent}
+                        onChange={(event) => setDocumentField("roiAnnualPowerDegradationFromYear3OnwardPercent", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Module efficiency drop from Year 3 onward</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">O&amp;M Cost (Year 1)</td>
+                    <td className="px-3 py-2 text-slate-700">% / INR</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiOperationMaintenancePercentYear1}
+                        onChange={(event) => setDocumentField("roiOperationMaintenancePercentYear1", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                      <div className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        {formatCurrency(roiOperationMaintenanceCostYear1)}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Year 1 maintenance cost as % of installation cost</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">O&amp;M Cost Escalation</td>
+                    <td className="px-3 py-2 text-slate-700">%</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={documentData.roiOperationMaintenanceEscalationPercent}
+                        onChange={(event) => setDocumentField("roiOperationMaintenanceEscalationPercent", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Inflation in O&amp;M</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-slate-900">Project Life</td>
+                    <td className="px-3 py-2 text-slate-700">Years</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={documentData.roiProjectLifeYears}
+                        onChange={(event) => setDocumentField("roiProjectLifeYears", Number(event.target.value || 0))}
+                        className={userInputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">Standard plant life used for ROI projection</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Year 1 Generation</div>
+              <div className="text-2xl font-bold text-amber-900">{formatDecimal(roiYear1GenerationKwh, 0)} kWh</div>
+              <div className="mt-1 text-[11px] text-amber-700">After shutdown-day assumption</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Year 1 Gross Savings</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiYear1GrossSavings)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Before O&amp;M cost</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Year 1 Net Savings</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiYear1NetSavings)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">After O&amp;M cost</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Estimated Payback</div>
+              <div className="text-2xl font-bold text-amber-900">
+                {roiEstimatedPaybackYears === null ? "Beyond projection" : `${formatDecimal(roiEstimatedPaybackYears)} years`}
+              </div>
+              <div className="mt-1 text-[11px] text-amber-700">Simple cumulative payback projection</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Lifetime Net Savings</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiLifetimeNetSavings)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Projected over {roiProjectionYears} years</div>
+            </div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">O&amp;M Cost Year 1</div>
+              <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiOperationMaintenanceCostYear1)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">{formatDecimal(documentData.roiOperationMaintenancePercentYear1)}% of installation cost</div>
+            </div>
+          </div>
         </div>
         </>
         )}
@@ -1754,6 +2173,70 @@ export function SolarQuotationForm({
               <div><strong>Resolved BOQ Rows:</strong> {resolvedRows.length}</div>
               <div className="mt-1"><strong>Cost / Watt:</strong> {actualSystemWatts > 0 ? formatCurrency(grandTotal / actualSystemWatts) : formatCurrency(0)}</div>
               <div className="mt-1"><strong>Cost / kW:</strong> {actualSystemKw > 0 ? formatCurrency(grandTotal / actualSystemKw) : formatCurrency(0)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-rose-900">Generation &amp; Revenue Details</h3>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-900">Format 5</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Generation / Day</div>
+                <div className="text-2xl font-bold text-amber-900">{formatDecimal(indicativeGenerationPerDay, 0)} Unit</div>
+              </div>
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">1st Year Generation</div>
+                <div className="text-2xl font-bold text-amber-900">{formatDecimal(annualGenerationKwh, 0)} kWh</div>
+              </div>
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Yearly Saving</div>
+                <div className="text-2xl font-bold text-amber-900">{formatCurrency(annualGenerationSavings)}</div>
+              </div>
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">25 Year Saving</div>
+                <div className="text-2xl font-bold text-amber-900">{formatCurrency(twentyFiveYearSavings)}</div>
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-rose-100 bg-white p-3 text-sm text-slate-700">
+              {documentData.generationDisclaimer}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-emerald-900">Installation Timeline &amp; ROI</h3>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-900">
+                {documentData.installationProcedureSteps.length} steps
+              </span>
+            </div>
+            <div className="space-y-2 text-sm text-emerald-950">
+              {documentData.installationProcedureSteps.slice(0, 4).map((step, index) => (
+                <div key={`${step.step}-${index}-timeline-preview`} className="rounded-md border border-emerald-100 bg-white px-3 py-2">
+                  <div className="font-medium">{step.step || `Step ${index + 1}`} - {step.procedure || "Procedure missing"}</div>
+                  <div className="text-xs text-slate-600">{step.timePeriod || "Time period missing"}</div>
+                </div>
+              ))}
+              {documentData.installationProcedureSteps.length > 4 && (
+                <div className="text-xs font-medium text-emerald-900">
+                  + {documentData.installationProcedureSteps.length - 4} more procedure step(s)
+                </div>
+              )}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Estimated Payback</div>
+                <div className="text-2xl font-bold text-amber-900">
+                  {roiEstimatedPaybackYears === null ? "Beyond projection" : `${formatDecimal(roiEstimatedPaybackYears)} years`}
+                </div>
+              </div>
+              <div className={calculatedCardClassName}>
+                <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Lifetime Net Savings</div>
+                <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiLifetimeNetSavings)}</div>
+              </div>
             </div>
           </div>
         </div>

@@ -477,6 +477,70 @@ export async function GET(
     const proposalGrandTotal = Number(version.grandTotal || 0) + additionalChargesTotal;
     const validUntil = new Date(version.createdAt);
     validUntil.setDate(validUntil.getDate() + Math.max(documentData.validityDays || 0, 0));
+    const toFraction = (value: number) => {
+      if (!Number.isFinite(value) || value <= 0) {
+        return 0;
+      }
+
+      return value > 1 ? value / 100 : value;
+    };
+
+    const generationRows = documentData.generationTable.map((row) => {
+      const kwh = documentData.totalKw * row.unitsPerDay * row.days;
+      const amount = kwh * Number(documentData.electricityTariffYear1 || 0);
+
+      return {
+        ...row,
+        kwh,
+        amount,
+      };
+    });
+    const annualGenerationKwh = generationRows.reduce((sum, row) => sum + row.kwh, 0);
+    const annualGenerationSavings = generationRows.reduce((sum, row) => sum + row.amount, 0);
+    const indicativeGenerationPerDay = documentData.totalKw * Math.max(Math.round(documentData.expectedGenerationUnitsPerKw || 0), 0);
+    const twentyFiveYearSaving = annualGenerationSavings * 25;
+    const roiInstallationCost = Number(version.grandTotal || 0);
+    const roiYear1GenerationKwh =
+      documentData.totalKw *
+      Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0) *
+      Math.max(365 - Number(documentData.roiShutdownDays || 0), 0);
+    const roiYear1GrossSavings = roiYear1GenerationKwh * Number(documentData.electricityTariffYear1 || 0);
+    const roiOperationMaintenanceCostYear1 =
+      roiInstallationCost * toFraction(documentData.roiOperationMaintenancePercentYear1);
+    const roiProjectionYears = Math.max(Math.round(Number(documentData.roiProjectLifeYears || 0)), 1);
+    const roiTariffEscalation = toFraction(documentData.roiTariffEscalationPercent);
+    const roiOperationMaintenanceEscalation = toFraction(documentData.roiOperationMaintenanceEscalationPercent);
+    const roiAfterYear1Degradation = toFraction(documentData.roiAnnualPowerDegradationAfterYear1Percent);
+    const roiYear3OnwardDegradation = toFraction(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent);
+    let roiLifetimeNetSavings = 0;
+    let roiEstimatedPaybackYears: number | null = null;
+
+    for (let year = 1; year <= roiProjectionYears; year += 1) {
+      const degradationMultiplier =
+        year === 1
+          ? 1
+          : year === 2
+            ? Math.max(1 - roiAfterYear1Degradation, 0)
+            : Math.max(1 - roiAfterYear1Degradation, 0) * Math.pow(Math.max(1 - roiYear3OnwardDegradation, 0), year - 2);
+      const tariffMultiplier = Math.pow(1 + roiTariffEscalation, year - 1);
+      const maintenanceMultiplier = Math.pow(1 + roiOperationMaintenanceEscalation, year - 1);
+      const annualNetSavings =
+        roiYear1GenerationKwh * degradationMultiplier * Number(documentData.electricityTariffYear1 || 0) * tariffMultiplier -
+        roiOperationMaintenanceCostYear1 * maintenanceMultiplier;
+
+      if (
+        roiEstimatedPaybackYears === null &&
+        annualNetSavings > 0 &&
+        roiLifetimeNetSavings < roiInstallationCost &&
+        roiLifetimeNetSavings + annualNetSavings >= roiInstallationCost
+      ) {
+        roiEstimatedPaybackYears = year - 1 + (roiInstallationCost - roiLifetimeNetSavings) / annualNetSavings;
+      }
+
+      roiLifetimeNetSavings += annualNetSavings;
+    }
+
+    const roiYear1NetSavings = roiYear1GrossSavings - roiOperationMaintenanceCostYear1;
 
     const descriptionOfServices = [
       "Engineering: Detailed site survey, feasibility analysis, and complete electrical and structural design.",
@@ -797,6 +861,106 @@ export async function GET(
 
     y -= 18;
 
+    const generationSectionHeight = 410;
+    if (y - generationSectionHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "System Generation & Revenue Details", MARGIN, y, 12.5, true, accent);
+    y -= 18;
+
+    const generationSummaryRows = [
+      [
+        { label: "Solar Roof Top Size", value: `${documentData.totalKw.toFixed(2)} Kw`, note: "Calculated system size" },
+        { label: "Generation / Day", value: `${indicativeGenerationPerDay.toFixed(0)} Unit`, note: "System size x rounded avg. generation" },
+        { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), note: "Sum of monthly savings" },
+      ],
+      [
+        { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, note: "Sum of monthly generation" },
+        { label: "25 Year Saving", value: formatCurrency(twentyFiveYearSaving), note: "Yearly saving x 25" },
+      ],
+    ];
+
+    generationSummaryRows.forEach((rowCards) => {
+      const gap = 10;
+      const cardWidth = (CONTENT_WIDTH - gap * (rowCards.length - 1)) / rowCards.length;
+      const cardHeight = 54;
+
+      rowCards.forEach((card, index) => {
+        const cardX = MARGIN + index * (cardWidth + gap);
+        page.drawRectangle({
+          x: cardX,
+          y: y - cardHeight,
+          width: cardWidth,
+          height: cardHeight,
+          color: white,
+          borderColor: border,
+          borderWidth: 1,
+        });
+        drawText(page, card.label, cardX + 8, y - 14, 7, true, muted);
+        drawText(page, card.value, cardX + 8, y - 28, 10, true, accent);
+        drawWrapped(page, card.note, cardX + 8, y - 40, cardWidth - 16, 6.5, false, muted, 8);
+      });
+
+      y -= cardHeight + 10;
+    });
+
+    page.drawRectangle({ x: MARGIN, y: y - 20, width: CONTENT_WIDTH, height: 20, color: secondary });
+    drawText(page, "Predicted Monthly Generation & Savings", MARGIN + 8, y - 13, 8.5, true, white);
+    y -= 24;
+
+    const generationColumns = [
+      { label: "Month", x: MARGIN, width: 68 },
+      { label: "Unit / Day", x: MARGIN + 68, width: 84 },
+      { label: "Days", x: MARGIN + 152, width: 58 },
+      { label: "kWh", x: MARGIN + 210, width: 110 },
+      { label: "Savings", x: MARGIN + 320, width: 211 },
+    ];
+
+    generationRows.forEach((row, index) => {
+      const rowHeight = 18;
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      generationColumns.slice(1).forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
+      });
+
+      drawText(page, row.month, generationColumns[0].x + 6, y - 12, 7.8, true, accent);
+      drawRightAligned(page, row.unitsPerDay.toFixed(2), generationColumns[1].x, generationColumns[1].width, y - 12, 7.8, false, accent);
+      drawRightAligned(page, row.days.toString(), generationColumns[2].x, generationColumns[2].width, y - 12, 7.8, false, accent);
+      drawRightAligned(page, row.kwh.toFixed(0), generationColumns[3].x, generationColumns[3].width, y - 12, 7.8, false, accent);
+      drawRightAligned(page, formatCurrency(row.amount), generationColumns[4].x, generationColumns[4].width, y - 12, 7.8, true, accent);
+      y -= rowHeight;
+    });
+
+    page.drawRectangle({ x: MARGIN, y: y - 20, width: CONTENT_WIDTH, height: 20, color: paleFill, borderColor: border, borderWidth: 1 });
+    drawText(page, "Total / Avg", MARGIN + 6, y - 13, 7.8, true, accent);
+    drawRightAligned(page, documentData.expectedGenerationUnitsPerKw.toFixed(2), generationColumns[1].x, generationColumns[1].width, y - 13, 7.8, true, accent);
+    drawRightAligned(page, "365", generationColumns[2].x, generationColumns[2].width, y - 13, 7.8, true, accent);
+    drawRightAligned(page, annualGenerationKwh.toFixed(0), generationColumns[3].x, generationColumns[3].width, y - 13, 7.8, true, accent);
+    drawRightAligned(page, formatCurrency(annualGenerationSavings), generationColumns[4].x, generationColumns[4].width, y - 13, 7.8, true, accent);
+    y -= 28;
+
+    const generationNoteLines = wrapText(documentData.generationDisclaimer, CONTENT_WIDTH - 20, 7.5);
+    const generationNoteHeight = 14 + generationNoteLines.length * 9;
+    page.drawRectangle({ x: MARGIN, y: y - generationNoteHeight, width: CONTENT_WIDTH, height: generationNoteHeight, color: white, borderColor: border, borderWidth: 1 });
+    drawText(page, "Note", MARGIN + 8, y - 12, 7.8, true, accent);
+    generationNoteLines.forEach((line, index) => drawText(page, line, MARGIN + 42, y - 12 - index * 9, 7.5, false, muted));
+    y -= generationNoteHeight + 18;
+
     const columns: Column[] = [
       { key: "title", label: "Item Head", x: MARGIN, width: 92 },
       { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
@@ -1037,6 +1201,205 @@ export async function GET(
       summaryY -= Math.max(labelLines.length, 1) * 10 + 4;
     });
     y -= summaryHeight + 16;
+
+    const installationColumns = [
+      { label: "Steps", x: MARGIN, width: 58 },
+      { label: "Procedure", x: MARGIN + 58, width: 122 },
+      { label: "Description", x: MARGIN + 180, width: 235 },
+      { label: "Time Period (Approx)", x: MARGIN + 415, width: 116 },
+    ];
+
+    const drawInstallationHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: secondary });
+      installationColumns.forEach((column) => {
+        drawText(targetPage, column.label, column.x + 6, topY - 16, 8.2, true, white);
+      });
+    };
+
+    if (y - 220 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Solar Plant Installation : Procedure & Time frame", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawInstallationHeader(page, y);
+    y -= 28;
+
+    documentData.installationProcedureSteps.forEach((step, index) => {
+      const stepLines = wrapText(step.step, installationColumns[0].width - 12, 7.2, true);
+      const procedureLines = wrapText(step.procedure, installationColumns[1].width - 12, 7.2, true);
+      const descriptionLines = wrapText(step.description, installationColumns[2].width - 12, 7.2);
+      const timeLines = wrapText(step.timePeriod, installationColumns[3].width - 12, 7.2, true);
+      const rowHeight = 12 + Math.max(stepLines.length, procedureLines.length, descriptionLines.length, timeLines.length, 1) * 9;
+
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "Solar Plant Installation : Procedure & Time frame", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawInstallationHeader(page, y);
+        y -= 28;
+      }
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      installationColumns.slice(1).forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
+      });
+
+      stepLines.forEach((line, lineIndex) => drawText(page, line, installationColumns[0].x + 6, y - 12 - lineIndex * 9, 7.2, true, accent));
+      procedureLines.forEach((line, lineIndex) => drawText(page, line, installationColumns[1].x + 6, y - 12 - lineIndex * 9, 7.2, true, accent));
+      descriptionLines.forEach((line, lineIndex) => drawText(page, line, installationColumns[2].x + 6, y - 12 - lineIndex * 9, 7.2, false, muted));
+      timeLines.forEach((line, lineIndex) => drawText(page, line, installationColumns[3].x + 6, y - 12 - lineIndex * 9, 7.2, true, accent));
+      y -= rowHeight;
+    });
+
+    const procedureNoteLines = wrapText(documentData.installationProcedureNote, CONTENT_WIDTH - 20, 7.5);
+    const procedureNoteHeight = 14 + procedureNoteLines.length * 9;
+    if (y - procedureNoteHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+    page.drawRectangle({ x: MARGIN, y: y - procedureNoteHeight, width: CONTENT_WIDTH, height: procedureNoteHeight, color: white, borderColor: border, borderWidth: 1 });
+    drawText(page, "Note", MARGIN + 8, y - 12, 7.8, true, accent);
+    procedureNoteLines.forEach((line, index) => drawText(page, line, MARGIN + 42, y - 12 - index * 9, 7.5, false, muted));
+    y -= procedureNoteHeight + 18;
+
+    const roiRows = [
+      ["Project Capacity", "kW", `${documentData.totalKw.toFixed(2)}`, "Size of plant"],
+      ["Installation Cost", "INR", formatCurrency(roiInstallationCost), "Total EPC cost"],
+      [
+        "Average Daily Generation",
+        "kWh / kWp / day",
+        documentData.roiAverageDailyGenerationUnitsPerKw.toFixed(2),
+        "Based on site data",
+      ],
+      ["Average Yearly Shutdown", "Days", documentData.roiShutdownDays.toFixed(0), "Plant or grid-side maintenance downtime"],
+      ["Electricity Tariff (Year 1)", "INR / kWh", formatCurrency(documentData.electricityTariffYear1), "Current grid rate"],
+      ["Tariff Escalation", "%", documentData.roiTariffEscalationPercent.toFixed(2), "Expected yearly increase"],
+      [
+        "Annual Power Degradation (After 1st Year)",
+        "%",
+        documentData.roiAnnualPowerDegradationAfterYear1Percent.toFixed(2),
+        "Module efficiency drop after Year 1",
+      ],
+      [
+        "Annual Power Degradation (From 3rd Year onward)",
+        "%",
+        documentData.roiAnnualPowerDegradationFromYear3OnwardPercent.toFixed(2),
+        "Module efficiency drop from Year 3 onward",
+      ],
+      [
+        "O&M Cost (Year 1)",
+        "% / INR",
+        `${documentData.roiOperationMaintenancePercentYear1.toFixed(2)} | ${formatCurrency(roiOperationMaintenanceCostYear1)}`,
+        "Year 1 maintenance cost",
+      ],
+      ["O&M Cost Escalation", "%", documentData.roiOperationMaintenanceEscalationPercent.toFixed(2), "Inflation in O&M"],
+      ["Project Life", "Years", documentData.roiProjectLifeYears.toFixed(0), "Standard plant life used for ROI projection"],
+    ];
+
+    const roiColumns = [
+      { label: "Parameter", x: MARGIN, width: 182 },
+      { label: "Unit", x: MARGIN + 182, width: 72 },
+      { label: "Value", x: MARGIN + 254, width: 122 },
+      { label: "Notes", x: MARGIN + 376, width: 155 },
+    ];
+
+    const drawRoiHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: primary });
+      roiColumns.forEach((column) => drawText(targetPage, column.label, column.x + 6, topY - 16, 8.2, true, white));
+    };
+
+    if (y - 260 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Solar Plant ROI Calculator", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawRoiHeader(page, y);
+    y -= 28;
+
+    roiRows.forEach((row, index) => {
+      const parameterLines = wrapText(row[0], roiColumns[0].width - 12, 7.2, true);
+      const unitLines = wrapText(row[1], roiColumns[1].width - 12, 7.2);
+      const valueLines = wrapText(row[2], roiColumns[2].width - 12, 7.2, true);
+      const noteLines = wrapText(row[3], roiColumns[3].width - 12, 7.2);
+      const rowHeight = 12 + Math.max(parameterLines.length, unitLines.length, valueLines.length, noteLines.length, 1) * 9;
+
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "Solar Plant ROI Calculator", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawRoiHeader(page, y);
+        y -= 28;
+      }
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      roiColumns.slice(1).forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
+      });
+
+      parameterLines.forEach((line, lineIndex) => drawText(page, line, roiColumns[0].x + 6, y - 12 - lineIndex * 9, 7.2, true, accent));
+      unitLines.forEach((line, lineIndex) => drawText(page, line, roiColumns[1].x + 6, y - 12 - lineIndex * 9, 7.2, false, accent));
+      valueLines.forEach((line, lineIndex) => drawText(page, line, roiColumns[2].x + 6, y - 12 - lineIndex * 9, 7.2, true, accent));
+      noteLines.forEach((line, lineIndex) => drawText(page, line, roiColumns[3].x + 6, y - 12 - lineIndex * 9, 7.2, false, muted));
+      y -= rowHeight;
+    });
+
+    const roiResultCards = [
+      { label: "Year 1 Generation", value: `${roiYear1GenerationKwh.toFixed(0)} kWh` },
+      { label: "Year 1 Gross Savings", value: formatCurrency(roiYear1GrossSavings) },
+      { label: "Year 1 Net Savings", value: formatCurrency(roiYear1NetSavings) },
+      {
+        label: "Estimated Payback",
+        value: roiEstimatedPaybackYears === null ? "Beyond projection" : `${roiEstimatedPaybackYears.toFixed(2)} years`,
+      },
+      { label: "Lifetime Net Savings", value: formatCurrency(roiLifetimeNetSavings) },
+    ];
+
+    const roiCardGap = 10;
+    const roiCardWidth = (CONTENT_WIDTH - roiCardGap * 2) / 3;
+    const roiCardHeight = 42;
+    if (y - 94 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    for (let index = 0; index < roiResultCards.length; index += 3) {
+      const rowCards = roiResultCards.slice(index, index + 3);
+      rowCards.forEach((card, cardIndex) => {
+        const cardX = MARGIN + cardIndex * (roiCardWidth + roiCardGap);
+        page.drawRectangle({ x: cardX, y: y - roiCardHeight, width: roiCardWidth, height: roiCardHeight, color: white, borderColor: border, borderWidth: 1 });
+        drawText(page, card.label, cardX + 8, y - 14, 7, true, muted);
+        drawWrapped(page, card.value, cardX + 8, y - 27, roiCardWidth - 16, 8.5, true, accent, 10);
+      });
+      y -= roiCardHeight + 10;
+    }
+
+    y -= 8;
 
     const paymentRows = documentData.paymentStages;
     const paymentTableHeight = 36 + paymentRows.length * 26;

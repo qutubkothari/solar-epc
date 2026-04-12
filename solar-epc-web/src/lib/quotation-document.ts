@@ -27,6 +27,13 @@ export type GenerationTableRow = {
   days: number;
 };
 
+export type InstallationProcedureStep = {
+  step: string;
+  procedure: string;
+  description: string;
+  timePeriod: string;
+};
+
 export type QuotationDocumentData = {
   consumerType: string;
   consumerNumber: string;
@@ -43,6 +50,7 @@ export type QuotationDocumentData = {
   expectedGenerationUnitsPerKw: number;
   electricityTariffYear1: number;
   generationTable: GenerationTableRow[];
+  generationDisclaimer: string;
   structureHeightSouth: string;
   structureHeightNorth: string;
   arrayLayout: string;
@@ -57,6 +65,16 @@ export type QuotationDocumentData = {
   gedaRegistrationCharges: number;
   netMeteringCharges: number;
   meterCharges: number;
+  installationProcedureSteps: InstallationProcedureStep[];
+  installationProcedureNote: string;
+  roiAverageDailyGenerationUnitsPerKw: number;
+  roiShutdownDays: number;
+  roiTariffEscalationPercent: number;
+  roiAnnualPowerDegradationAfterYear1Percent: number;
+  roiAnnualPowerDegradationFromYear3OnwardPercent: number;
+  roiOperationMaintenancePercentYear1: number;
+  roiOperationMaintenanceEscalationPercent: number;
+  roiProjectLifeYears: number;
   paymentStages: PaymentStage[];
   scopeOfWorkRows: ScopeOfWorkRow[];
   requiredDocuments: string[];
@@ -120,6 +138,63 @@ const DEFAULT_GENERATION_TABLE: GenerationTableRow[] = [
   { month: "Oct", unitsPerDay: 4.6, days: 31 },
   { month: "Nov", unitsPerDay: 4.6, days: 30 },
   { month: "Dec", unitsPerDay: 4.6, days: 31 },
+];
+
+const DEFAULT_INSTALLATION_PROCEDURE_STEPS: InstallationProcedureStep[] = [
+  {
+    step: "Step-1",
+    procedure: "GEDA Registration",
+    description: "Start registration process by collecting required documents.",
+    timePeriod: "1-2 working days",
+  },
+  {
+    step: "Step-2",
+    procedure: "Document Verification",
+    description: "Verification of uploaded documents after registration.",
+    timePeriod: "4-5 working days",
+  },
+  {
+    step: "Step-3",
+    procedure: "Feasibility Approval",
+    description: "DISCOM gives feasibility approval and issues the solar meter estimate after document verification.",
+    timePeriod: "10-15 working days",
+  },
+  {
+    step: "Step-4",
+    procedure: "IFP Drawing Approval",
+    description: "Applicable above 10 kW. Electrical drawing is prepared and uploaded on the IFP portal for execution approval.",
+    timePeriod: "15-20 working days",
+  },
+  {
+    step: "Step-5",
+    procedure: "Execution Work",
+    description: "Plant execution starts after all required approvals are in place.",
+    timePeriod: "15-20 working days",
+  },
+  {
+    step: "Step-6",
+    procedure: "CEIG Inspection Approval",
+    description: "Applicable above 10 kW. After installation, CEIG inspection is applied for and the inspector verifies the site physically.",
+    timePeriod: "15-20 working days",
+  },
+  {
+    step: "Step-7",
+    procedure: "Net Metering Process",
+    description: "After CEIG approval, the net metering file is prepared and submitted to DISCOM for meter installation.",
+    timePeriod: "30-45 working days",
+  },
+  {
+    step: "Step-8",
+    procedure: "Commissioning & Testing",
+    description: "Testing is carried out after installation and CEIG approval.",
+    timePeriod: "1-2 working days",
+  },
+  {
+    step: "Step-9",
+    procedure: "Completion of Project",
+    description: "After testing, the plant is handed over to the client.",
+    timePeriod: "1-2 working days",
+  },
 ];
 
 const DEFAULT_SCOPE_OF_WORK_ROWS: ScopeOfWorkRow[] = [
@@ -494,6 +569,9 @@ export const createDefaultQuotationDocumentData = (
     expectedGenerationUnitsPerKw: overrides?.expectedGenerationUnitsPerKw ?? 4.59,
     electricityTariffYear1: overrides?.electricityTariffYear1 ?? 8,
     generationTable: (overrides?.generationTable ?? DEFAULT_GENERATION_TABLE).map((entry) => ({ ...entry })),
+    generationDisclaimer:
+      overrides?.generationDisclaimer ??
+      "Predicted generation is indicative only. It may vary depending on weather conditions and module condition. Savings are calculated at the Year 1 tariff.",
     structureHeightSouth: overrides?.structureHeightSouth ?? "15 ft",
     structureHeightNorth: overrides?.structureHeightNorth ?? "17 ft",
     arrayLayout: overrides?.arrayLayout ?? "South Facing, 14° Tilt, Portrait orientation",
@@ -511,6 +589,18 @@ export const createDefaultQuotationDocumentData = (
     gedaRegistrationCharges: overrides?.gedaRegistrationCharges ?? 0,
     netMeteringCharges: overrides?.netMeteringCharges ?? 0,
     meterCharges: overrides?.meterCharges ?? 0,
+    installationProcedureSteps: (overrides?.installationProcedureSteps ?? DEFAULT_INSTALLATION_PROCEDURE_STEPS).map((entry) => ({ ...entry })),
+    installationProcedureNote:
+      overrides?.installationProcedureNote ??
+      "The procedure and timeframe mentioned above are approximate and may vary depending on weather conditions, document processing delays, payment delays, and approvals from the concerned authorities.",
+    roiAverageDailyGenerationUnitsPerKw: overrides?.roiAverageDailyGenerationUnitsPerKw ?? 4,
+    roiShutdownDays: overrides?.roiShutdownDays ?? 30,
+    roiTariffEscalationPercent: overrides?.roiTariffEscalationPercent ?? 3,
+    roiAnnualPowerDegradationAfterYear1Percent: overrides?.roiAnnualPowerDegradationAfterYear1Percent ?? 2,
+    roiAnnualPowerDegradationFromYear3OnwardPercent: overrides?.roiAnnualPowerDegradationFromYear3OnwardPercent ?? 0.5,
+    roiOperationMaintenancePercentYear1: overrides?.roiOperationMaintenancePercentYear1 ?? 1,
+    roiOperationMaintenanceEscalationPercent: overrides?.roiOperationMaintenanceEscalationPercent ?? 3,
+    roiProjectLifeYears: overrides?.roiProjectLifeYears ?? 30,
     paymentStages: (overrides?.paymentStages ?? DEFAULT_PAYMENT_STAGES).map((entry) => ({ ...entry })),
     scopeOfWorkRows: (overrides?.scopeOfWorkRows ?? DEFAULT_SCOPE_OF_WORK_ROWS).map((entry) => ({ ...entry })),
     requiredDocuments: [...(overrides?.requiredDocuments ?? DEFAULT_REQUIRED_DOCUMENTS)],
@@ -545,6 +635,18 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
           days: asNumber(entry.days),
         }))
         .filter((entry) => entry.month)
+    : undefined;
+
+  const installationProcedureSteps = Array.isArray(raw.installationProcedureSteps)
+    ? raw.installationProcedureSteps
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+        .map((entry) => ({
+          step: asString(entry.step),
+          procedure: asString(entry.procedure),
+          description: asString(entry.description),
+          timePeriod: asString(entry.timePeriod),
+        }))
+        .filter((entry) => entry.step || entry.procedure || entry.description || entry.timePeriod)
     : undefined;
 
   const scopeOfWorkRows = Array.isArray(raw.scopeOfWorkRows)
@@ -583,6 +685,10 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     expectedGenerationUnitsPerKw: asNumber(raw.expectedGenerationUnitsPerKw, 4.59),
     electricityTariffYear1: asNumber(raw.electricityTariffYear1, 8),
     generationTable,
+    generationDisclaimer: asString(
+      raw.generationDisclaimer,
+      "Predicted generation is indicative only. It may vary depending on weather conditions and module condition. Savings are calculated at the Year 1 tariff."
+    ),
     structureHeightSouth: asString(raw.structureHeightSouth, "15 ft"),
     structureHeightNorth: asString(raw.structureHeightNorth, "17 ft"),
     arrayLayout: asString(raw.arrayLayout, "South Facing, 14° Tilt, Portrait orientation"),
@@ -597,6 +703,19 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     gedaRegistrationCharges: asNumber(raw.gedaRegistrationCharges, 0),
     netMeteringCharges: asNumber(raw.netMeteringCharges, 0),
     meterCharges: asNumber(raw.meterCharges, 0),
+    installationProcedureSteps,
+    installationProcedureNote: asString(
+      raw.installationProcedureNote,
+      "The procedure and timeframe mentioned above are approximate and may vary depending on weather conditions, document processing delays, payment delays, and approvals from the concerned authorities."
+    ),
+    roiAverageDailyGenerationUnitsPerKw: asNumber(raw.roiAverageDailyGenerationUnitsPerKw, 4),
+    roiShutdownDays: asNumber(raw.roiShutdownDays, 30),
+    roiTariffEscalationPercent: asNumber(raw.roiTariffEscalationPercent, 3),
+    roiAnnualPowerDegradationAfterYear1Percent: asNumber(raw.roiAnnualPowerDegradationAfterYear1Percent, 2),
+    roiAnnualPowerDegradationFromYear3OnwardPercent: asNumber(raw.roiAnnualPowerDegradationFromYear3OnwardPercent, 0.5),
+    roiOperationMaintenancePercentYear1: asNumber(raw.roiOperationMaintenancePercentYear1, 1),
+    roiOperationMaintenanceEscalationPercent: asNumber(raw.roiOperationMaintenanceEscalationPercent, 3),
+    roiProjectLifeYears: asNumber(raw.roiProjectLifeYears, 30),
     paymentStages,
     scopeOfWorkRows,
     requiredDocuments,
