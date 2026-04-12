@@ -105,15 +105,7 @@ const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: stri
   { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
   { key: "boq", label: "BOQ & Pricing", description: "Workbook BOQ builder and totals" },
   { key: "payment", label: "Payment & Banking", description: "Payment stages and bank details" },
-  { key: "scope", label: "Scope & Documents", description: "Scope preview and required documents" },
-];
-
-const SCOPE_OF_WORK_ITEMS = [
-  "Engineering and design with site survey, feasibility review, layout, and structural planning.",
-  "Procurement of modules, inverters, structures, cables, ACDB, DCDB, earthing, and protection materials.",
-  "Installation of MMS, modules, inverter systems, AC/DC cabling, earthing, and lightning protection.",
-  "Testing, commissioning, synchronization, and coordination for approvals and handover.",
-  "Operator handover support, documentation, and post-installation assistance.",
+  { key: "scope", label: "Scope & Documents", description: "Editable scope matrix and required documents" },
 ];
 
 export function SolarQuotationForm({
@@ -352,6 +344,9 @@ export function SolarQuotationForm({
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
+  const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
+  const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
+  const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
 
   const handleSelectItem = (sequence: number, itemId: string) => {
     const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
@@ -465,6 +460,46 @@ export function SolarQuotationForm({
     }));
   };
 
+  const updateScopeRow = (
+    index: number,
+    key: "srNo" | "workItem" | "responsibility" | "remarks",
+    value: string
+  ) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      scopeOfWorkRows: prev.scopeOfWorkRows.map((row, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...row,
+              [key]: value,
+            }
+          : row
+      ),
+    }));
+  };
+
+  const addScopeRow = () => {
+    setDocumentData((prev) => ({
+      ...prev,
+      scopeOfWorkRows: [
+        ...prev.scopeOfWorkRows,
+        {
+          srNo: `${prev.scopeOfWorkRows.length + 1}`,
+          workItem: "",
+          responsibility: "",
+          remarks: "",
+        },
+      ],
+    }));
+  };
+
+  const removeScopeRow = (index: number) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      scopeOfWorkRows: prev.scopeOfWorkRows.filter((_, rowIndex) => rowIndex !== index),
+    }));
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -564,7 +599,7 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-solar-border bg-white p-3 md:grid-cols-5">
+        <div className="grid gap-2 rounded-xl border border-solar-border bg-white p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {FORM_TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -578,14 +613,19 @@ export function SolarQuotationForm({
                     : "border-solar-border bg-white hover:border-solar-amber/50"
                 }`}
               >
-                <div className="text-sm font-semibold text-solar-ink">{tab.label}</div>
-                <div className="mt-1 text-[11px] text-solar-muted">{tab.description}</div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${isActive ? "bg-solar-amber text-white" : "bg-solar-sand text-solar-ink"}`}>
+                    {FORM_TABS.findIndex((entry) => entry.key === tab.key) + 1}
+                  </span>
+                  <div className="text-sm font-semibold text-solar-ink">{tab.label}</div>
+                </div>
+                <div className="mt-1 hidden text-[11px] text-solar-muted xl:block">{tab.description}</div>
               </button>
             );
           })}
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-solar-border bg-solar-sand/40 p-4 md:grid-cols-4">
+        <div className="grid gap-3 rounded-xl border border-solar-border bg-solar-sand/40 p-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-solar-muted">Title</div>
             <div className="text-sm font-semibold text-solar-ink">{formData.title || "New quotation"}</div>
@@ -1194,11 +1234,72 @@ export function SolarQuotationForm({
         {activeTab === "scope" && (
         <>
         <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-          <h3 className="mb-4 text-lg font-semibold text-indigo-900">Scope of Work</h3>
-          <div className="space-y-2 text-sm text-indigo-950">
-            {SCOPE_OF_WORK_ITEMS.map((item) => (
-              <div key={item} className="rounded-md border border-indigo-100 bg-white px-3 py-2">
-                {item}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-indigo-900">Scope of Work Matrix</h3>
+              <p className="text-xs text-indigo-800">These rows are saved with the quotation and flow into the PDF scope matrix.</p>
+            </div>
+            <button
+              type="button"
+              onClick={addScopeRow}
+              className="rounded-md border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-900"
+            >
+              Add Scope Row
+            </button>
+          </div>
+          <div className="space-y-3">
+            {documentData.scopeOfWorkRows.map((row, index) => (
+              <div key={`${row.srNo}-${index}`} className="rounded-lg border border-indigo-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-indigo-950">Scope Row {index + 1}</div>
+                  {documentData.scopeOfWorkRows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeScopeRow(index)}
+                      className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Sr. No.</label>
+                    <input
+                      type="text"
+                      value={row.srNo}
+                      onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Responsibility</label>
+                    <input
+                      type="text"
+                      value={row.responsibility}
+                      onChange={(event) => updateScopeRow(index, "responsibility", event.target.value)}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Work Item / Activity</label>
+                    <textarea
+                      value={row.workItem}
+                      onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
+                      rows={2}
+                      className={userInputClassName}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
+                    <textarea
+                      value={row.remarks}
+                      onChange={(event) => updateScopeRow(index, "remarks", event.target.value)}
+                      rows={2}
+                      className={userInputClassName}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1241,21 +1342,47 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 border-t pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading || resolvedRows.length === 0}
-            className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
-          >
-            {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Quotation" : isNewVersion ? "Create Version" : "Create Quotation"}
-          </button>
+        <div className="flex flex-col gap-4 border-t pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="text-xs font-medium uppercase tracking-wide text-solar-muted">
+              Step {activeTabIndex + 1} of {FORM_TABS.length}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => previousTab && setActiveTab(previousTab.key)}
+                disabled={!previousTab}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous Tab
+              </button>
+              <button
+                type="button"
+                onClick={() => nextTab && setActiveTab(nextTab.key)}
+                disabled={!nextTab}
+                className="rounded-md border border-solar-border bg-solar-sand px-4 py-2 text-sm font-medium text-solar-ink disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next Tab
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || resolvedRows.length === 0}
+              className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
+            >
+              {loading ? (isEditing ? "Updating..." : "Creating...") : isEditing ? "Update Quotation" : isNewVersion ? "Create Version" : "Create Quotation"}
+            </button>
+          </div>
         </div>
       </form>
     </ModalShell>

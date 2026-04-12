@@ -544,30 +544,12 @@ export async function GET(
       ["Project Completion Timeline", documentData.projectCompletionTimeline, ""],
     ];
 
-    const scopeMatrixRows = [
-      ["1.1", "Feasibility Study (technical & financial)", "Consumer with EPC Contractor", "Can be jointly discussed with EPC."],
-      ["1.2", "Site Survey & Assessment", "EPC Contractor", "Includes structural and electrical feasibility."],
-      ["1.3", "System Design & Engineering Drawings", "EPC Contractor", "Electrical SLD, layout, shadow analysis, etc."],
-      ["1.4", "Statutory and Safety Compliance (design level)", "EPC Contractor", "Must follow MNRE, DISCOM, CEIG norms."],
-      ["1.5", "Land Levelling and Grading / Tree Cutting", "Consumer", "In consumer scope."],
-      ["1.6", "Cable Trenches", "Consumer", "Existing trenches considered."],
-      ["1.7", "Control Rooms (RCC / PEB)", "Consumer", "Existing covered control room space considered."],
-      ["1.8", "Water Drainage", "Consumer", "Existing drainage considered."],
-      ["1.9", "Water and Electricity", "Consumer", "Free water and electricity in customer scope during I&C and O&M if applicable."],
-      ["2.1", "Procurement of Solar Modules (approved make)", "EPC Contractor", "Must meet MNRE ALMM list and BIS norms."],
-      ["2.2", "Procurement of Inverters", "EPC Contractor", "Must meet DISCOM and MNRE specifications."],
-      ["2.3", "Procurement of Mounting Structures", "EPC Contractor", "Corrosion-resistant hot dip galvanized structure."],
-      ["2.4", "Cables, Junction Boxes, Earthing Material", "EPC Contractor", "IS-compliant cables and materials."],
-      ["2.5", "Transportation to Site", "EPC Contractor", "Delivered to consumer site."],
-      ["3.1", "Module Mounting Structure Installation", "EPC Contractor", "Based on roof type such as RCC or sheet metal."],
-      ["3.2", "Module Installation", "EPC Contractor", "Including alignment and clamping."],
-      ["3.3", "Inverter and Electrical Panel Installation", "EPC Contractor", "Includes ACDB, DCDB, SPD, meters, and associated accessories."],
-      ["3.4", "Cable Laying and Termination", "EPC Contractor", "DC, AC, earthing, and communication cable laying with proper routing and termination."],
-      ["3.5", "Earthing and Lightning Protection", "EPC Contractor", "As per applicable electrical safety standards."],
-      ["4.1", "Testing and Commissioning", "EPC Contractor", "Pre-commissioning checks, energization, and performance testing."],
-      ["4.2", "Net Metering / Statutory Coordination", "EPC Contractor with Consumer Support", "Subject to DISCOM / CEIG process and document availability."],
-      ["5.1", "Operation and Maintenance Training", "EPC Contractor", "Basic operation and safety handover training."],
-    ];
+    const scopeMatrixRows = documentData.scopeOfWorkRows.map((row) => [
+      sanitizeText(row.srNo || "-"),
+      sanitizeText(row.workItem || "-"),
+      sanitizeText(row.responsibility || "-"),
+      sanitizeText(row.remarks || "-"),
+    ]);
 
     const companyRows = [
       companySettings?.companyName || "Hi-Tech Solar",

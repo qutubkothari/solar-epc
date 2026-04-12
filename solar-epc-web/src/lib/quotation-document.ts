@@ -14,6 +14,13 @@ export type BankDetails = {
   branch: string;
 };
 
+export type ScopeOfWorkRow = {
+  srNo: string;
+  workItem: string;
+  responsibility: string;
+  remarks: string;
+};
+
 export type QuotationDocumentData = {
   consumerType: string;
   consumerNumber: string;
@@ -43,6 +50,7 @@ export type QuotationDocumentData = {
   netMeteringCharges: number;
   meterCharges: number;
   paymentStages: PaymentStage[];
+  scopeOfWorkRows: ScopeOfWorkRow[];
   requiredDocuments: string[];
   bankDetails: BankDetails;
 };
@@ -89,6 +97,141 @@ const DEFAULT_REQUIRED_DOCUMENTS = [
   "GST certificate",
   "Undertaking on stamp paper",
   "Authorization letter",
+];
+
+const DEFAULT_SCOPE_OF_WORK_ROWS: ScopeOfWorkRow[] = [
+  {
+    srNo: "1.1",
+    workItem: "Feasibility Study (technical & financial)",
+    responsibility: "Consumer with EPC Contractor",
+    remarks: "Can be jointly discussed with EPC.",
+  },
+  {
+    srNo: "1.2",
+    workItem: "Site Survey & Assessment",
+    responsibility: "EPC Contractor",
+    remarks: "Includes structural and electrical feasibility.",
+  },
+  {
+    srNo: "1.3",
+    workItem: "System Design & Engineering Drawings",
+    responsibility: "EPC Contractor",
+    remarks: "Electrical SLD, layout, shadow analysis, etc.",
+  },
+  {
+    srNo: "1.4",
+    workItem: "Statutory and Safety Compliance (design level)",
+    responsibility: "EPC Contractor",
+    remarks: "Must follow MNRE, DISCOM, CEIG norms.",
+  },
+  {
+    srNo: "1.5",
+    workItem: "Land Levelling and Grading / Tree Cutting",
+    responsibility: "Consumer",
+    remarks: "In consumer scope.",
+  },
+  {
+    srNo: "1.6",
+    workItem: "Cable Trenches",
+    responsibility: "Consumer",
+    remarks: "Existing trenches considered.",
+  },
+  {
+    srNo: "1.7",
+    workItem: "Control Rooms (RCC / PEB)",
+    responsibility: "Consumer",
+    remarks: "Existing covered control room space considered.",
+  },
+  {
+    srNo: "1.8",
+    workItem: "Water Drainage",
+    responsibility: "Consumer",
+    remarks: "Existing drainage considered.",
+  },
+  {
+    srNo: "1.9",
+    workItem: "Water and Electricity",
+    responsibility: "Consumer",
+    remarks: "Free water and electricity in customer scope during I&C and O&M if applicable.",
+  },
+  {
+    srNo: "2.1",
+    workItem: "Procurement of Solar Modules (approved make)",
+    responsibility: "EPC Contractor",
+    remarks: "Must meet MNRE ALMM list and BIS norms.",
+  },
+  {
+    srNo: "2.2",
+    workItem: "Procurement of Inverters",
+    responsibility: "EPC Contractor",
+    remarks: "Must meet DISCOM and MNRE specifications.",
+  },
+  {
+    srNo: "2.3",
+    workItem: "Procurement of Mounting Structures",
+    responsibility: "EPC Contractor",
+    remarks: "Corrosion-resistant hot dip galvanized structure.",
+  },
+  {
+    srNo: "2.4",
+    workItem: "Cables, Junction Boxes, Earthing Material",
+    responsibility: "EPC Contractor",
+    remarks: "IS-compliant cables and materials.",
+  },
+  {
+    srNo: "2.5",
+    workItem: "Transportation to Site",
+    responsibility: "EPC Contractor",
+    remarks: "Delivered to consumer site.",
+  },
+  {
+    srNo: "3.1",
+    workItem: "Module Mounting Structure Installation",
+    responsibility: "EPC Contractor",
+    remarks: "Based on roof type such as RCC or sheet metal.",
+  },
+  {
+    srNo: "3.2",
+    workItem: "Module Installation",
+    responsibility: "EPC Contractor",
+    remarks: "Including alignment and clamping.",
+  },
+  {
+    srNo: "3.3",
+    workItem: "Inverter and Electrical Panel Installation",
+    responsibility: "EPC Contractor",
+    remarks: "Includes ACDB, DCDB, SPD, meters, and associated accessories.",
+  },
+  {
+    srNo: "3.4",
+    workItem: "Cable Laying and Termination",
+    responsibility: "EPC Contractor",
+    remarks: "DC, AC, earthing, and communication cable laying with proper routing and termination.",
+  },
+  {
+    srNo: "3.5",
+    workItem: "Earthing and Lightning Protection",
+    responsibility: "EPC Contractor",
+    remarks: "As per applicable electrical safety standards.",
+  },
+  {
+    srNo: "4.1",
+    workItem: "Testing and Commissioning",
+    responsibility: "EPC Contractor",
+    remarks: "Pre-commissioning checks, energization, and performance testing.",
+  },
+  {
+    srNo: "4.2",
+    workItem: "Net Metering / Statutory Coordination",
+    responsibility: "EPC Contractor with Consumer Support",
+    remarks: "Subject to DISCOM / CEIG process and document availability.",
+  },
+  {
+    srNo: "5.1",
+    workItem: "Operation and Maintenance Training",
+    responsibility: "EPC Contractor",
+    remarks: "Basic operation and safety handover training.",
+  },
 ];
 
 const DEFAULT_BANK_DETAILS: BankDetails = {
@@ -145,9 +288,10 @@ export const createDefaultQuotationDocumentData = (
     gedaRegistrationCharges: overrides?.gedaRegistrationCharges ?? 0,
     netMeteringCharges: overrides?.netMeteringCharges ?? 0,
     meterCharges: overrides?.meterCharges ?? 0,
-    paymentStages: overrides?.paymentStages ?? DEFAULT_PAYMENT_STAGES,
-    requiredDocuments: overrides?.requiredDocuments ?? DEFAULT_REQUIRED_DOCUMENTS,
-    bankDetails: overrides?.bankDetails ?? DEFAULT_BANK_DETAILS,
+    paymentStages: (overrides?.paymentStages ?? DEFAULT_PAYMENT_STAGES).map((entry) => ({ ...entry })),
+    scopeOfWorkRows: (overrides?.scopeOfWorkRows ?? DEFAULT_SCOPE_OF_WORK_ROWS).map((entry) => ({ ...entry })),
+    requiredDocuments: [...(overrides?.requiredDocuments ?? DEFAULT_REQUIRED_DOCUMENTS)],
+    bankDetails: { ...(overrides?.bankDetails ?? DEFAULT_BANK_DETAILS) },
   };
 };
 
@@ -167,6 +311,18 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
           remarks: asString(entry.remarks),
         }))
         .filter((entry) => entry.label)
+    : undefined;
+
+  const scopeOfWorkRows = Array.isArray(raw.scopeOfWorkRows)
+    ? raw.scopeOfWorkRows
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+        .map((entry) => ({
+          srNo: asString(entry.srNo),
+          workItem: asString(entry.workItem),
+          responsibility: asString(entry.responsibility),
+          remarks: asString(entry.remarks),
+        }))
+        .filter((entry) => entry.srNo || entry.workItem || entry.responsibility || entry.remarks)
     : undefined;
 
   const requiredDocuments = Array.isArray(raw.requiredDocuments)
@@ -206,6 +362,7 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     netMeteringCharges: asNumber(raw.netMeteringCharges, 0),
     meterCharges: asNumber(raw.meterCharges, 0),
     paymentStages,
+    scopeOfWorkRows,
     requiredDocuments,
     bankDetails: bankRaw
       ? {
