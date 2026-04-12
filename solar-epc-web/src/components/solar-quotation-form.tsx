@@ -132,6 +132,9 @@ const OVERVIEW_REQUIRED_FIELDS = [
 const isScopeSectionRow = (row: QuotationDocumentData["scopeOfWorkRows"][number]) =>
   row.responsibility === "Section";
 
+const formatDecimal = (value: number, fractionDigits = 2) =>
+  Number.isFinite(value) ? value.toLocaleString("en-IN", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }) : "0.00";
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -368,6 +371,21 @@ export function SolarQuotationForm({
   const subtotal = resolvedRows.reduce((sum, row) => sum + row.baseTotal, 0);
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
+  const generationRows = documentData.generationTable.map((row) => {
+    const kwh = actualSystemKw * row.unitsPerDay * row.days;
+    const amount = kwh * Number(documentData.electricityTariffYear1 || 0);
+    return {
+      ...row,
+      kwh,
+      amount,
+    };
+  });
+  const averageGenerationUnitsPerKw =
+    generationRows.length > 0
+      ? generationRows.reduce((sum, row) => sum + row.unitsPerDay, 0) / generationRows.length
+      : 0;
+  const annualGenerationKwh = generationRows.reduce((sum, row) => sum + row.kwh, 0);
+  const annualGenerationSavings = generationRows.reduce((sum, row) => sum + row.amount, 0);
   const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => !documentData[key].trim());
   const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
@@ -627,6 +645,20 @@ export function SolarQuotationForm({
     }));
   };
 
+  const updateGenerationRow = (index: number, value: string) => {
+    setDocumentData((prev) => ({
+      ...prev,
+      generationTable: prev.generationTable.map((row, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...row,
+              unitsPerDay: Number(value || 0),
+            }
+          : row
+      ),
+    }));
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setHasAttemptedSubmit(true);
@@ -689,6 +721,7 @@ export function SolarQuotationForm({
         documentData: {
           ...documentData,
           preparedFor: documentData.preparedFor || formData.title,
+          expectedGenerationUnitsPerKw: Number(averageGenerationUnitsPerKw.toFixed(2)),
           moduleWattage: documentData.moduleWattage,
           numberOfModules,
           totalWatts: actualSystemWatts,
@@ -1057,15 +1090,8 @@ export function SolarQuotationForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Expected Generation Units / kW / Day</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={documentData.expectedGenerationUnitsPerKw}
-                onChange={(event) => setDocumentField("expectedGenerationUnitsPerKw", Number(event.target.value || 0))}
-                className={userInputClassName}
-              />
+              <label className="mb-1 block text-sm font-medium text-gray-700">Average Generation Units / kW / Day</label>
+              <div className={readOnlyFieldClassName}>{formatDecimal(averageGenerationUnitsPerKw)}</div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Structure Height South</label>
@@ -1192,6 +1218,77 @@ export function SolarQuotationForm({
             </div>
           </div>
         </div>
+
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-rose-900">Generation Settings</h3>
+              <p className="text-xs text-rose-800">Monthly generation settings from Generation Table.docx. Red cells are inputs, amber values are calculated.</p>
+            </div>
+            <div className="w-full max-w-[220px]">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Electricity Tariff - Year 1</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={documentData.electricityTariffYear1}
+                onChange={(event) => setDocumentField("electricityTariffYear1", Number(event.target.value || 0))}
+                className={userInputClassName}
+              />
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-rose-200 bg-white">
+            <div className="max-h-[420px] overflow-auto">
+              <table className="min-w-[760px] table-fixed divide-y divide-rose-100">
+                <thead className="sticky top-0 bg-rose-50 text-[11px] uppercase tracking-wide text-rose-900">
+                  <tr>
+                    <th className="w-24 px-3 py-2 text-left">Month</th>
+                    <th className="w-28 px-3 py-2 text-right">Unit / Day</th>
+                    <th className="w-20 px-3 py-2 text-right">Days</th>
+                    <th className="w-32 px-3 py-2 text-right">kWh</th>
+                    <th className="w-36 px-3 py-2 text-right">INR</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rose-100 text-sm">
+                  {generationRows.map((row, index) => (
+                    <tr key={row.month}>
+                      <td className="px-3 py-2 font-medium text-slate-900">{row.month}</td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.unitsPerDay}
+                          onChange={(event) => updateGenerationRow(index, event.target.value)}
+                          className="w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{row.days}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatDecimal(row.kwh)}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{formatCurrency(row.amount)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-amber-50 text-sm font-semibold text-amber-950">
+                  <tr>
+                    <td className="px-3 py-3">Total / Avg</td>
+                    <td className="px-3 py-3 text-right">{formatDecimal(averageGenerationUnitsPerKw)}</td>
+                    <td className="px-3 py-3 text-right">365</td>
+                    <td className="px-3 py-3 text-right">{formatDecimal(annualGenerationKwh)}</td>
+                    <td className="px-3 py-3 text-right">{formatCurrency(annualGenerationSavings)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
         </>
         )}
 
@@ -1204,12 +1301,13 @@ export function SolarQuotationForm({
           </div>
 
           <div className="max-h-[440px] overflow-auto">
-            <table className="min-w-[960px] table-fixed divide-y divide-gray-200">
+            <table className="min-w-[1080px] table-fixed divide-y divide-gray-200">
               <thead className="sticky top-0 bg-yellow-50 text-[11px] uppercase tracking-wide text-gray-700">
                 <tr>
                   <th className="w-14 px-2 py-2 text-left">Seq.</th>
                   <th className="w-40 px-2 py-2 text-left">Item Head</th>
-                  <th className="w-[320px] px-2 py-2 text-left">Item Type &amp; Ratings / Capacity</th>
+                  <th className="w-[280px] px-2 py-2 text-left">Item Type</th>
+                  <th className="w-44 px-2 py-2 text-left">Ratings / Capacity</th>
                   <th className="w-40 px-2 py-2 text-left">Selection Unit</th>
                   <th className="w-44 px-2 py-2 text-right">Unit Rate</th>
                   <th className="w-40 px-2 py-2 text-left">User Input Number</th>
@@ -1222,6 +1320,7 @@ export function SolarQuotationForm({
                   const selectedItem = items.find((item) => item.id === row?.itemId);
                   const resolved = resolvedRows.find((entry) => entry.sequence === config.sequence);
                   const selectionUnit = selectedItem ? inferSelectionUnit(selectedItem) : "-";
+                  const selectedDisplay = selectedItem ? getBoqDisplayParts(selectedItem) : null;
 
                   return (
                     <tr key={config.sequence} className="align-top hover:bg-gray-50">
@@ -1233,11 +1332,12 @@ export function SolarQuotationForm({
                             value: item.id,
                             label: (() => {
                               const display = getBoqDisplayParts(item);
-                              return display.ratingOrCapacity
-                                ? `${display.itemType} - ${display.ratingOrCapacity}`
-                                : display.itemType;
+                              return display.itemType;
                             })(),
-                            subtitle: item.brand || undefined,
+                            subtitle: (() => {
+                              const display = getBoqDisplayParts(item);
+                              return [display.ratingOrCapacity, item.brand].filter(Boolean).join(" | ") || undefined;
+                            })(),
                           }))}
                           value={row?.itemId || ""}
                           onChange={(value) => handleSelectItem(config.sequence, value)}
@@ -1247,16 +1347,14 @@ export function SolarQuotationForm({
                         />
                       </td>
                       <td className="px-2 py-3 text-gray-700">
-                        <div>{selectionUnit}</div>
-                        {selectedItem && (
+                        <div>{selectedDisplay?.ratingOrCapacity || "-"}</div>
+                        {selectedItem?.brand && (
                           <div className="mt-1 text-xs text-gray-500">
-                            {(() => {
-                              const display = getBoqDisplayParts(selectedItem);
-                              return display.ratingOrCapacity || selectedItem.brand || "";
-                            })()}
+                            {selectedItem.brand}
                           </div>
                         )}
                       </td>
+                      <td className="px-2 py-3 text-gray-700">{selectionUnit}</td>
                       <td className="px-2 py-3 text-right text-xs font-medium text-gray-900 sm:text-sm">
                         {selectedItem
                           ? isPercentageItem(selectedItem)

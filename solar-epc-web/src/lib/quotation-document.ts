@@ -21,6 +21,12 @@ export type ScopeOfWorkRow = {
   remarks: string;
 };
 
+export type GenerationTableRow = {
+  month: string;
+  unitsPerDay: number;
+  days: number;
+};
+
 export type QuotationDocumentData = {
   consumerType: string;
   consumerNumber: string;
@@ -35,6 +41,8 @@ export type QuotationDocumentData = {
   systemType: string;
   requiredAreaFactorSqftPerKw: number;
   expectedGenerationUnitsPerKw: number;
+  electricityTariffYear1: number;
+  generationTable: GenerationTableRow[];
   structureHeightSouth: string;
   structureHeightNorth: string;
   arrayLayout: string;
@@ -97,6 +105,21 @@ const DEFAULT_REQUIRED_DOCUMENTS = [
   "GST certificate",
   "Undertaking on stamp paper",
   "Authorization letter",
+];
+
+const DEFAULT_GENERATION_TABLE: GenerationTableRow[] = [
+  { month: "Jan", unitsPerDay: 4.6, days: 31 },
+  { month: "Feb", unitsPerDay: 4.6, days: 28 },
+  { month: "Mar", unitsPerDay: 5, days: 31 },
+  { month: "Apr", unitsPerDay: 5, days: 30 },
+  { month: "May", unitsPerDay: 5, days: 31 },
+  { month: "Jun", unitsPerDay: 5, days: 30 },
+  { month: "Jul", unitsPerDay: 4.1, days: 31 },
+  { month: "Aug", unitsPerDay: 4.1, days: 31 },
+  { month: "Sep", unitsPerDay: 3.9, days: 30 },
+  { month: "Oct", unitsPerDay: 4.6, days: 31 },
+  { month: "Nov", unitsPerDay: 4.6, days: 30 },
+  { month: "Dec", unitsPerDay: 4.6, days: 31 },
 ];
 
 const DEFAULT_SCOPE_OF_WORK_ROWS: ScopeOfWorkRow[] = [
@@ -468,7 +491,9 @@ export const createDefaultQuotationDocumentData = (
     totalKw,
     systemType: overrides?.systemType ?? "On Grid",
     requiredAreaFactorSqftPerKw: overrides?.requiredAreaFactorSqftPerKw ?? 50,
-    expectedGenerationUnitsPerKw: overrides?.expectedGenerationUnitsPerKw ?? 4,
+    expectedGenerationUnitsPerKw: overrides?.expectedGenerationUnitsPerKw ?? 4.59,
+    electricityTariffYear1: overrides?.electricityTariffYear1 ?? 8,
+    generationTable: (overrides?.generationTable ?? DEFAULT_GENERATION_TABLE).map((entry) => ({ ...entry })),
     structureHeightSouth: overrides?.structureHeightSouth ?? "15 ft",
     structureHeightNorth: overrides?.structureHeightNorth ?? "17 ft",
     arrayLayout: overrides?.arrayLayout ?? "South Facing, 14° Tilt, Portrait orientation",
@@ -511,6 +536,17 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
         .filter((entry) => entry.label)
     : undefined;
 
+  const generationTable = Array.isArray(raw.generationTable)
+    ? raw.generationTable
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+        .map((entry) => ({
+          month: asString(entry.month),
+          unitsPerDay: asNumber(entry.unitsPerDay),
+          days: asNumber(entry.days),
+        }))
+        .filter((entry) => entry.month)
+    : undefined;
+
   const scopeOfWorkRows = Array.isArray(raw.scopeOfWorkRows)
     ? raw.scopeOfWorkRows
         .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
@@ -544,7 +580,9 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     totalKw: asNumber(raw.totalKw, 5.5),
     systemType: asString(raw.systemType, "On Grid"),
     requiredAreaFactorSqftPerKw: asNumber(raw.requiredAreaFactorSqftPerKw, 50),
-    expectedGenerationUnitsPerKw: asNumber(raw.expectedGenerationUnitsPerKw, 4),
+    expectedGenerationUnitsPerKw: asNumber(raw.expectedGenerationUnitsPerKw, 4.59),
+    electricityTariffYear1: asNumber(raw.electricityTariffYear1, 8),
+    generationTable,
     structureHeightSouth: asString(raw.structureHeightSouth, "15 ft"),
     structureHeightNorth: asString(raw.structureHeightNorth, "17 ft"),
     arrayLayout: asString(raw.arrayLayout, "South Facing, 14° Tilt, Portrait orientation"),
