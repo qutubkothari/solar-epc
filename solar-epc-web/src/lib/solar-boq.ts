@@ -295,6 +295,7 @@ const cleanName = (value?: string | null) => (value || "").replace(/\s+/g, " ").
 const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description">) => {
   const text = `${cleanName(item.name)} ${cleanName(item.description)}`;
   const patterns = [
+    /(\d+(?:\.\d+)?)\s*TO\s*(\d+(?:\.\d+)?)(?:\s*(?:WP|W|KW|KVA|MM))?\b/i,
     /(\d+(?:\.\d+)?)\s*WP\b/i,
     /(\d+(?:\.\d+)?)\s*KW\b/i,
     /(\d+(?:\.\d+)?)\s*KVA\b/i,
@@ -302,6 +303,7 @@ const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description"
     /(\d+(?:\.\d+)?\s*[XC]\s*\d+(?:\.\d+)?\s*SQMM)\b/i,
     /(\d+(?:\.\d+)?\s*MM\s*X\s*\d+(?:\.\d+)?\s*MTR)\b/i,
     /(\d+(?:\.\d+)?\s*MM)\b/i,
+    /(?:^|\s|-)(\d{3,4})(?:\s|$)/i,
   ];
 
   for (const pattern of patterns) {
@@ -314,6 +316,20 @@ const extractRatingOrCapacity = (item: Pick<SolarBoqItem, "name" | "description"
   return "";
 };
 
+const stripRatingFromItemType = (value: string, ratingOrCapacity: string) => {
+  if (!ratingOrCapacity) {
+    return value.trim();
+  }
+
+  const escapedRating = ratingOrCapacity.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  return value
+    .replace(new RegExp(`(?:-|–|—|/)?\\s*${escapedRating}\\s*$`, "i"), "")
+    .replace(new RegExp(`(?:-|–|—|/)\\s*${escapedRating}(?:\\s*(?:-|–|—|/))?`, "i"), " ")
+    .replace(/\s*[-/|]+\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
 export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => {
   const resolvedHead = resolveBoqItemHead(item);
   const rawName = cleanName(item.name);
@@ -321,13 +337,13 @@ export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => 
 
   if (resolvedHead === "SOLAR MODULE") {
     return {
-      itemType: rawName.replace(/^\d+(?:\.\d+)?\s*WP\s*/i, "").trim() || rawName,
+      itemType: stripRatingFromItemType(rawName.replace(/^\d+(?:\.\d+)?\s*WP\s*/i, "").trim(), ratingOrCapacity) || rawName,
       ratingOrCapacity,
     };
   }
 
   if (resolvedHead === "SOLAR INVERTER") {
-    const normalizedName = rawName.replace(/^INV\s*-\s*/i, "").trim();
+    const normalizedName = stripRatingFromItemType(rawName.replace(/^INV\s*-\s*/i, "").trim(), ratingOrCapacity);
     return {
       itemType: normalizedName || rawName,
       ratingOrCapacity,
@@ -335,7 +351,7 @@ export const getBoqDisplayParts = (item: SolarBoqItem): SolarBoqDisplayParts => 
   }
 
   return {
-    itemType: rawName,
+    itemType: stripRatingFromItemType(rawName, ratingOrCapacity) || rawName,
     ratingOrCapacity,
   };
 };

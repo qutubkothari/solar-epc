@@ -35,6 +35,7 @@ type BoqDraftRow = {
   sequence: number;
   itemHead: string;
   itemId: string;
+  itemType?: string;
   quantity: number;
   quantityTouched: boolean;
 };
@@ -87,6 +88,7 @@ const createInitialRows = (): BoqDraftRow[] =>
     sequence: row.sequence,
     itemHead: row.itemHead,
     itemId: "",
+    itemType: "",
     quantity: 0,
     quantityTouched: false,
   }));
@@ -104,8 +106,8 @@ const PAYMENT_TOTAL_TOLERANCE = 0.01;
 
 const FORM_TABS: Array<{ key: QuotationFormTab; label: string; description: string }> = [
   { key: "overview", label: "Overview", description: "Client, quotation, and proposal basics" },
-  { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
   { key: "boq", label: "BOQ & Pricing", description: "Workbook BOQ builder and totals" },
+  { key: "technical", label: "Technical Proposal", description: "System sizing and technical defaults" },
   { key: "payment", label: "Payment & Banking", description: "Payment stages and bank details" },
   { key: "scope", label: "Scope & Documents", description: "Editable scope matrix and required documents" },
   { key: "preview", label: "Preview", description: "Final quotation summary before save" },
@@ -134,6 +136,8 @@ const isScopeSectionRow = (row: QuotationDocumentData["scopeOfWorkRows"][number]
 
 const formatDecimal = (value: number, fractionDigits = 2) =>
   Number.isFinite(value) ? value.toLocaleString("en-IN", { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }) : "0.00";
+
+const getItemTypeFromItem = (item?: SolarBoqItem | null) => (item ? getBoqDisplayParts(item).itemType || item.name : "");
 
 export function SolarQuotationForm({
   onClose,
@@ -178,7 +182,10 @@ export function SolarQuotationForm({
         })
   );
   const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() =>
-    initialBoqRows && initialBoqRows.length > 0 ? initialBoqRows : createInitialRows()
+    (initialBoqRows && initialBoqRows.length > 0 ? initialBoqRows : createInitialRows()).map((row) => ({
+      ...row,
+      itemType: row.itemType || "",
+    }))
   );
 
   useEffect(() => {
@@ -264,6 +271,35 @@ export function SolarQuotationForm({
   ) => {
     setDocumentData((prev) => ({ ...prev, [key]: value }));
   };
+
+  useEffect(() => {
+    setBoqRows((prev) => {
+      let changed = false;
+      const next = prev.map((row) => {
+        if (!row.itemId) {
+          return row;
+        }
+
+        const selectedItem = items.find((item) => item.id === row.itemId);
+        if (!selectedItem) {
+          return row;
+        }
+
+        const itemType = getItemTypeFromItem(selectedItem);
+        if (row.itemType === itemType) {
+          return row;
+        }
+
+        changed = true;
+        return {
+          ...row,
+          itemType,
+        };
+      });
+
+      return changed ? next : prev;
+    });
+  }, [items]);
 
   useEffect(() => {
     setBoqRows((prev) => {
@@ -536,7 +572,47 @@ export function SolarQuotationForm({
     return 0;
   };
 
-  const handleSelectItem = (sequence: number, itemId: string) => {
+  const handleSelectItemType = (sequence: number, itemType: string) => {
+    const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
+    const selectedItem = config
+      ? getBoqRowItems(items, config).find((item) => getItemTypeFromItem(item) === itemType)
+      : undefined;
+
+    setBoqRows((prev) =>
+      prev.map((row) => {
+        if (row.sequence !== sequence) {
+          return row;
+        }
+
+        if (!selectedItem || !config) {
+          return { ...row, itemType, itemId: "", quantity: 0, quantityTouched: false };
+        }
+
+        const nextQty = getDefaultQuantity(config, selectedItem, {
+          actualSystemWatts,
+          actualSystemKw,
+          numberOfModules,
+        });
+
+        return {
+          ...row,
+          itemType,
+          itemId: selectedItem.id,
+          quantity: row.quantityTouched && row.itemId ? row.quantity : nextQty,
+          quantityTouched: false,
+        };
+      })
+    );
+
+    if (sequence === 1 && selectedItem) {
+      const wattage = extractWattageFromItem(selectedItem);
+      if (wattage) {
+        setDocumentField("moduleWattage", wattage);
+      }
+    }
+  };
+
+  const handleSelectRating = (sequence: number, itemId: string) => {
     const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
     const selectedItem = items.find((item) => item.id === itemId);
 
@@ -558,6 +634,7 @@ export function SolarQuotationForm({
 
         return {
           ...row,
+          itemType: getItemTypeFromItem(selectedItem),
           itemId,
           quantity: row.quantityTouched && row.itemId ? row.quantity : nextQty,
           quantityTouched: false,
@@ -1736,10 +1813,18 @@ export function SolarQuotationForm({
                 {SOLAR_BOQ_SEQUENCE.map((config) => {
                   const row = boqRows.find((entry) => entry.sequence === config.sequence);
                   const rowItems = getBoqRowItems(items, config);
+                  const itemTypeOptions = Array.from(
+                    new Map(
+                      rowItems.map((item) => {
+                        const itemType = getItemTypeFromItem(item);
+                        return [itemType.toLowerCase(), { value: itemType, label: itemType }];
+                      })
+                    ).values()
+                  );
+                  const ratingItems = rowItems.filter((item) => getItemTypeFromItem(item) === (row?.itemType || ""));
                   const selectedItem = items.find((item) => item.id === row?.itemId);
                   const resolved = resolvedRows.find((entry) => entry.sequence === config.sequence);
                   const selectionUnit = selectedItem ? inferSelectionUnit(selectedItem) : "-";
-                  const selectedDisplay = selectedItem ? getBoqDisplayParts(selectedItem) : null;
 
                   return (
                     <tr key={config.sequence} className="align-top hover:bg-gray-50">
@@ -1747,26 +1832,32 @@ export function SolarQuotationForm({
                       <td className="px-2 py-3 font-medium text-gray-900">{config.itemHead}</td>
                       <td className="px-2 py-3">
                         <SearchableSelect
-                          options={rowItems.map((item) => ({
-                            value: item.id,
-                            label: (() => {
-                              const display = getBoqDisplayParts(item);
-                              return display.itemType;
-                            })(),
-                            subtitle: (() => {
-                              const display = getBoqDisplayParts(item);
-                              return [display.ratingOrCapacity, item.brand].filter(Boolean).join(" | ") || undefined;
-                            })(),
-                          }))}
-                          value={row?.itemId || ""}
-                          onChange={(value) => handleSelectItem(config.sequence, value)}
-                          placeholder={rowItems.length > 0 ? "Select item..." : "No mapped items found"}
-                          searchPlaceholder="Search BOQ items"
+                          options={itemTypeOptions}
+                          value={row?.itemType || ""}
+                          onChange={(value) => handleSelectItemType(config.sequence, value)}
+                          placeholder={itemTypeOptions.length > 0 ? "Select item type..." : "No mapped items found"}
+                          searchPlaceholder="Search item types"
                           triggerClassName="border-red-300 bg-red-50"
                         />
                       </td>
                       <td className="px-2 py-3 text-gray-700">
-                        <div>{selectedDisplay?.ratingOrCapacity || "-"}</div>
+                        <SearchableSelect
+                          options={ratingItems.map((item) => {
+                            const display = getBoqDisplayParts(item);
+                            return {
+                              value: item.id,
+                              label: display.ratingOrCapacity || "-",
+                              subtitle: item.brand || undefined,
+                            };
+                          })}
+                          value={row?.itemId || ""}
+                          onChange={(value) => handleSelectRating(config.sequence, value)}
+                          placeholder={row?.itemType ? "Select rating..." : "Select item type first"}
+                          searchPlaceholder="Search ratings"
+                          emptyLabel={row?.itemType ? "No ratings found" : "Select item type first"}
+                          disabled={!row?.itemType}
+                          triggerClassName="border-red-300 bg-red-50"
+                        />
                         {selectedItem?.brand && (
                           <div className="mt-1 text-xs text-gray-500">
                             {selectedItem.brand}
