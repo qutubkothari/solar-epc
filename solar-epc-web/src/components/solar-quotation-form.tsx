@@ -572,6 +572,51 @@ export function SolarQuotationForm({
     return 0;
   };
 
+  const solarSystemConfigurationPanel = (
+    <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+      <h3 className="mb-4 text-lg font-semibold text-blue-900">Solar System Configuration</h3>
+      <div className="grid gap-4 md:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Module Wattage (W)</label>
+          <input
+            type="number"
+            min="0"
+            value={documentData.moduleWattage}
+            onChange={(event) =>
+              setDocumentField("moduleWattage", Number(event.target.value || 0))
+            }
+            className={userInputClassName}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">No. of Modules</label>
+          <input
+            type="number"
+            min="0"
+            value={documentData.numberOfModules}
+            onChange={(event) =>
+              setDocumentField("numberOfModules", Number(event.target.value || 0))
+            }
+            className={userInputClassName}
+          />
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total WP</div>
+          <div className="text-2xl font-bold text-amber-900">{actualSystemWatts.toLocaleString()}</div>
+          <div className="mt-1 text-[11px] text-amber-700">Module Wattage x No. of Modules</div>
+        </div>
+        <div className={calculatedCardClassName}>
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total KW</div>
+          <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)}</div>
+          <div className="mt-1 text-[11px] text-amber-700">Total WP / 1000</div>
+        </div>
+      </div>
+      <div className={`mt-4 ${calculatedPanelClassName}`}>
+        <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {documentData.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
+      </div>
+    </div>
+  );
+
   const handleSelectItemType = (sequence: number, itemType: string) => {
     const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
     const selectedItem = config
@@ -1174,49 +1219,6 @@ export function SolarQuotationForm({
 
         {activeTab === "technical" && (
         <>
-        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-          <h3 className="mb-4 text-lg font-semibold text-blue-900">Solar System Configuration</h3>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Module Wattage (W)</label>
-              <input
-                type="number"
-                min="0"
-                value={documentData.moduleWattage}
-                onChange={(event) =>
-                  setDocumentField("moduleWattage", Number(event.target.value || 0))
-                }
-                className={userInputClassName}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">No. of Modules</label>
-              <input
-                type="number"
-                min="0"
-                value={documentData.numberOfModules}
-                onChange={(event) =>
-                  setDocumentField("numberOfModules", Number(event.target.value || 0))
-                }
-                className={userInputClassName}
-              />
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total WP</div>
-              <div className="text-2xl font-bold text-amber-900">{actualSystemWatts.toLocaleString()}</div>
-              <div className="mt-1 text-[11px] text-amber-700">Module Wattage x No. of Modules</div>
-            </div>
-            <div className={calculatedCardClassName}>
-              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total KW</div>
-              <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)}</div>
-              <div className="mt-1 text-[11px] text-amber-700">Total WP / 1000</div>
-            </div>
-          </div>
-          <div className={`mt-4 ${calculatedPanelClassName}`}>
-            <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {documentData.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
-          </div>
-        </div>
-
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4">
           <h3 className="mb-4 text-lg font-semibold text-violet-900">Technical & Commercial Defaults</h3>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1790,6 +1792,8 @@ export function SolarQuotationForm({
 
         {activeTab === "boq" && (
         <>
+        {solarSystemConfigurationPanel}
+
         <div className="overflow-hidden rounded-lg border border-gray-200">
           <div className="border-b bg-gray-50 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-800">BOQ Builder</h3>
