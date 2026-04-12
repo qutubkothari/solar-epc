@@ -251,6 +251,87 @@ export async function GET(
       return lines.length * lineHeight;
     };
 
+    const drawBarChartCard = (
+      page: PDFPage,
+      options: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        title: string;
+        data: Array<{ label: string; value: number }>;
+        barColor: ReturnType<typeof rgb>;
+        valueFormatter: (value: number) => string;
+      }
+    ) => {
+      const { x, y, width, height, title, data, barColor, valueFormatter } = options;
+      const cardBottom = y - height;
+      page.drawRectangle({
+        x,
+        y: cardBottom,
+        width,
+        height,
+        color: white,
+        borderColor: border,
+        borderWidth: 1,
+      });
+      page.drawRectangle({
+        x,
+        y: y - 22,
+        width,
+        height: 22,
+        color: paleFill,
+      });
+      drawText(page, title, x + 8, y - 14, 8.2, true, accent);
+
+      const chartTop = y - 34;
+      const chartBottom = cardBottom + 24;
+      const chartLeft = x + 26;
+      const chartRight = x + width - 10;
+      const chartHeight = chartTop - chartBottom;
+      const chartWidth = chartRight - chartLeft;
+      const maxValue = Math.max(...data.map((entry) => entry.value), 1);
+      const barGap = 5;
+      const barWidth = Math.max((chartWidth - barGap * (data.length - 1)) / Math.max(data.length, 1), 8);
+
+      page.drawLine({
+        start: { x: chartLeft, y: chartBottom },
+        end: { x: chartRight, y: chartBottom },
+        thickness: 1,
+        color: subtleLine,
+      });
+      page.drawLine({
+        start: { x: chartLeft, y: chartBottom },
+        end: { x: chartLeft, y: chartTop },
+        thickness: 1,
+        color: subtleLine,
+      });
+
+      data.forEach((entry, index) => {
+        const barHeight = Math.max((entry.value / maxValue) * (chartHeight - 18), 2);
+        const barX = chartLeft + index * (barWidth + barGap);
+        const barY = chartBottom;
+        const label = entry.label.slice(0, 3).toUpperCase();
+        const valueLabel = valueFormatter(entry.value);
+
+        page.drawRectangle({
+          x: barX,
+          y: barY,
+          width: barWidth,
+          height: barHeight,
+          color: barColor,
+          opacity: 0.92,
+        });
+
+        const fittedValueLabel = measureWidth(valueLabel, 5.8, boldFont) <= barWidth + 10 ? valueLabel : valueFormatter(entry.value).split(" ")[0];
+        const valueWidth = measureWidth(fittedValueLabel, 5.8, boldFont);
+        drawText(page, fittedValueLabel, barX + Math.max((barWidth - valueWidth) / 2, 0), barY + barHeight + 4, 5.8, true, accent);
+
+        const labelWidth = measureWidth(label, 5.8, boldFont);
+        drawText(page, label, barX + Math.max((barWidth - labelWidth) / 2, 0), chartBottom - 10, 5.8, true, muted);
+      });
+    };
+
     const formatDate = (value: Date | string) =>
       new Intl.DateTimeFormat("en-IN", {
         day: "2-digit",
@@ -861,7 +942,7 @@ export async function GET(
 
     y -= 18;
 
-    const generationSectionHeight = 410;
+    const generationSectionHeight = 360;
     if (y - generationSectionHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
@@ -909,50 +990,44 @@ export async function GET(
     drawText(page, "Predicted Monthly Generation & Savings", MARGIN + 8, y - 13, 8.5, true, white);
     y -= 24;
 
-    const generationColumns = [
-      { label: "Month", x: MARGIN, width: 68 },
-      { label: "Unit / Day", x: MARGIN + 68, width: 84 },
-      { label: "Days", x: MARGIN + 152, width: 58 },
-      { label: "kWh", x: MARGIN + 210, width: 110 },
-      { label: "Savings", x: MARGIN + 320, width: 211 },
-    ];
-
-    generationRows.forEach((row, index) => {
-      const rowHeight = 18;
-
-      page.drawRectangle({
-        x: MARGIN,
-        y: y - rowHeight,
-        width: CONTENT_WIDTH,
-        height: rowHeight,
-        color: index % 2 === 0 ? white : softFill,
-        borderColor: subtleLine,
-        borderWidth: 1,
-      });
-      generationColumns.slice(1).forEach((column) => {
-        page.drawLine({
-          start: { x: column.x, y },
-          end: { x: column.x, y: y - rowHeight },
-          thickness: 1,
-          color: subtleLine,
-        });
-      });
-
-      drawText(page, row.month, generationColumns[0].x + 6, y - 12, 7.8, true, accent);
-      drawRightAligned(page, row.unitsPerDay.toFixed(2), generationColumns[1].x, generationColumns[1].width, y - 12, 7.8, false, accent);
-      drawRightAligned(page, row.days.toString(), generationColumns[2].x, generationColumns[2].width, y - 12, 7.8, false, accent);
-      drawRightAligned(page, row.kwh.toFixed(0), generationColumns[3].x, generationColumns[3].width, y - 12, 7.8, false, accent);
-      drawRightAligned(page, formatCurrency(row.amount), generationColumns[4].x, generationColumns[4].width, y - 12, 7.8, true, accent);
-      y -= rowHeight;
+    const chartGap = 12;
+    const chartWidth = (CONTENT_WIDTH - chartGap) / 2;
+    const chartHeight = 150;
+    drawBarChartCard(page, {
+      x: MARGIN,
+      y,
+      width: chartWidth,
+      height: chartHeight,
+      title: "Predicted Monthly Generation (kWh)",
+      data: generationRows.map((row) => ({ label: row.month, value: row.kwh })),
+      barColor: secondary,
+      valueFormatter: (value) => value.toFixed(0),
     });
+    drawBarChartCard(page, {
+      x: MARGIN + chartWidth + chartGap,
+      y,
+      width: chartWidth,
+      height: chartHeight,
+      title: "Predicted Monthly Savings (INR)",
+      data: generationRows.map((row) => ({ label: row.month, value: row.amount })),
+      barColor: primary,
+      valueFormatter: (value) => `Rs.${value.toFixed(0)}`,
+    });
+    y -= chartHeight + 12;
 
-    page.drawRectangle({ x: MARGIN, y: y - 20, width: CONTENT_WIDTH, height: 20, color: paleFill, borderColor: border, borderWidth: 1 });
-    drawText(page, "Total / Avg", MARGIN + 6, y - 13, 7.8, true, accent);
-    drawRightAligned(page, documentData.expectedGenerationUnitsPerKw.toFixed(2), generationColumns[1].x, generationColumns[1].width, y - 13, 7.8, true, accent);
-    drawRightAligned(page, "365", generationColumns[2].x, generationColumns[2].width, y - 13, 7.8, true, accent);
-    drawRightAligned(page, annualGenerationKwh.toFixed(0), generationColumns[3].x, generationColumns[3].width, y - 13, 7.8, true, accent);
-    drawRightAligned(page, formatCurrency(annualGenerationSavings), generationColumns[4].x, generationColumns[4].width, y - 13, 7.8, true, accent);
-    y -= 28;
+    const miniSummaryHeight = 40;
+    page.drawRectangle({ x: MARGIN, y: y - miniSummaryHeight, width: CONTENT_WIDTH, height: miniSummaryHeight, color: white, borderColor: border, borderWidth: 1 });
+    const miniSummaryColumns = [
+      { label: "Avg. Unit / Day", value: documentData.expectedGenerationUnitsPerKw.toFixed(2), x: MARGIN + 10 },
+      { label: "Total Days", value: "365", x: MARGIN + 145 },
+      { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, x: MARGIN + 250 },
+      { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), x: MARGIN + 405 },
+    ];
+    miniSummaryColumns.forEach((entry) => {
+      drawText(page, entry.label, entry.x, y - 13, 6.6, true, muted);
+      drawText(page, entry.value, entry.x, y - 27, 8.2, true, accent);
+    });
+    y -= miniSummaryHeight + 10;
 
     const generationNoteLines = wrapText(documentData.generationDisclaimer, CONTENT_WIDTH - 20, 7.5);
     const generationNoteHeight = 14 + generationNoteLines.length * 9;
