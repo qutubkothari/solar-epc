@@ -546,6 +546,15 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const asLikelyPercentPoint = (value: unknown, fallback = 0, legacyThreshold = Number.POSITIVE_INFINITY) => {
+  const parsed = asNumber(value, fallback);
+  if (parsed <= legacyThreshold) {
+    return parsed;
+  }
+
+  return parsed / 100;
+};
+
 export const createDefaultQuotationDocumentData = (
   overrides?: Partial<QuotationDocumentData>
 ): QuotationDocumentData => {
@@ -713,8 +722,8 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     roiAverageDailyGenerationUnitsPerKw: asNumber(raw.roiAverageDailyGenerationUnitsPerKw, 4),
     roiShutdownDays: asNumber(raw.roiShutdownDays, 30),
     roiTariffEscalationPercent: asNumber(raw.roiTariffEscalationPercent, 3),
-    roiAnnualPowerDegradationAfterYear1Percent: asNumber(raw.roiAnnualPowerDegradationAfterYear1Percent, 2),
-    roiAnnualPowerDegradationFromYear3OnwardPercent: asNumber(raw.roiAnnualPowerDegradationFromYear3OnwardPercent, 0.5),
+    roiAnnualPowerDegradationAfterYear1Percent: asLikelyPercentPoint(raw.roiAnnualPowerDegradationAfterYear1Percent, 2, 10),
+    roiAnnualPowerDegradationFromYear3OnwardPercent: asLikelyPercentPoint(raw.roiAnnualPowerDegradationFromYear3OnwardPercent, 0.5, 10),
     roiOperationMaintenanceCostYear1: asNumber(raw.roiOperationMaintenanceCostYear1, 0),
     roiOperationMaintenancePercentYear1: asNumber(raw.roiOperationMaintenancePercentYear1, 1),
     roiOperationMaintenanceEscalationPercent: asNumber(raw.roiOperationMaintenanceEscalationPercent, 3),

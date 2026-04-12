@@ -1478,7 +1478,7 @@ export async function GET(
 
     const roiRows = [
       ["Project Capacity", "kW", `${documentData.totalKw.toFixed(2)}`, "Size of plant"],
-      ["Installation Cost", "INR", formatCurrency(roiInstallationCost), "Total EPC cost"],
+      ["Total Cost", "INR", formatCurrency(roiInstallationCost), "Total EPC cost"],
       [
         "Average Daily Generation",
         "kWh / kWp / day",
@@ -1504,7 +1504,7 @@ export async function GET(
         "O&M Cost (Year 1)",
         "% / INR",
         `${documentData.roiOperationMaintenancePercentYear1.toFixed(2)} | ${formatCurrency(roiOperationMaintenanceCostYear1)}`,
-        "Year 1 maintenance cost",
+        "Year 1 maintenance cost as % of total cost",
       ],
       ["O&M Cost Escalation", "%", documentData.roiOperationMaintenanceEscalationPercent.toFixed(2), "Inflation in O&M"],
       ["Project Life", "Years", documentData.roiProjectLifeYears.toFixed(0), "Standard plant life used for ROI projection"],

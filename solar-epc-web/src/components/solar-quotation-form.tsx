@@ -24,6 +24,7 @@ import {
 type Client = {
   id: string;
   name: string;
+  contactName?: string;
 };
 
 type Inquiry = {
@@ -209,6 +210,7 @@ export function SolarQuotationForm({
     value: client.id,
     label: client.name,
   }));
+  const selectedClient = clients.find((entry) => entry.id === formData.clientId);
 
   const inquiryOptions = inquiries
     .filter((inquiry) => !formData.clientId || inquiry.clientId === formData.clientId)
@@ -261,6 +263,24 @@ export function SolarQuotationForm({
       prev.preparedFor ? prev : { ...prev, preparedFor: inquiryTitle || formData.title }
     );
   }, [formData.title, inquiryTitle]);
+
+  useEffect(() => {
+    const clientContactName = selectedClient?.contactName?.trim();
+    if (!clientContactName) {
+      return;
+    }
+
+    setDocumentData((prev) => {
+      if (prev.customerContactPerson.trim()) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        customerContactPerson: clientContactName,
+      };
+    });
+  }, [selectedClient?.contactName]);
 
   const safeModuleWattage = Math.max(documentData.moduleWattage || 0, 0);
   const numberOfModules = Math.max(Number(documentData.numberOfModules || 0), 0);
@@ -447,7 +467,14 @@ export function SolarQuotationForm({
   const roiYear1NetSavings = roiProjection.year1NetSavings;
   const roiEstimatedPaybackYears = roiProjection.estimatedPaybackYears;
   const roiLifetimeNetSavings = roiProjection.lifetimeNetSavings;
-  const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => !documentData[key].trim());
+  const resolvedCustomerContactPerson = documentData.customerContactPerson.trim() || selectedClient?.contactName?.trim() || "";
+  const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => {
+    if (key === "customerContactPerson") {
+      return !resolvedCustomerContactPerson;
+    }
+
+    return !documentData[key].trim();
+  });
   const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
   const incompletePaymentStages = documentData.paymentStages
@@ -492,7 +519,7 @@ export function SolarQuotationForm({
   const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
   const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
-  const selectedClientLabel = clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected";
+  const selectedClientLabel = clientName || selectedClient?.name || "Not selected";
   const selectedInquiryLabel = inquiryTitle || inquiries.find((entry) => entry.id === formData.inquiryId)?.title || "Not linked";
   const validationErrorMessage = (() => {
     if (!formData.clientId) {
@@ -1022,6 +1049,7 @@ export function SolarQuotationForm({
         documentData: {
           ...documentData,
           preparedFor: documentData.preparedFor || formData.title,
+          customerContactPerson: resolvedCustomerContactPerson,
           expectedGenerationUnitsPerKw: Number(averageGenerationUnitsPerKw.toFixed(2)),
           moduleWattage: documentData.moduleWattage,
           numberOfModules,
@@ -1264,7 +1292,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.customerContactPerson}
                 onChange={(event) => setDocumentField("customerContactPerson", event.target.value)}
-                placeholder="Customer contact person"
+                placeholder={selectedClient?.contactName ? `Saved client contact: ${selectedClient.contactName}` : "Customer contact person"}
                 className={`${userInputClassName} ${missingOverviewFields.some((field) => field.key === "customerContactPerson") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
@@ -1591,7 +1619,7 @@ export function SolarQuotationForm({
                     <td className="px-3 py-2 text-slate-600">Size of plant</td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 font-medium text-slate-900">Installation Cost</td>
+                    <td className="px-3 py-2 font-medium text-slate-900">Total Cost</td>
                     <td className="px-3 py-2 text-slate-700">INR</td>
                     <td className="px-3 py-2"><div className={readOnlyFieldClassName}>{formatCurrency(grandTotal)}</div></td>
                     <td className="px-3 py-2 text-slate-600">Total EPC cost</td>
@@ -1702,7 +1730,7 @@ export function SolarQuotationForm({
                         {formatCurrency(roiOperationMaintenanceCostYear1)}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">Year 1 maintenance cost as % of installation cost</td>
+                    <td className="px-3 py-2 text-slate-600">Year 1 maintenance cost as % of total cost</td>
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-medium text-slate-900">O&amp;M Cost Escalation</td>
@@ -1770,14 +1798,14 @@ export function SolarQuotationForm({
             <div className={calculatedCardClassName}>
               <div className="text-xs font-medium uppercase tracking-wide text-amber-700">O&amp;M Cost Year 1</div>
               <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiOperationMaintenanceCostYear1)}</div>
-              <div className="mt-1 text-[11px] text-amber-700">{formatDecimal(documentData.roiOperationMaintenancePercentYear1)}% of installation cost</div>
+              <div className="mt-1 text-[11px] text-amber-700">{formatDecimal(documentData.roiOperationMaintenancePercentYear1)}% of total cost</div>
             </div>
           </div>
 
           <div className="mt-4 rounded-lg border border-amber-200 bg-white">
             <div className="border-b border-amber-200 bg-amber-50 px-4 py-3">
               <h4 className="text-sm font-semibold text-amber-900">ROI Calculation Table</h4>
-              <p className="text-xs text-amber-800">Year-wise projection from ROI Calculation Table.docx with payback status based on cumulative savings versus installation cost.</p>
+              <p className="text-xs text-amber-800">Year-wise projection from ROI Calculation Table.docx with payback status based on cumulative savings versus total cost.</p>
             </div>
             <div className="max-h-[420px] overflow-auto">
               <table className="min-w-[1180px] table-fixed divide-y divide-amber-100 text-sm">
