@@ -176,10 +176,10 @@ export function SolarQuotationForm({
       ? normalizeQuotationDocumentData(initialDocumentData)
       : createDefaultQuotationDocumentData({
           preparedFor: defaultTitle || inquiryTitle || "",
-          moduleWattage: 630,
-          numberOfModules: 24,
-          totalWatts: 15120,
-          totalKw: 15.12,
+          moduleWattage: 0,
+          numberOfModules: 0,
+          totalWatts: 0,
+          totalKw: 0,
         })
   );
   const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() =>
@@ -261,7 +261,7 @@ export function SolarQuotationForm({
     );
   }, [formData.title, inquiryTitle]);
 
-  const safeModuleWattage = Math.max(documentData.moduleWattage || 1, 1);
+  const safeModuleWattage = Math.max(documentData.moduleWattage || 0, 0);
   const numberOfModules = Math.max(Number(documentData.numberOfModules || 0), 0);
   const actualSystemWatts = numberOfModules * safeModuleWattage;
   const actualSystemKw = actualSystemWatts / 1000;
@@ -582,7 +582,7 @@ export function SolarQuotationForm({
           <input
             type="number"
             min="0"
-            value={documentData.moduleWattage}
+            value={documentData.moduleWattage > 0 ? documentData.moduleWattage : ""}
             onChange={(event) =>
               setDocumentField("moduleWattage", Number(event.target.value || 0))
             }
@@ -594,7 +594,7 @@ export function SolarQuotationForm({
           <input
             type="number"
             min="0"
-            value={documentData.numberOfModules}
+            value={documentData.numberOfModules > 0 ? documentData.numberOfModules : ""}
             onChange={(event) =>
               setDocumentField("numberOfModules", Number(event.target.value || 0))
             }
