@@ -262,9 +262,10 @@ export async function GET(
         data: Array<{ label: string; value: number }>;
         barColor: ReturnType<typeof rgb>;
         valueFormatter: (value: number) => string;
+        axisFormatter?: (value: number) => string;
       }
     ) => {
-      const { x, y, width, height, title, data, barColor, valueFormatter } = options;
+      const { x, y, width, height, title, data, barColor, valueFormatter, axisFormatter } = options;
       const cardBottom = y - height;
       page.drawRectangle({
         x,
@@ -284,15 +285,57 @@ export async function GET(
       });
       drawText(page, title, x + 8, y - 14, 8.2, true, accent);
 
-      const chartTop = y - 34;
-      const chartBottom = cardBottom + 24;
-      const chartLeft = x + 26;
-      const chartRight = x + width - 10;
+      const safeAxisFormatter =
+        axisFormatter ||
+        ((value: number) => {
+          if (value >= 1000) {
+            return `${(value / 1000).toFixed(1)}k`;
+          }
+          return value.toFixed(0);
+        });
+
+      const chartTop = y - 42;
+      const chartBottom = cardBottom + 28;
+      const chartLeft = x + 34;
+      const chartRight = x + width - 12;
       const chartHeight = chartTop - chartBottom;
       const chartWidth = chartRight - chartLeft;
       const maxValue = Math.max(...data.map((entry) => entry.value), 1);
-      const barGap = 5;
-      const barWidth = Math.max((chartWidth - barGap * (data.length - 1)) / Math.max(data.length, 1), 8);
+      const averageValue = data.reduce((sum, entry) => sum + entry.value, 0) / Math.max(data.length, 1);
+      const tickCount = 4;
+      const barGap = 6;
+      const barWidth = Math.max((chartWidth - barGap * (data.length - 1)) / Math.max(data.length, 1), 7);
+      const peakEntry = data.reduce((peak, entry) => (entry.value > peak.value ? entry : peak), data[0]);
+      const peakText = `Peak ${peakEntry.label.toUpperCase()}: ${valueFormatter(peakEntry.value)}`;
+      const peakTextWidth = measureWidth(peakText, 6, boldFont);
+      const peakChipWidth = Math.min(Math.max(peakTextWidth + 16, 78), width - 24);
+
+      page.drawRectangle({
+        x: x + width - peakChipWidth - 8,
+        y: y - 18,
+        width: peakChipWidth,
+        height: 12,
+        color: softFill,
+        borderColor: border,
+        borderWidth: 1,
+      });
+      drawText(page, peakText, x + width - peakChipWidth, y - 14, 6, true, muted);
+
+      for (let tickIndex = 0; tickIndex <= tickCount; tickIndex += 1) {
+        const ratio = tickIndex / tickCount;
+        const tickValue = maxValue * ratio;
+        const tickY = chartBottom + (chartHeight - 8) * ratio;
+        const tickLabel = safeAxisFormatter(tickValue);
+        const tickLabelWidth = measureWidth(tickLabel, 5.6, regularFont);
+
+        page.drawLine({
+          start: { x: chartLeft, y: tickY },
+          end: { x: chartRight, y: tickY },
+          thickness: tickIndex === 0 ? 1 : 0.6,
+          color: subtleLine,
+        });
+        drawText(page, tickLabel, chartLeft - tickLabelWidth - 6, tickY - 2, 5.6, false, muted);
+      }
 
       page.drawLine({
         start: { x: chartLeft, y: chartBottom },
@@ -307,12 +350,21 @@ export async function GET(
         color: subtleLine,
       });
 
+      const avgY = chartBottom + (averageValue / maxValue) * (chartHeight - 8);
+      page.drawLine({
+        start: { x: chartLeft, y: avgY },
+        end: { x: chartRight, y: avgY },
+        thickness: 1,
+        color: rgb(0.78, 0.48, 0.12),
+        dashArray: [3, 3],
+      });
+      drawText(page, `Avg ${safeAxisFormatter(averageValue)}`, chartLeft + 4, avgY + 3, 5.8, true, rgb(0.78, 0.48, 0.12));
+
       data.forEach((entry, index) => {
-        const barHeight = Math.max((entry.value / maxValue) * (chartHeight - 18), 2);
+        const barHeight = Math.max((entry.value / maxValue) * (chartHeight - 10), 2);
         const barX = chartLeft + index * (barWidth + barGap);
         const barY = chartBottom;
         const label = entry.label.slice(0, 3).toUpperCase();
-        const valueLabel = valueFormatter(entry.value);
 
         page.drawRectangle({
           x: barX,
@@ -323,9 +375,13 @@ export async function GET(
           opacity: 0.92,
         });
 
-        const fittedValueLabel = measureWidth(valueLabel, 5.8, boldFont) <= barWidth + 10 ? valueLabel : valueFormatter(entry.value).split(" ")[0];
-        const valueWidth = measureWidth(fittedValueLabel, 5.8, boldFont);
-        drawText(page, fittedValueLabel, barX + Math.max((barWidth - valueWidth) / 2, 0), barY + barHeight + 4, 5.8, true, accent);
+        page.drawLine({
+          start: { x: barX, y: barY + barHeight },
+          end: { x: barX + barWidth, y: barY + barHeight },
+          thickness: 0.6,
+          color: white,
+          opacity: 0.35,
+        });
 
         const labelWidth = measureWidth(label, 5.8, boldFont);
         drawText(page, label, barX + Math.max((barWidth - labelWidth) / 2, 0), chartBottom - 10, 5.8, true, muted);
