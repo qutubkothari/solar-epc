@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { formatCurrency } from "@/lib/format";
+import { buildRoiProjection } from "@/lib/roi-calculation";
 import { getBoqDisplayParts } from "@/lib/solar-boq";
 import { normalizeQuotationDocumentData } from "@/lib/quotation-document";
 
@@ -388,6 +389,103 @@ export async function GET(
       });
     };
 
+    const drawDualAxisChartCard = (
+      page: PDFPage,
+      options: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        title: string;
+        data: Array<{ label: string; barValue: number; lineValue: number }>;
+        barColor: ReturnType<typeof rgb>;
+        lineColor: ReturnType<typeof rgb>;
+        leftFormatter: (value: number) => string;
+        rightFormatter: (value: number) => string;
+        barLegend: string;
+        lineLegend: string;
+      }
+    ) => {
+      const {
+        x,
+        y,
+        width,
+        height,
+        title,
+        data,
+        barColor,
+        lineColor,
+        leftFormatter,
+        rightFormatter,
+        barLegend,
+        lineLegend,
+      } = options;
+      const cardBottom = y - height;
+      page.drawRectangle({ x, y: cardBottom, width, height, color: white, borderColor: border, borderWidth: 1 });
+      page.drawRectangle({ x, y: y - 22, width, height: 22, color: paleFill });
+      drawText(page, title, x + 8, y - 14, 8.2, true, accent);
+
+      const chartTop = y - 40;
+      const chartBottom = cardBottom + 28;
+      const chartLeft = x + 34;
+      const chartRight = x + width - 34;
+      const chartHeight = chartTop - chartBottom;
+      const chartWidth = chartRight - chartLeft;
+      const maxBarValue = Math.max(...data.map((entry) => entry.barValue), 1);
+      const maxLineValue = Math.max(...data.map((entry) => entry.lineValue), 1);
+      const tickCount = 4;
+      const barGap = data.length > 20 ? 2 : 4;
+      const barWidth = Math.max((chartWidth - barGap * (data.length - 1)) / Math.max(data.length, 1), 3);
+      const legendY = y - 14;
+
+      page.drawRectangle({ x: x + width - 140, y: legendY - 2, width: 8, height: 8, color: barColor });
+      drawText(page, barLegend, x + width - 128, legendY, 5.8, true, muted);
+      page.drawLine({ start: { x: x + width - 62, y: legendY + 2 }, end: { x: x + width - 48, y: legendY + 2 }, thickness: 1.4, color: lineColor });
+      drawText(page, lineLegend, x + width - 44, legendY, 5.8, true, muted);
+
+      for (let tickIndex = 0; tickIndex <= tickCount; tickIndex += 1) {
+        const ratio = tickIndex / tickCount;
+        const gridY = chartBottom + (chartHeight - 8) * ratio;
+        const leftValue = maxBarValue * ratio;
+        const rightValue = maxLineValue * ratio;
+        const leftLabel = leftFormatter(leftValue);
+        const rightLabel = rightFormatter(rightValue);
+
+        page.drawLine({ start: { x: chartLeft, y: gridY }, end: { x: chartRight, y: gridY }, thickness: tickIndex === 0 ? 1 : 0.6, color: subtleLine });
+        drawText(page, leftLabel, x + 2, gridY - 2, 5.4, false, muted);
+        drawText(page, rightLabel, chartRight + 6, gridY - 2, 5.4, false, muted);
+      }
+
+      page.drawLine({ start: { x: chartLeft, y: chartBottom }, end: { x: chartRight, y: chartBottom }, thickness: 1, color: subtleLine });
+      page.drawLine({ start: { x: chartLeft, y: chartBottom }, end: { x: chartLeft, y: chartTop }, thickness: 1, color: subtleLine });
+      page.drawLine({ start: { x: chartRight, y: chartBottom }, end: { x: chartRight, y: chartTop }, thickness: 1, color: subtleLine });
+
+      const points = data.map((entry, index) => {
+        const barX = chartLeft + index * (barWidth + barGap);
+        const barHeight = Math.max((entry.barValue / maxBarValue) * (chartHeight - 10), 2);
+        const pointX = barX + barWidth / 2;
+        const pointY = chartBottom + (entry.lineValue / maxLineValue) * (chartHeight - 8);
+        const labelShouldRender = data.length <= 12 || index === 0 || index === data.length - 1 || (index + 1) % 5 === 0;
+
+        page.drawRectangle({ x: barX, y: chartBottom, width: barWidth, height: barHeight, color: barColor, opacity: 0.9 });
+
+        if (labelShouldRender) {
+          const label = entry.label;
+          const labelWidth = measureWidth(label, 5.4, regularFont);
+          drawText(page, label, pointX - labelWidth / 2, chartBottom - 10, 5.4, false, muted);
+        }
+
+        return { x: pointX, y: pointY };
+      });
+
+      points.forEach((point, index) => {
+        if (index > 0) {
+          page.drawLine({ start: points[index - 1], end: point, thickness: 1.4, color: lineColor });
+        }
+        page.drawCircle({ x: point.x, y: point.y, size: 1.8, color: lineColor, borderColor: white, borderWidth: 0.6 });
+      });
+    };
+
     const formatDate = (value: Date | string) =>
       new Intl.DateTimeFormat("en-IN", {
         day: "2-digit",
@@ -614,14 +712,6 @@ export async function GET(
     const proposalGrandTotal = Number(version.grandTotal || 0) + additionalChargesTotal;
     const validUntil = new Date(version.createdAt);
     validUntil.setDate(validUntil.getDate() + Math.max(documentData.validityDays || 0, 0));
-    const toFraction = (value: number) => {
-      if (!Number.isFinite(value) || value <= 0) {
-        return 0;
-      }
-
-      return value > 1 ? value / 100 : value;
-    };
-
     const generationRows = documentData.generationTable.map((row) => {
       const kwh = documentData.totalKw * row.unitsPerDay * row.days;
       const amount = kwh * Number(documentData.electricityTariffYear1 || 0);
@@ -637,47 +727,27 @@ export async function GET(
     const indicativeGenerationPerDay = documentData.totalKw * Math.max(Math.round(documentData.expectedGenerationUnitsPerKw || 0), 0);
     const twentyFiveYearSaving = annualGenerationSavings * 25;
     const roiInstallationCost = Number(version.grandTotal || 0);
-    const roiYear1GenerationKwh =
-      documentData.totalKw *
-      Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0) *
-      Math.max(365 - Number(documentData.roiShutdownDays || 0), 0);
-    const roiYear1GrossSavings = roiYear1GenerationKwh * Number(documentData.electricityTariffYear1 || 0);
-    const roiOperationMaintenanceCostYear1 =
-      roiInstallationCost * toFraction(documentData.roiOperationMaintenancePercentYear1);
-    const roiProjectionYears = Math.max(Math.round(Number(documentData.roiProjectLifeYears || 0)), 1);
-    const roiTariffEscalation = toFraction(documentData.roiTariffEscalationPercent);
-    const roiOperationMaintenanceEscalation = toFraction(documentData.roiOperationMaintenanceEscalationPercent);
-    const roiAfterYear1Degradation = toFraction(documentData.roiAnnualPowerDegradationAfterYear1Percent);
-    const roiYear3OnwardDegradation = toFraction(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent);
-    let roiLifetimeNetSavings = 0;
-    let roiEstimatedPaybackYears: number | null = null;
-
-    for (let year = 1; year <= roiProjectionYears; year += 1) {
-      const degradationMultiplier =
-        year === 1
-          ? 1
-          : year === 2
-            ? Math.max(1 - roiAfterYear1Degradation, 0)
-            : Math.max(1 - roiAfterYear1Degradation, 0) * Math.pow(Math.max(1 - roiYear3OnwardDegradation, 0), year - 2);
-      const tariffMultiplier = Math.pow(1 + roiTariffEscalation, year - 1);
-      const maintenanceMultiplier = Math.pow(1 + roiOperationMaintenanceEscalation, year - 1);
-      const annualNetSavings =
-        roiYear1GenerationKwh * degradationMultiplier * Number(documentData.electricityTariffYear1 || 0) * tariffMultiplier -
-        roiOperationMaintenanceCostYear1 * maintenanceMultiplier;
-
-      if (
-        roiEstimatedPaybackYears === null &&
-        annualNetSavings > 0 &&
-        roiLifetimeNetSavings < roiInstallationCost &&
-        roiLifetimeNetSavings + annualNetSavings >= roiInstallationCost
-      ) {
-        roiEstimatedPaybackYears = year - 1 + (roiInstallationCost - roiLifetimeNetSavings) / annualNetSavings;
-      }
-
-      roiLifetimeNetSavings += annualNetSavings;
-    }
-
-    const roiYear1NetSavings = roiYear1GrossSavings - roiOperationMaintenanceCostYear1;
+    const roiProjection = buildRoiProjection({
+      totalKw: documentData.totalKw,
+      installationCost: roiInstallationCost,
+      averageDailyGenerationUnitsPerKw: Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0),
+      yearlyShutdownDays: Number(documentData.roiShutdownDays || 0),
+      electricityTariffYear1: Number(documentData.electricityTariffYear1 || 0),
+      tariffEscalationPercent: Number(documentData.roiTariffEscalationPercent || 0),
+      annualPowerDegradationAfterYear1Percent: Number(documentData.roiAnnualPowerDegradationAfterYear1Percent || 0),
+      annualPowerDegradationFromYear3OnwardPercent: Number(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent || 0),
+      operationMaintenancePercentYear1: Number(documentData.roiOperationMaintenancePercentYear1 || 0),
+      operationMaintenanceEscalationPercent: Number(documentData.roiOperationMaintenanceEscalationPercent || 0),
+      projectionYears: Number(documentData.roiProjectLifeYears || 0),
+    });
+    const roiProjectionRows = roiProjection.rows;
+    const roiProjectionYears = roiProjectionRows.length;
+    const roiYear1GenerationKwh = roiProjection.year1GenerationKwh;
+    const roiYear1GrossSavings = roiProjection.year1GrossSavings;
+    const roiOperationMaintenanceCostYear1 = roiProjection.year1OperationMaintenanceCost;
+    const roiYear1NetSavings = roiProjection.year1NetSavings;
+    const roiLifetimeNetSavings = roiProjection.lifetimeNetSavings;
+    const roiEstimatedPaybackYears = roiProjection.estimatedPaybackYears;
 
     const descriptionOfServices = [
       "Engineering: Detailed site survey, feasibility analysis, and complete electrical and structural design.",
@@ -1531,6 +1601,128 @@ export async function GET(
     }
 
     y -= 8;
+
+    const roiProjectionColumns = [
+      { label: "Year", x: MARGIN, width: 32 },
+      { label: "Generation", x: MARGIN + 32, width: 66 },
+      { label: "Tariff", x: MARGIN + 98, width: 58 },
+      { label: "Revenue", x: MARGIN + 156, width: 76 },
+      { label: "O&M", x: MARGIN + 232, width: 72 },
+      { label: "Net", x: MARGIN + 304, width: 72 },
+      { label: "Cumulative", x: MARGIN + 376, width: 86 },
+      { label: "Payback", x: MARGIN + 462, width: 69 },
+    ];
+
+    const drawRoiProjectionHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: secondary });
+      roiProjectionColumns.forEach((column) => {
+        if (column.label === "Payback") {
+          drawText(targetPage, column.label, column.x + 10, topY - 16, 7.2, true, white);
+          return;
+        }
+
+        drawRightAligned(targetPage, column.label, column.x, column.width, topY - 16, 7.2, true, white);
+      });
+    };
+
+    if (y - 170 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "ROI Calculation Table", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawRoiProjectionHeader(page, y);
+    y -= 28;
+
+    roiProjectionRows.forEach((row, index) => {
+      const rowHeight = 22;
+
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "ROI Calculation Table", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawRoiProjectionHeader(page, y);
+        y -= 28;
+      }
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      roiProjectionColumns.slice(1).forEach((column) => {
+        page.drawLine({ start: { x: column.x, y }, end: { x: column.x, y: y - rowHeight }, thickness: 1, color: subtleLine });
+      });
+
+      drawRightAligned(page, row.year.toString(), roiProjectionColumns[0].x, roiProjectionColumns[0].width, y - 14, 6.8, true, accent);
+      drawRightAligned(page, row.generationKwh.toFixed(0), roiProjectionColumns[1].x, roiProjectionColumns[1].width, y - 14, 6.8, false, accent);
+      drawRightAligned(page, row.tariffPerKwh.toFixed(2), roiProjectionColumns[2].x, roiProjectionColumns[2].width, y - 14, 6.8, false, accent);
+      drawRightAligned(page, formatCurrency(row.annualRevenue), roiProjectionColumns[3].x, roiProjectionColumns[3].width, y - 14, 6.8, false, accent);
+      drawRightAligned(page, formatCurrency(row.operationMaintenanceCost), roiProjectionColumns[4].x, roiProjectionColumns[4].width, y - 14, 6.8, false, accent);
+      drawRightAligned(page, formatCurrency(row.netSavings), roiProjectionColumns[5].x, roiProjectionColumns[5].width, y - 14, 6.8, true, accent);
+      drawRightAligned(page, formatCurrency(row.cumulativeSavings), roiProjectionColumns[6].x, roiProjectionColumns[6].width, y - 14, 6.8, true, accent);
+      drawText(page, row.paybackAchieved ? "Yes" : "No", roiProjectionColumns[7].x + 21, y - 14, 6.8, true, row.paybackAchieved ? secondary : primary);
+      y -= rowHeight;
+    });
+
+    y -= 16;
+
+    const roiChartHeight = 176;
+    if (y - roiChartHeight * 2 - 26 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Graphical Representation Of Yearly Generation V/S Tariff", MARGIN, y, 11.5, true, accent);
+    y -= 12;
+    drawDualAxisChartCard(page, {
+      x: MARGIN,
+      y,
+      width: CONTENT_WIDTH,
+      height: roiChartHeight,
+      title: "Yearly Generation vs Tariff",
+      data: roiProjectionRows.map((row) => ({
+        label: row.year.toString(),
+        barValue: row.generationKwh,
+        lineValue: row.tariffPerKwh,
+      })),
+      barColor: secondary,
+      lineColor: primary,
+      leftFormatter: (value) => `${(value / 1000).toFixed(1)}k`,
+      rightFormatter: (value) => value.toFixed(2),
+      barLegend: "Generation (kWh)",
+      lineLegend: "Tariff (Rs./kWh)",
+    });
+    y -= roiChartHeight + 18;
+
+    if (y - roiChartHeight - 18 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Graphical Representation of Annual V/S Cumulative Savings", MARGIN, y, 11.5, true, accent);
+    y -= 12;
+    drawDualAxisChartCard(page, {
+      x: MARGIN,
+      y,
+      width: CONTENT_WIDTH,
+      height: roiChartHeight,
+      title: "Annual Net Savings vs Cumulative Savings",
+      data: roiProjectionRows.map((row) => ({
+        label: row.year.toString(),
+        barValue: row.netSavings,
+        lineValue: row.cumulativeSavings,
+      })),
+      barColor: primary,
+      lineColor: secondary,
+      leftFormatter: (value) => `${(value / 1000).toFixed(0)}k`,
+      rightFormatter: (value) => `${(value / 1000).toFixed(0)}k`,
+      barLegend: "Annual Net Savings",
+      lineLegend: "Cumulative Savings",
+    });
+    y -= roiChartHeight + 18;
 
     const paymentRows = documentData.paymentStages;
     const paymentTableHeight = 36 + paymentRows.length * 26;

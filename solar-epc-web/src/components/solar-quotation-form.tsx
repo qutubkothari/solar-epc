@@ -9,6 +9,7 @@ import {
   normalizeQuotationDocumentData,
   type QuotationDocumentData,
 } from "@/lib/quotation-document";
+import { buildRoiProjection } from "@/lib/roi-calculation";
 import {
   extractWattageFromItem,
   getBoqDisplayParts,
@@ -425,47 +426,27 @@ export function SolarQuotationForm({
   const annualGenerationSavings = generationRows.reduce((sum, row) => sum + row.amount, 0);
   const indicativeGenerationPerDay = actualSystemKw * Math.max(Math.round(averageGenerationUnitsPerKw), 0);
   const twentyFiveYearSavings = annualGenerationSavings * 25;
-  const roiYear1GenerationKwh =
-    actualSystemKw *
-    Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0) *
-    Math.max(365 - Number(documentData.roiShutdownDays || 0), 0);
-  const roiYear1GrossSavings = roiYear1GenerationKwh * Number(documentData.electricityTariffYear1 || 0);
-  const roiOperationMaintenanceCostYear1 =
-    grandTotal * percentToDecimal(documentData.roiOperationMaintenancePercentYear1);
-  const roiProjectionYears = Math.max(Math.round(Number(documentData.roiProjectLifeYears || 0)), 1);
-  const roiTariffEscalation = percentToDecimal(documentData.roiTariffEscalationPercent);
-  const roiOperationMaintenanceEscalation = percentToDecimal(documentData.roiOperationMaintenanceEscalationPercent);
-  const roiAfterYear1Degradation = percentToDecimal(documentData.roiAnnualPowerDegradationAfterYear1Percent);
-  const roiYear3OnwardDegradation = percentToDecimal(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent);
-  let roiLifetimeNetSavings = 0;
-  let roiEstimatedPaybackYears: number | null = null;
-
-  for (let year = 1; year <= roiProjectionYears; year += 1) {
-    const degradationMultiplier =
-      year === 1
-        ? 1
-        : year === 2
-          ? Math.max(1 - roiAfterYear1Degradation, 0)
-          : Math.max(1 - roiAfterYear1Degradation, 0) * Math.pow(Math.max(1 - roiYear3OnwardDegradation, 0), year - 2);
-    const tariffMultiplier = Math.pow(1 + roiTariffEscalation, year - 1);
-    const maintenanceMultiplier = Math.pow(1 + roiOperationMaintenanceEscalation, year - 1);
-    const annualNetSavings =
-      roiYear1GenerationKwh * degradationMultiplier * Number(documentData.electricityTariffYear1 || 0) * tariffMultiplier -
-      roiOperationMaintenanceCostYear1 * maintenanceMultiplier;
-
-    if (
-      roiEstimatedPaybackYears === null &&
-      annualNetSavings > 0 &&
-      roiLifetimeNetSavings < grandTotal &&
-      roiLifetimeNetSavings + annualNetSavings >= grandTotal
-    ) {
-      roiEstimatedPaybackYears = year - 1 + (grandTotal - roiLifetimeNetSavings) / annualNetSavings;
-    }
-
-    roiLifetimeNetSavings += annualNetSavings;
-  }
-
-  const roiYear1NetSavings = roiYear1GrossSavings - roiOperationMaintenanceCostYear1;
+  const roiProjection = buildRoiProjection({
+    totalKw: actualSystemKw,
+    installationCost: grandTotal,
+    averageDailyGenerationUnitsPerKw: Number(documentData.roiAverageDailyGenerationUnitsPerKw || 0),
+    yearlyShutdownDays: Number(documentData.roiShutdownDays || 0),
+    electricityTariffYear1: Number(documentData.electricityTariffYear1 || 0),
+    tariffEscalationPercent: Number(documentData.roiTariffEscalationPercent || 0),
+    annualPowerDegradationAfterYear1Percent: Number(documentData.roiAnnualPowerDegradationAfterYear1Percent || 0),
+    annualPowerDegradationFromYear3OnwardPercent: Number(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent || 0),
+    operationMaintenancePercentYear1: Number(documentData.roiOperationMaintenancePercentYear1 || 0),
+    operationMaintenanceEscalationPercent: Number(documentData.roiOperationMaintenanceEscalationPercent || 0),
+    projectionYears: Number(documentData.roiProjectLifeYears || 0),
+  });
+  const roiProjectionRows = roiProjection.rows;
+  const roiProjectionYears = roiProjectionRows.length;
+  const roiYear1GenerationKwh = roiProjection.year1GenerationKwh;
+  const roiYear1GrossSavings = roiProjection.year1GrossSavings;
+  const roiOperationMaintenanceCostYear1 = roiProjection.year1OperationMaintenanceCost;
+  const roiYear1NetSavings = roiProjection.year1NetSavings;
+  const roiEstimatedPaybackYears = roiProjection.estimatedPaybackYears;
+  const roiLifetimeNetSavings = roiProjection.lifetimeNetSavings;
   const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => !documentData[key].trim());
   const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
@@ -1790,6 +1771,47 @@ export function SolarQuotationForm({
               <div className="text-xs font-medium uppercase tracking-wide text-amber-700">O&amp;M Cost Year 1</div>
               <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiOperationMaintenanceCostYear1)}</div>
               <div className="mt-1 text-[11px] text-amber-700">{formatDecimal(documentData.roiOperationMaintenancePercentYear1)}% of installation cost</div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-amber-200 bg-white">
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-3">
+              <h4 className="text-sm font-semibold text-amber-900">ROI Calculation Table</h4>
+              <p className="text-xs text-amber-800">Year-wise projection from ROI Calculation Table.docx with payback status based on cumulative savings versus installation cost.</p>
+            </div>
+            <div className="max-h-[420px] overflow-auto">
+              <table className="min-w-[1180px] table-fixed divide-y divide-amber-100 text-sm">
+                <thead className="sticky top-0 bg-amber-50 text-[11px] uppercase tracking-wide text-amber-900">
+                  <tr>
+                    <th className="w-16 px-3 py-2 text-right">Year</th>
+                    <th className="w-32 px-3 py-2 text-right">Generation (kWh)</th>
+                    <th className="w-28 px-3 py-2 text-right">Tariff (Rs./kWh)</th>
+                    <th className="w-36 px-3 py-2 text-right">Annual Revenue (Rs.)</th>
+                    <th className="w-32 px-3 py-2 text-right">O&amp;M Cost (Rs.)</th>
+                    <th className="w-36 px-3 py-2 text-right">Net Savings (Rs.)</th>
+                    <th className="w-40 px-3 py-2 text-right">Cumulative Savings (Rs.)</th>
+                    <th className="w-28 px-3 py-2 text-center">Payback Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100">
+                  {roiProjectionRows.map((row) => (
+                    <tr key={row.year} className="bg-white hover:bg-amber-50/40">
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">{row.year}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{formatDecimal(row.generationKwh, 0)}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{formatDecimal(row.tariffPerKwh)}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(row.annualRevenue)}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(row.operationMaintenanceCost)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">{formatCurrency(row.netSavings)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">{formatCurrency(row.cumulativeSavings)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${row.paybackAchieved ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                          {row.paybackAchieved ? "Yes" : "No"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
