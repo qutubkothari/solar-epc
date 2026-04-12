@@ -9,7 +9,7 @@ const percentToDecimal = (value: number) => {
     return 0;
   }
 
-  return value > 1 ? value / 100 : value;
+  return value / 100;
 };
 
 export async function GET() {
