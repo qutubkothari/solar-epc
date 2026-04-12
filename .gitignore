@@ -154,3 +154,6 @@ solar-epc-web/prisma.config.ts.bak
 
 # Generated sample quotation files
 sample-quotation*.pdf
+
+# Local document review extraction
+doc-extract/

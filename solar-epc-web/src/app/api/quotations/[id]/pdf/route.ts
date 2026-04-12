@@ -443,7 +443,21 @@ export async function GET(
       Number(documentData.gedaRegistrationCharges || 0) +
       Number(documentData.netMeteringCharges || 0) +
       Number(documentData.meterCharges || 0);
+    const systemTotalWithTax = systemInstallationCost + taxTotalValue;
+    const totalAmountPerKw = documentData.totalKw > 0 ? systemTotalWithTax / documentData.totalKw : 0;
+    const effectiveTaxPercent = systemInstallationCost > 0 ? (taxTotalValue / systemInstallationCost) * 100 : 0;
     const proposalGrandTotal = Number(version.grandTotal || 0) + additionalChargesTotal;
+    const validUntil = new Date(version.createdAt);
+    validUntil.setDate(validUntil.getDate() + Math.max(documentData.validityDays || 0, 0));
+
+    const descriptionOfServices = [
+      "Engineering: Detailed site survey, feasibility analysis, and complete electrical and structural design.",
+      "Procurement: Solar PV modules, inverters, structures, cables, connectors, switchgear, and protection systems compliant with BIS and IEC standards.",
+      "Construction & Installation: Civil works, structure installation, module mounting, cabling, earthing, lightning protection, and grid synchronization.",
+      "Testing & Commissioning: Pre-commissioning checks, energization, performance validation, and authority coordination.",
+      "Training & Support: Basic operator training, handover support, and post-installation technical assistance.",
+      "Documentation & Approvals: Assistance for approvals, as-built records, warranty papers, and handover documentation.",
+    ];
 
     const technicalRows = [
       ["System Size", `${documentData.totalKw.toFixed(2)} Kwp`, ""],
@@ -527,8 +541,8 @@ export async function GET(
 
     let { page, y } = createPage(false);
 
-    const metaHeight = 72;
-    const metaLeftWidth = 270;
+    const metaHeight = 110;
+    const metaLeftWidth = 240;
     const metaRightWidth = CONTENT_WIDTH - metaLeftWidth;
     page.drawRectangle({
       x: MARGIN,
@@ -560,19 +574,29 @@ export async function GET(
       color: border,
     });
 
-    drawText(page, "SOLAR EPC QUOTATION", MARGIN + 12, y - 22, 15, true, accent);
-    drawText(page, quotation.title, MARGIN + 12, y - 40, 9, false, muted);
+    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, y - 22, 14, true, accent);
+    drawText(page, `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, MARGIN + 12, y - 42, 13, true, secondary);
+    drawText(page, quotation.title, MARGIN + 12, y - 60, 8.5, false, muted);
     const metaLabelX = MARGIN + metaLeftWidth + 14;
     const metaValueX = MARGIN + metaLeftWidth + 78;
-    drawText(page, "Version", metaLabelX, y - 18, 8.5, true, muted);
-    drawText(page, version.version || "1.0", metaValueX, y - 18, 8.5, true, secondary);
-    drawText(page, "Quote Ref", metaLabelX, y - 34, 8.5, true, muted);
-    drawText(page, quotation.id.slice(-8).toUpperCase(), metaValueX, y - 34, 8.5, false, accent);
-    drawText(page, "Issued", metaLabelX, y - 50, 8.5, true, muted);
-    drawText(page, formatDate(version.createdAt), metaValueX, y - 50, 8.5, false, muted);
+    const projectMetaRows = [
+      ["Client", quotation.client.name],
+      ["Prepared For", documentData.preparedFor || quotation.title],
+      ["Customer Contact", documentData.customerContactPerson || quotation.client.contactName || "-"],
+      ["Consumer Type", documentData.consumerType],
+      ["Consumer No.", documentData.consumerNumber || "-"],
+      ["Prepared By", documentData.preparedBy],
+      ["Issued", formatDate(version.createdAt)],
+      ["Valid Till", formatDate(validUntil)],
+    ];
+    projectMetaRows.forEach(([label, value], index) => {
+      const rowY = y - 18 - index * 11;
+      drawText(page, label, metaLabelX, rowY, 8.2, true, muted);
+      drawWrapped(page, value, metaValueX, rowY, metaRightWidth - 84, 8.2, false, accent, 9.5);
+    });
     if (version.brand) {
-      drawText(page, "Brand", metaLabelX + 128, y - 18, 8.5, true, muted);
-      drawWrapped(page, version.brand, metaLabelX + 168, y - 18, metaRightWidth - 184, 8.5, true, accent, 10);
+      drawText(page, "Offer", MARGIN + 12, y - 79, 8.5, true, muted);
+      drawWrapped(page, version.brand, MARGIN + 48, y - 79, metaLeftWidth - 60, 8.5, true, accent, 10);
     }
 
     y -= metaHeight + 14;
@@ -649,6 +673,28 @@ export async function GET(
       drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.5, false, muted);
     });
     y -= executiveSummaryHeight + 10;
+
+    const serviceLines = descriptionOfServices.flatMap((entry) => bulletizeDescription(entry, CONTENT_WIDTH - 22, 8.2));
+    const servicesHeight = 34 + serviceLines.length * 11;
+    if (y - servicesHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Description of Services", MARGIN, y, 12.5, true, accent);
+    y -= 16;
+    page.drawRectangle({
+      x: MARGIN,
+      y: y - (servicesHeight - 18),
+      width: CONTENT_WIDTH,
+      height: servicesHeight - 18,
+      color: white,
+      borderColor: border,
+      borderWidth: 1,
+    });
+    serviceLines.forEach((line, index) => {
+      drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.2, false, muted);
+    });
+    y -= servicesHeight + 10;
 
     const technicalColumns = [
       { label: "Parameter", x: MARGIN, width: 150 },
@@ -741,6 +787,8 @@ export async function GET(
       });
     };
 
+    drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+    y -= 10;
     drawTableHeader(page, y);
     y -= 28;
 
@@ -752,6 +800,8 @@ export async function GET(
 
       if (y - rowHeight < FOOTER_TOP + 16) {
         ({ page, y } = createPage(true));
+        drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+        y -= 10;
         drawTableHeader(page, y);
         y -= 28;
       }
@@ -799,8 +849,8 @@ export async function GET(
       y -= rowHeight;
     });
 
-    const summaryWidth = 230;
-    const summaryHeight = 134;
+    const summaryWidth = 250;
+    const summaryHeight = 168;
     if (y - summaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
@@ -821,11 +871,13 @@ export async function GET(
       height: 24,
       color: secondary,
     });
-    drawText(page, "Commercial Summary", PAGE_WIDTH - MARGIN - summaryWidth + 10, y - 16, 10, true, white);
+    drawText(page, "Solar Roof Top System Pricing", PAGE_WIDTH - MARGIN - summaryWidth + 10, y - 16, 10, true, white);
 
     const summaryRows = [
-      ["System & Installation", formatCurrency(systemInstallationCost)],
+      [`Solar Power Generating System With GST@${effectiveTaxPercent.toFixed(2)}%`, formatCurrency(systemTotalWithTax)],
+      ["Solar System & Installation Cost", formatCurrency(systemInstallationCost)],
       ["Tax / GST", formatCurrency(taxTotalValue)],
+      ["Total Amount / Total Kw", formatCurrency(totalAmountPerKw)],
       ["Registration Charges", formatCurrency(Number(documentData.gedaRegistrationCharges || 0))],
       ["Net Metering Charges", formatCurrency(Number(documentData.netMeteringCharges || 0))],
       ["Meter / Modem Charges", formatCurrency(Number(documentData.meterCharges || 0))],
@@ -834,18 +886,21 @@ export async function GET(
     let summaryY = y - 40;
     summaryRows.forEach(([label, value], index) => {
       const emphasized = index === summaryRows.length - 1;
-      drawText(page, label, PAGE_WIDTH - MARGIN - summaryWidth + 10, summaryY, 9.5, emphasized, accent);
+      const labelLines = wrapText(label, 126, 8.8, emphasized);
+      labelLines.forEach((line, lineIndex) => {
+        drawText(page, line, PAGE_WIDTH - MARGIN - summaryWidth + 10, summaryY - lineIndex * 10, 8.8, emphasized, accent);
+      });
       drawRightAligned(
         page,
         value,
-        PAGE_WIDTH - MARGIN - summaryWidth + 94,
-        summaryWidth - 104,
+        PAGE_WIDTH - MARGIN - summaryWidth + 136,
+        summaryWidth - 146,
         summaryY,
-        9.5,
+        8.8,
         emphasized,
         emphasized ? secondary : accent
       );
-      summaryY -= 16;
+      summaryY -= Math.max(labelLines.length, 1) * 10 + 4;
     });
     y -= summaryHeight + 16;
 
