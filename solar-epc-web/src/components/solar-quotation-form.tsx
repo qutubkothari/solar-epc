@@ -762,8 +762,8 @@ export function SolarQuotationForm({
                   <th className="px-3 py-2 text-left">Item Head</th>
                   <th className="px-3 py-2 text-left">Item Type &amp; Ratings / Capacity</th>
                   <th className="px-3 py-2 text-left">As Per Selection Unit</th>
+                  <th className="px-3 py-2 text-right">Rate</th>
                   <th className="px-3 py-2 text-left">User Input Number</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white text-sm">
@@ -788,13 +788,7 @@ export function SolarQuotationForm({
                                 ? `${display.itemType} - ${display.ratingOrCapacity}`
                                 : display.itemType;
                             })(),
-                            subtitle: [
-                              item.brand || "",
-                              formatCurrency(Number(item.unitPrice || 0)) +
-                                (isPercentageItem(item) ? " of subtotal" : ` / ${inferSelectionUnit(item)}`),
-                            ]
-                              .filter(Boolean)
-                              .join(" • "),
+                            subtitle: item.brand || undefined,
                           }))}
                           value={row?.itemId || ""}
                           onChange={(value) => handleSelectItem(config.sequence, value)}
@@ -808,12 +802,17 @@ export function SolarQuotationForm({
                           <div className="mt-1 text-xs text-gray-500">
                             {(() => {
                               const display = getBoqDisplayParts(selectedItem);
-                              return display.ratingOrCapacity ? `${display.ratingOrCapacity} • ` : "";
+                              return display.ratingOrCapacity || selectedItem.brand || "";
                             })()}
-                            Rate {formatCurrency(Number(resolved?.rawRate || selectedItem.unitPrice || 0))}
-                            {isPercentageItem(selectedItem) ? " as %" : ` / ${selectionUnit}`}
                           </div>
                         )}
+                      </td>
+                      <td className="px-3 py-3 text-right font-medium text-gray-900">
+                        {selectedItem
+                          ? isPercentageItem(selectedItem)
+                            ? `${Number(resolved?.rawRate || selectedItem.unitPrice || 0).toFixed(2)}% of subtotal`
+                            : `${formatCurrency(Number(resolved?.rawRate || selectedItem.unitPrice || 0))} / ${selectionUnit}`
+                          : "-"}
                       </td>
                       <td className="px-3 py-3">
                         <input
@@ -828,9 +827,6 @@ export function SolarQuotationForm({
                         {selectedItem && isPercentageItem(selectedItem) && (
                           <div className="mt-1 text-xs text-amber-700">Use 1 to apply this percentage charge once.</div>
                         )}
-                      </td>
-                      <td className="px-3 py-3 text-right font-medium text-gray-900">
-                        {resolved ? formatCurrency(resolved.grandTotal) : "-"}
                       </td>
                     </tr>
                   );
