@@ -154,6 +154,7 @@ export function SolarQuotationForm({
   const [items, setItems] = useState<SolarBoqItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [activeTab, setActiveTab] = useState<QuotationFormTab>("overview");
   const [formData, setFormData] = useState({
     clientId: defaultClientId || "",
@@ -414,6 +415,46 @@ export function SolarQuotationForm({
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
   const selectedClientLabel = clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected";
   const selectedInquiryLabel = inquiryTitle || inquiries.find((entry) => entry.id === formData.inquiryId)?.title || "Not linked";
+  const validationErrorMessage = (() => {
+    if (!formData.clientId) {
+      return "Please select a client";
+    }
+
+    if (!formData.title) {
+      return "Please enter a quotation title";
+    }
+
+    if (missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) {
+      const issueLabels = [...missingOverviewFields.map((field) => field.label), ...invalidOverviewFields];
+      return `Complete the overview details before saving. Missing or invalid: ${issueLabels.join(", ")}.`;
+    }
+
+    if (resolvedRows.length === 0) {
+      return "Please select at least one BOQ item";
+    }
+
+    if (hasInvalidPaymentTotal) {
+      return `Payment stages must total 100%. Current total is ${paymentStageTotal.toFixed(2)}%.`;
+    }
+
+    if (incompletePaymentStages.length > 0) {
+      return `Complete all payment stage fields before saving. ${incompletePaymentStages.length} stage(s) are incomplete.`;
+    }
+
+    if (missingBankFields.length > 0) {
+      return `Complete all bank details before saving. Missing: ${missingBankFields.map((field) => field.label).join(", ")}.`;
+    }
+
+    if (incompleteScopeRows.length > 0) {
+      return `Complete all scope rows before saving. ${incompleteScopeRows.length} row(s) are incomplete.`;
+    }
+
+    if (missingRequiredDocuments) {
+      return "Add at least one required document before saving.";
+    }
+
+    return null;
+  })();
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
     if (tabKey === "overview") {
       return missingOverviewFields.length + invalidOverviewFields.length;
@@ -588,58 +629,48 @@ export function SolarQuotationForm({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setHasAttemptedSubmit(true);
     setErrorMessage(null);
 
     if (!formData.clientId) {
-      setErrorMessage("Please select a client");
       return;
     }
 
     if (!formData.title) {
-      setErrorMessage("Please enter a quotation title");
       return;
     }
 
     if (missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) {
       setActiveTab("overview");
-      const missingLabels = missingOverviewFields.map((field) => field.label);
-      const issueLabels = [...missingLabels, ...invalidOverviewFields];
-      setErrorMessage(`Complete the overview details before saving. Missing or invalid: ${issueLabels.join(", ")}.`);
       return;
     }
 
     if (resolvedRows.length === 0) {
-      setErrorMessage("Please select at least one BOQ item");
       return;
     }
 
     if (hasInvalidPaymentTotal) {
       setActiveTab("payment");
-      setErrorMessage(`Payment stages must total 100%. Current total is ${paymentStageTotal.toFixed(2)}%.`);
       return;
     }
 
     if (incompletePaymentStages.length > 0) {
       setActiveTab("payment");
-      setErrorMessage(`Complete all payment stage fields before saving. ${incompletePaymentStages.length} stage(s) are incomplete.`);
       return;
     }
 
     if (missingBankFields.length > 0) {
       setActiveTab("payment");
-      setErrorMessage(`Complete all bank details before saving. Missing: ${missingBankFields.map((field) => field.label).join(", ")}.`);
       return;
     }
 
     if (incompleteScopeRows.length > 0) {
       setActiveTab("scope");
-      setErrorMessage(`Complete all scope rows before saving. ${incompleteScopeRows.length} row(s) are incomplete.`);
       return;
     }
 
     if (missingRequiredDocuments) {
       setActiveTab("scope");
-      setErrorMessage("Add at least one required document before saving.");
       return;
     }
 
@@ -776,9 +807,9 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        {errorMessage && (
+        {(errorMessage || (hasAttemptedSubmit && validationErrorMessage)) && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4">
-            <p className="text-sm text-red-800">{errorMessage}</p>
+            <p className="text-sm text-red-800">{errorMessage || validationErrorMessage}</p>
           </div>
         )}
 
