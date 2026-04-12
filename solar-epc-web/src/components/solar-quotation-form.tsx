@@ -123,6 +123,12 @@ const BANK_DETAIL_FIELDS: Array<{
   { key: "branch", label: "Branch" },
 ];
 
+const OVERVIEW_REQUIRED_FIELDS = [
+  { key: "preparedFor", label: "Prepared For" },
+  { key: "customerContactPerson", label: "Customer Contact Person" },
+  { key: "preparedBy", label: "Prepared By" },
+] as const;
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -358,6 +364,8 @@ export function SolarQuotationForm({
   const subtotal = resolvedRows.reduce((sum, row) => sum + row.baseTotal, 0);
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
+  const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => !documentData[key].trim());
+  const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
   const incompletePaymentStages = documentData.paymentStages
     .map((stage, index) => ({
@@ -381,6 +389,8 @@ export function SolarQuotationForm({
     .filter((entry) => entry.isIncomplete);
   const missingRequiredDocuments = documentData.requiredDocuments.length === 0;
   const totalValidationIssueCount =
+    missingOverviewFields.length +
+    invalidOverviewFields.length +
     incompletePaymentStages.length +
     incompleteScopeRows.length +
     missingBankFields.length +
@@ -388,6 +398,8 @@ export function SolarQuotationForm({
     (missingRequiredDocuments ? 1 : 0);
   const hasValidationIssues =
     hasInvalidPaymentTotal ||
+    missingOverviewFields.length > 0 ||
+    invalidOverviewFields.length > 0 ||
     incompletePaymentStages.length > 0 ||
     incompleteScopeRows.length > 0 ||
     missingBankFields.length > 0 ||
@@ -398,6 +410,10 @@ export function SolarQuotationForm({
   const selectedClientLabel = clientName || clientOptions.find((entry) => entry.value === formData.clientId)?.label || "Not selected";
   const selectedInquiryLabel = inquiryTitle || inquiries.find((entry) => entry.id === formData.inquiryId)?.title || "Not linked";
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
+    if (tabKey === "overview") {
+      return missingOverviewFields.length + invalidOverviewFields.length;
+    }
+
     if (tabKey === "payment") {
       return incompletePaymentStages.length + missingBankFields.length + (hasInvalidPaymentTotal ? 1 : 0);
     }
@@ -576,6 +592,14 @@ export function SolarQuotationForm({
 
     if (!formData.title) {
       setErrorMessage("Please enter a quotation title");
+      return;
+    }
+
+    if (missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) {
+      setActiveTab("overview");
+      const missingLabels = missingOverviewFields.map((field) => field.label);
+      const issueLabels = [...missingLabels, ...invalidOverviewFields];
+      setErrorMessage(`Complete the overview details before saving. Missing or invalid: ${issueLabels.join(", ")}.`);
       return;
     }
 
@@ -762,6 +786,11 @@ export function SolarQuotationForm({
 
         {activeTab === "overview" && (
         <>
+        {(missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            Complete the required overview details before saving. Missing or invalid: {[...missingOverviewFields.map((field) => field.label), ...invalidOverviewFields].join(", ")}.
+          </div>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -856,7 +885,7 @@ export function SolarQuotationForm({
                 value={documentData.preparedFor}
                 onChange={(event) => setDocumentField("preparedFor", event.target.value)}
                 placeholder="Plant / project / prepared for"
-                className={userInputClassName}
+                className={`${userInputClassName} ${missingOverviewFields.some((field) => field.key === "preparedFor") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
             <div>
@@ -866,7 +895,7 @@ export function SolarQuotationForm({
                 value={documentData.customerContactPerson}
                 onChange={(event) => setDocumentField("customerContactPerson", event.target.value)}
                 placeholder="Customer contact person"
-                className={userInputClassName}
+                className={`${userInputClassName} ${missingOverviewFields.some((field) => field.key === "customerContactPerson") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
             <div>
@@ -896,7 +925,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.preparedBy}
                 onChange={(event) => setDocumentField("preparedBy", event.target.value)}
-                className={userInputClassName}
+                className={`${userInputClassName} ${missingOverviewFields.some((field) => field.key === "preparedBy") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
             <div>
@@ -906,7 +935,7 @@ export function SolarQuotationForm({
                 min="1"
                 value={documentData.validityDays}
                 onChange={(event) => setDocumentField("validityDays", Number(event.target.value || 0))}
-                className={userInputClassName}
+                className={`${userInputClassName} ${invalidOverviewFields.includes("Validity (Days)") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
           </div>
@@ -1466,17 +1495,67 @@ export function SolarQuotationForm({
           <div className="rounded-lg border border-red-200 bg-red-50 p-4">
             <h3 className="text-lg font-semibold text-red-900">Resolve Validation Issues Before Saving</h3>
             <div className="mt-3 space-y-2 text-sm text-red-800">
+              {(missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white px-3 py-2">
+                  <span>Overview issues: {[...missingOverviewFields.map((field) => field.label), ...invalidOverviewFields].join(", ")}.</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("overview")}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Open Overview
+                  </button>
+                </div>
+              )}
               {hasInvalidPaymentTotal && <div>Payment stages total {paymentStageTotal.toFixed(2)}%. It must equal 100%.</div>}
               {incompletePaymentStages.length > 0 && (
-                <div>Incomplete payment stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.</div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white px-3 py-2">
+                  <span>Incomplete payment stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("payment")}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Open Payment
+                  </button>
+                </div>
               )}
               {missingBankFields.length > 0 && (
-                <div>Missing bank details: {missingBankFields.map((field) => field.label).join(", ")}.</div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white px-3 py-2">
+                  <span>Missing bank details: {missingBankFields.map((field) => field.label).join(", ")}.</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("payment")}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Open Payment
+                  </button>
+                </div>
               )}
               {incompleteScopeRows.length > 0 && (
-                <div>Incomplete scope rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.</div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white px-3 py-2">
+                  <span>Incomplete scope rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("scope")}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Open Scope
+                  </button>
+                </div>
               )}
-              {missingRequiredDocuments && <div>Required documents list is empty.</div>}
+              {missingRequiredDocuments && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white px-3 py-2">
+                  <span>Required documents list is empty.</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("scope")}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                  >
+                    Open Scope
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
