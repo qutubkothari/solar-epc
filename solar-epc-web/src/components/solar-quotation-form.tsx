@@ -346,6 +346,17 @@ export function SolarQuotationForm({
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
+  const incompletePaymentStages = documentData.paymentStages
+    .map((stage, index) => ({
+      index,
+      stage,
+      isIncomplete:
+        !stage.label.trim() ||
+        !stage.milestone.trim() ||
+        !stage.remarks.trim() ||
+        Number(stage.percentage || 0) <= 0,
+    }))
+    .filter((entry) => entry.isIncomplete);
   const hasInvalidPaymentTotal = Math.abs(paymentStageTotal - 100) > PAYMENT_TOTAL_TOLERANCE;
   const incompleteScopeRows = documentData.scopeOfWorkRows
     .map((row, index) => ({
@@ -354,13 +365,13 @@ export function SolarQuotationForm({
       isIncomplete: !row.srNo.trim() || !row.workItem.trim() || !row.responsibility.trim() || !row.remarks.trim(),
     }))
     .filter((entry) => entry.isIncomplete);
-  const hasValidationIssues = hasInvalidPaymentTotal || incompleteScopeRows.length > 0;
+  const hasValidationIssues = hasInvalidPaymentTotal || incompletePaymentStages.length > 0 || incompleteScopeRows.length > 0;
   const activeTabIndex = FORM_TABS.findIndex((tab) => tab.key === activeTab);
   const previousTab = activeTabIndex > 0 ? FORM_TABS[activeTabIndex - 1] : null;
   const nextTab = activeTabIndex < FORM_TABS.length - 1 ? FORM_TABS[activeTabIndex + 1] : null;
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
     if (tabKey === "payment") {
-      return hasInvalidPaymentTotal ? 1 : 0;
+      return incompletePaymentStages.length + (hasInvalidPaymentTotal ? 1 : 0);
     }
 
     if (tabKey === "scope") {
@@ -544,6 +555,12 @@ export function SolarQuotationForm({
     if (hasInvalidPaymentTotal) {
       setActiveTab("payment");
       setErrorMessage(`Payment stages must total 100%. Current total is ${paymentStageTotal.toFixed(2)}%.`);
+      return;
+    }
+
+    if (incompletePaymentStages.length > 0) {
+      setActiveTab("payment");
+      setErrorMessage(`Complete all payment stage fields before saving. ${incompletePaymentStages.length} stage(s) are incomplete.`);
       return;
     }
 
@@ -1179,9 +1196,21 @@ export function SolarQuotationForm({
               Payment stages must total exactly 100% before saving this quotation.
             </div>
           )}
+          {incompletePaymentStages.length > 0 && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              Complete all fields for every payment stage before saving. Incomplete stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.
+            </div>
+          )}
           <div className="space-y-3">
             {documentData.paymentStages.map((stage, index) => (
-              <div key={`${stage.label}-${index}`} className="rounded-lg border border-cyan-200 bg-white p-4">
+              <div
+                key={`${stage.label}-${index}`}
+                className={`rounded-lg border bg-white p-4 ${
+                  incompletePaymentStages.some((entry) => entry.index === index)
+                    ? "border-red-200"
+                    : "border-cyan-200"
+                }`}
+              >
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-solar-ink">Stage {index + 1}</div>
                   {documentData.paymentStages.length > 1 && (
