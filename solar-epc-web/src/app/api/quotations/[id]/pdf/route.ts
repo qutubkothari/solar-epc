@@ -544,6 +544,31 @@ export async function GET(
       ["Project Completion Timeline", documentData.projectCompletionTimeline, ""],
     ];
 
+    const scopeMatrixRows = [
+      ["1.1", "Feasibility Study (technical & financial)", "Consumer with EPC Contractor", "Can be jointly discussed with EPC."],
+      ["1.2", "Site Survey & Assessment", "EPC Contractor", "Includes structural and electrical feasibility."],
+      ["1.3", "System Design & Engineering Drawings", "EPC Contractor", "Electrical SLD, layout, shadow analysis, etc."],
+      ["1.4", "Statutory and Safety Compliance (design level)", "EPC Contractor", "Must follow MNRE, DISCOM, CEIG norms."],
+      ["1.5", "Land Levelling and Grading / Tree Cutting", "Consumer", "In consumer scope."],
+      ["1.6", "Cable Trenches", "Consumer", "Existing trenches considered."],
+      ["1.7", "Control Rooms (RCC / PEB)", "Consumer", "Existing covered control room space considered."],
+      ["1.8", "Water Drainage", "Consumer", "Existing drainage considered."],
+      ["1.9", "Water and Electricity", "Consumer", "Free water and electricity in customer scope during I&C and O&M if applicable."],
+      ["2.1", "Procurement of Solar Modules (approved make)", "EPC Contractor", "Must meet MNRE ALMM list and BIS norms."],
+      ["2.2", "Procurement of Inverters", "EPC Contractor", "Must meet DISCOM and MNRE specifications."],
+      ["2.3", "Procurement of Mounting Structures", "EPC Contractor", "Corrosion-resistant hot dip galvanized structure."],
+      ["2.4", "Cables, Junction Boxes, Earthing Material", "EPC Contractor", "IS-compliant cables and materials."],
+      ["2.5", "Transportation to Site", "EPC Contractor", "Delivered to consumer site."],
+      ["3.1", "Module Mounting Structure Installation", "EPC Contractor", "Based on roof type such as RCC or sheet metal."],
+      ["3.2", "Module Installation", "EPC Contractor", "Including alignment and clamping."],
+      ["3.3", "Inverter and Electrical Panel Installation", "EPC Contractor", "Includes ACDB, DCDB, SPD, meters, and associated accessories."],
+      ["3.4", "Cable Laying and Termination", "EPC Contractor", "DC, AC, earthing, and communication cable laying with proper routing and termination."],
+      ["3.5", "Earthing and Lightning Protection", "EPC Contractor", "As per applicable electrical safety standards."],
+      ["4.1", "Testing and Commissioning", "EPC Contractor", "Pre-commissioning checks, energization, and performance testing."],
+      ["4.2", "Net Metering / Statutory Coordination", "EPC Contractor with Consumer Support", "Subject to DISCOM / CEIG process and document availability."],
+      ["5.1", "Operation and Maintenance Training", "EPC Contractor", "Basic operation and safety handover training."],
+    ];
+
     const companyRows = [
       companySettings?.companyName || "Hi-Tech Solar",
       companySettings?.contactAddress || "",
@@ -874,6 +899,78 @@ export async function GET(
       drawRightAligned(page, formatCurrency(line.rate), columns[3].x, columns[3].width, y - 14, 8, false, accent);
       drawRightAligned(page, formatCurrency(line.amount), columns[4].x, columns[4].width, y - 14, 8.5, true, accent);
 
+      y -= rowHeight;
+    });
+
+    y -= 18;
+
+    const scopeColumns = [
+      { label: "Sr", x: MARGIN, width: 42 },
+      { label: "Work Item / Activity", x: MARGIN + 42, width: 208 },
+      { label: "Responsibility", x: MARGIN + 250, width: 122 },
+      { label: "Remarks", x: MARGIN + 372, width: 159 },
+    ];
+
+    const drawScopeHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({
+        x: MARGIN,
+        y: topY - 24,
+        width: CONTENT_WIDTH,
+        height: 24,
+        color: secondary,
+      });
+      scopeColumns.forEach((column) => {
+        drawText(targetPage, column.label, column.x + 6, topY - 16, 8.5, true, white);
+      });
+    };
+
+    if (y - 120 < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
+    drawText(page, "Scope of Work Matrix", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawScopeHeader(page, y);
+    y -= 28;
+
+    scopeMatrixRows.forEach((row, index) => {
+      const srLines = wrapText(row[0], scopeColumns[0].width - 12, 7.5, true);
+      const workLines = wrapText(row[1], scopeColumns[1].width - 12, 7.5);
+      const responsibilityLines = wrapText(row[2], scopeColumns[2].width - 12, 7.5, true);
+      const remarkLines = wrapText(row[3], scopeColumns[3].width - 12, 7.5);
+      const lineCount = Math.max(srLines.length, workLines.length, responsibilityLines.length, remarkLines.length, 1);
+      const rowHeight = 12 + lineCount * 10;
+
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "Scope of Work Matrix", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawScopeHeader(page, y);
+        y -= 28;
+      }
+
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      [scopeColumns[1], scopeColumns[2], scopeColumns[3]].forEach((column) => {
+        page.drawLine({
+          start: { x: column.x, y },
+          end: { x: column.x, y: y - rowHeight },
+          thickness: 1,
+          color: subtleLine,
+        });
+      });
+
+      srLines.forEach((line, lineIndex) => drawText(page, line, scopeColumns[0].x + 6, y - 14 - lineIndex * 10, 7.5, true, accent));
+      workLines.forEach((line, lineIndex) => drawText(page, line, scopeColumns[1].x + 6, y - 14 - lineIndex * 10, 7.5, false, accent));
+      responsibilityLines.forEach((line, lineIndex) => drawText(page, line, scopeColumns[2].x + 6, y - 14 - lineIndex * 10, 7.5, true, accent));
+      remarkLines.forEach((line, lineIndex) => drawText(page, line, scopeColumns[3].x + 6, y - 14 - lineIndex * 10, 7.5, false, muted));
       y -= rowHeight;
     });
 

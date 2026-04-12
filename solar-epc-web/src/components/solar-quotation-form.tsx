@@ -646,10 +646,12 @@ export function SolarQuotationForm({
             <div className={calculatedCardClassName}>
               <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total WP</div>
               <div className="text-2xl font-bold text-amber-900">{actualSystemWatts.toLocaleString()}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Module Wattage x No. of Modules</div>
             </div>
             <div className={calculatedCardClassName}>
               <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total KW</div>
               <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)}</div>
+              <div className="mt-1 text-[11px] text-amber-700">Total WP / 1000</div>
             </div>
           </div>
           <div className={`mt-4 ${calculatedPanelClassName}`}>
