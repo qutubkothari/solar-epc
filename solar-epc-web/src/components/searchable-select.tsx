@@ -18,6 +18,7 @@ type SearchableSelectProps = {
   emptyLabel?: string;
   disabled?: boolean;
   className?: string;
+  triggerClassName?: string;
 };
 
 export function SearchableSelect({
@@ -29,6 +30,7 @@ export function SearchableSelect({
   emptyLabel = "No results",
   disabled = false,
   className,
+  triggerClassName,
 }: SearchableSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -73,7 +75,8 @@ export function SearchableSelect({
         onClick={() => setOpen((prev) => !prev)}
         className={clsx(
           "flex w-full items-center justify-between rounded-xl border border-solar-border bg-white px-3 py-2 text-sm text-left shadow-sm hover:border-solar-amber transition-colors",
-          disabled && "opacity-60 cursor-not-allowed bg-gray-100"
+          disabled && "opacity-60 cursor-not-allowed bg-gray-100",
+          triggerClassName
         )}
       >
         <span className={clsx(!selected && "text-gray-500")}>

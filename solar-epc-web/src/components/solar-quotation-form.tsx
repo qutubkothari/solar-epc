@@ -81,6 +81,15 @@ const createInitialRows = (): BoqDraftRow[] =>
     quantityTouched: false,
   }));
 
+const userInputClassName =
+  "w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-gray-900 placeholder:text-red-300 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100";
+
+const calculatedCardClassName = "rounded-md border border-amber-300 bg-amber-100 p-3";
+
+const calculatedPanelClassName = "rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900";
+
+const readOnlyFieldClassName = "w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900";
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -437,6 +446,17 @@ export function SolarQuotationForm({
       size="xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-xs text-gray-700">
+          <div className="inline-flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm border border-red-300 bg-red-100" />
+            <span>User input fields</span>
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm border border-amber-300 bg-amber-100" />
+            <span>Calculated fields</span>
+          </div>
+        </div>
+
         {errorMessage && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4">
             <p className="text-sm text-red-800">{errorMessage}</p>
@@ -456,7 +476,7 @@ export function SolarQuotationForm({
               Client <span className="text-red-500">*</span>
             </label>
             {isNewVersion ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+              <div className={readOnlyFieldClassName}>
                 {clientName || "Loading..."}
               </div>
             ) : (
@@ -465,13 +485,14 @@ export function SolarQuotationForm({
                 value={formData.clientId}
                 onChange={(value) => setFormData((prev) => ({ ...prev, clientId: value }))}
                 placeholder="Select client..."
+                triggerClassName="border-red-300 bg-red-50"
               />
             )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Inquiry / Project</label>
             {isNewVersion ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+              <div className={readOnlyFieldClassName}>
                 {inquiryTitle || "Not linked"}
               </div>
             ) : (
@@ -480,6 +501,7 @@ export function SolarQuotationForm({
                 value={formData.inquiryId}
                 onChange={(value) => setFormData((prev) => ({ ...prev, inquiryId: value }))}
                 placeholder="Select inquiry..."
+                triggerClassName="border-red-300 bg-red-50"
               />
             )}
           </div>
@@ -491,7 +513,7 @@ export function SolarQuotationForm({
               {isNewVersion ? "Quotation" : "Quotation Title"} <span className="text-red-500">*</span>
             </label>
             {isNewVersion ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+              <div className={readOnlyFieldClassName}>
                 {formData.title}
               </div>
             ) : (
@@ -500,7 +522,7 @@ export function SolarQuotationForm({
                 value={formData.title}
                 onChange={(event) => setFormData((prev) => ({ ...prev, title: event.target.value }))}
                 placeholder="e.g., Roof Top Solar System"
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             )}
           </div>
@@ -513,7 +535,7 @@ export function SolarQuotationForm({
               type="text"
               value={formData.version}
               onChange={(event) => setFormData((prev) => ({ ...prev, version: event.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
+              className={userInputClassName}
             />
           </div>
           <div>
@@ -523,7 +545,7 @@ export function SolarQuotationForm({
               value={formData.brand}
               onChange={(event) => setFormData((prev) => ({ ...prev, brand: event.target.value }))}
               placeholder="e.g., Sungrow + Pahal"
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
+              className={userInputClassName}
             />
           </div>
         </div>
@@ -538,7 +560,7 @@ export function SolarQuotationForm({
                 value={documentData.preparedFor}
                 onChange={(event) => setDocumentField("preparedFor", event.target.value)}
                 placeholder="Plant / project / prepared for"
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -548,7 +570,7 @@ export function SolarQuotationForm({
                 value={documentData.customerContactPerson}
                 onChange={(event) => setDocumentField("customerContactPerson", event.target.value)}
                 placeholder="Customer contact person"
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -556,7 +578,7 @@ export function SolarQuotationForm({
               <select
                 value={documentData.consumerType}
                 onChange={(event) => setDocumentField("consumerType", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               >
                 <option value="LT Consumer">LT Consumer</option>
                 <option value="HT Consumer">HT Consumer</option>
@@ -569,7 +591,7 @@ export function SolarQuotationForm({
                 value={documentData.consumerNumber}
                 onChange={(event) => setDocumentField("consumerNumber", event.target.value)}
                 placeholder="Consumer number"
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -578,7 +600,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.preparedBy}
                 onChange={(event) => setDocumentField("preparedBy", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -588,7 +610,7 @@ export function SolarQuotationForm({
                 min="1"
                 value={documentData.validityDays}
                 onChange={(event) => setDocumentField("validityDays", Number(event.target.value || 0))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
           </div>
@@ -606,7 +628,7 @@ export function SolarQuotationForm({
                 onChange={(event) =>
                   setDocumentField("moduleWattage", Number(event.target.value || 0))
                 }
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -618,19 +640,19 @@ export function SolarQuotationForm({
                 onChange={(event) =>
                   setDocumentField("numberOfModules", Number(event.target.value || 0))
                 }
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
-            <div className="rounded-md border-2 border-blue-300 bg-white p-3">
-              <div className="text-xs text-gray-600">Total WP</div>
-              <div className="text-2xl font-bold text-blue-600">{actualSystemWatts.toLocaleString()}</div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total WP</div>
+              <div className="text-2xl font-bold text-amber-900">{actualSystemWatts.toLocaleString()}</div>
             </div>
-            <div className="rounded-md border-2 border-blue-300 bg-white p-3">
-              <div className="text-xs text-gray-600">Total KW</div>
-              <div className="text-2xl font-bold text-blue-600">{actualSystemKw.toFixed(2)}</div>
+            <div className={calculatedCardClassName}>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-700">Total KW</div>
+              <div className="text-2xl font-bold text-amber-900">{actualSystemKw.toFixed(2)}</div>
             </div>
           </div>
-          <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          <div className={`mt-4 ${calculatedPanelClassName}`}>
             <strong>System Summary:</strong> {actualSystemKw.toFixed(2)} kWp ({numberOfModules} x {documentData.moduleWattage}W = {actualSystemWatts.toLocaleString()}W)
           </div>
         </div>
@@ -644,7 +666,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.systemType}
                 onChange={(event) => setDocumentField("systemType", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -653,7 +675,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.projectCompletionTimeline}
                 onChange={(event) => setDocumentField("projectCompletionTimeline", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -664,7 +686,7 @@ export function SolarQuotationForm({
                 min="0"
                 value={documentData.requiredAreaFactorSqftPerKw}
                 onChange={(event) => setDocumentField("requiredAreaFactorSqftPerKw", Number(event.target.value || 0))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -675,7 +697,7 @@ export function SolarQuotationForm({
                 min="0"
                 value={documentData.expectedGenerationUnitsPerKw}
                 onChange={(event) => setDocumentField("expectedGenerationUnitsPerKw", Number(event.target.value || 0))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -684,7 +706,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.structureHeightSouth}
                 onChange={(event) => setDocumentField("structureHeightSouth", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -693,7 +715,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.structureHeightNorth}
                 onChange={(event) => setDocumentField("structureHeightNorth", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div className="md:col-span-2">
@@ -702,7 +724,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.arrayLayout}
                 onChange={(event) => setDocumentField("arrayLayout", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div className="md:col-span-2">
@@ -711,7 +733,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.monitoringSystem}
                 onChange={(event) => setDocumentField("monitoringSystem", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div className="md:col-span-2">
@@ -720,7 +742,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.approvalsCompliance}
                 onChange={(event) => setDocumentField("approvalsCompliance", event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -731,7 +753,7 @@ export function SolarQuotationForm({
                 min="0"
                 value={documentData.gedaRegistrationCharges}
                 onChange={(event) => setDocumentField("gedaRegistrationCharges", Number(event.target.value || 0))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
             <div>
@@ -742,7 +764,7 @@ export function SolarQuotationForm({
                 min="0"
                 value={documentData.netMeteringCharges}
                 onChange={(event) => setDocumentField("netMeteringCharges", Number(event.target.value || 0))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className={userInputClassName}
               />
             </div>
           </div>
@@ -755,15 +777,15 @@ export function SolarQuotationForm({
           </div>
 
           <div className="max-h-[440px] overflow-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-[960px] table-fixed divide-y divide-gray-200">
               <thead className="sticky top-0 bg-yellow-50 text-[11px] uppercase tracking-wide text-gray-700">
                 <tr>
-                  <th className="px-3 py-2 text-left">Seq.</th>
-                  <th className="px-3 py-2 text-left">Item Head</th>
-                  <th className="px-3 py-2 text-left">Item Type &amp; Ratings / Capacity</th>
-                  <th className="px-3 py-2 text-left">As Per Selection Unit</th>
-                  <th className="px-3 py-2 text-right">Rate</th>
-                  <th className="px-3 py-2 text-left">User Input Number</th>
+                  <th className="w-14 px-2 py-2 text-left">Seq.</th>
+                  <th className="w-40 px-2 py-2 text-left">Item Head</th>
+                  <th className="w-[320px] px-2 py-2 text-left">Item Type &amp; Ratings / Capacity</th>
+                  <th className="w-40 px-2 py-2 text-left">Selection Unit</th>
+                  <th className="w-44 px-2 py-2 text-right">Unit Rate</th>
+                  <th className="w-40 px-2 py-2 text-left">User Input Number</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white text-sm">
@@ -776,9 +798,9 @@ export function SolarQuotationForm({
 
                   return (
                     <tr key={config.sequence} className="align-top hover:bg-gray-50">
-                      <td className="px-3 py-3 text-gray-700">{config.sequence}</td>
-                      <td className="px-3 py-3 font-medium text-gray-900">{config.itemHead}</td>
-                      <td className="min-w-[300px] px-3 py-3">
+                      <td className="px-2 py-3 text-gray-700">{config.sequence}</td>
+                      <td className="px-2 py-3 font-medium text-gray-900">{config.itemHead}</td>
+                      <td className="px-2 py-3">
                         <SearchableSelect
                           options={rowItems.map((item) => ({
                             value: item.id,
@@ -794,9 +816,10 @@ export function SolarQuotationForm({
                           onChange={(value) => handleSelectItem(config.sequence, value)}
                           placeholder={rowItems.length > 0 ? "Select item..." : "No mapped items found"}
                           searchPlaceholder="Search BOQ items"
+                          triggerClassName="border-red-300 bg-red-50"
                         />
                       </td>
-                      <td className="px-3 py-3 text-gray-700">
+                      <td className="px-2 py-3 text-gray-700">
                         <div>{selectionUnit}</div>
                         {selectedItem && (
                           <div className="mt-1 text-xs text-gray-500">
@@ -807,14 +830,14 @@ export function SolarQuotationForm({
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right font-medium text-gray-900">
+                      <td className="px-2 py-3 text-right text-xs font-medium text-gray-900 sm:text-sm">
                         {selectedItem
                           ? isPercentageItem(selectedItem)
                             ? `${Number(resolved?.rawRate || selectedItem.unitPrice || 0).toFixed(2)}% of subtotal`
                             : `${formatCurrency(Number(resolved?.rawRate || selectedItem.unitPrice || 0))} / ${selectionUnit}`
                           : "-"}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-3">
                         <input
                           type="number"
                           min="0"
@@ -822,7 +845,7 @@ export function SolarQuotationForm({
                           value={row?.quantity ?? 0}
                           onChange={(event) => handleQuantityChange(config.sequence, event.target.value)}
                           disabled={!selectedItem}
-                          className="w-28 rounded-md border border-gray-300 px-3 py-2 text-right disabled:bg-gray-100"
+                          className="w-28 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900 disabled:bg-gray-100"
                         />
                         {selectedItem && isPercentageItem(selectedItem) && (
                           <div className="mt-1 text-xs text-amber-700">Use 1 to apply this percentage charge once.</div>
@@ -836,23 +859,23 @@ export function SolarQuotationForm({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <div className="grid gap-2 text-sm md:grid-cols-2">
             <div className="space-y-2">
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-amber-800">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-amber-800">
                 <span>GST</span>
                 <span>{formatCurrency(totalGst)}</span>
               </div>
-              <div className="flex justify-between border-t border-gray-200 pt-2 font-semibold text-gray-900">
+              <div className="flex justify-between border-t border-amber-300 pt-2 font-semibold text-amber-950">
                 <span>Grand Total</span>
                 <span>{formatCurrency(grandTotal)}</span>
               </div>
             </div>
-            <div className="rounded-md border border-blue-100 bg-white p-3 text-xs text-gray-600">
+            <div className="rounded-md border border-amber-300 bg-amber-100 p-3 text-xs text-amber-900">
               <div><strong>Resolved rows:</strong> {resolvedRows.length}</div>
               <div className="mt-1"><strong>Cost / Watt:</strong> {actualSystemWatts > 0 ? formatCurrency(grandTotal / actualSystemWatts) : formatCurrency(0)}</div>
               <div className="mt-1"><strong>Cost / kW:</strong> {actualSystemKw > 0 ? formatCurrency(grandTotal / actualSystemKw) : formatCurrency(0)}</div>
