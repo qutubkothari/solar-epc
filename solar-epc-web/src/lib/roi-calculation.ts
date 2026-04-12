@@ -7,7 +7,7 @@ export type RoiProjectionInputs = {
   tariffEscalationPercent: number;
   annualPowerDegradationAfterYear1Percent: number;
   annualPowerDegradationFromYear3OnwardPercent: number;
-  operationMaintenancePercentYear1: number;
+  operationMaintenanceCostYear1: number;
   operationMaintenanceEscalationPercent: number;
   projectionYears: number;
 };
@@ -52,12 +52,12 @@ export const buildRoiProjection = (inputs: RoiProjectionInputs): RoiProjectionRe
   const tariffEscalation = percentToFraction(Number(inputs.tariffEscalationPercent || 0));
   const degradationAfterYear1 = percentToFraction(Number(inputs.annualPowerDegradationAfterYear1Percent || 0));
   const degradationFromYear3Onward = percentToFraction(Number(inputs.annualPowerDegradationFromYear3OnwardPercent || 0));
-  const operationMaintenancePercentYear1 = percentToFraction(Number(inputs.operationMaintenancePercentYear1 || 0));
+  const operationMaintenanceCostYear1 = Math.max(Number(inputs.operationMaintenanceCostYear1 || 0), 0);
   const operationMaintenanceEscalation = percentToFraction(Number(inputs.operationMaintenanceEscalationPercent || 0));
 
   const rows: RoiProjectionRow[] = [];
   const year1GenerationKwh = totalKw * averageDailyGenerationUnitsPerKw * availableDays;
-  const year1OperationMaintenanceCost = installationCost * operationMaintenancePercentYear1;
+  const year1OperationMaintenanceCost = operationMaintenanceCostYear1;
   let previousGenerationKwh = year1GenerationKwh;
   let previousTariffPerKwh = electricityTariffYear1;
   let previousOperationMaintenanceCost = year1OperationMaintenanceCost;

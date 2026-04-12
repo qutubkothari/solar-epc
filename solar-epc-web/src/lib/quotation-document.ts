@@ -72,6 +72,7 @@ export type QuotationDocumentData = {
   roiTariffEscalationPercent: number;
   roiAnnualPowerDegradationAfterYear1Percent: number;
   roiAnnualPowerDegradationFromYear3OnwardPercent: number;
+  roiOperationMaintenanceCostYear1: number;
   roiOperationMaintenancePercentYear1: number;
   roiOperationMaintenanceEscalationPercent: number;
   roiProjectLifeYears: number;
@@ -598,6 +599,7 @@ export const createDefaultQuotationDocumentData = (
     roiTariffEscalationPercent: overrides?.roiTariffEscalationPercent ?? 3,
     roiAnnualPowerDegradationAfterYear1Percent: overrides?.roiAnnualPowerDegradationAfterYear1Percent ?? 2,
     roiAnnualPowerDegradationFromYear3OnwardPercent: overrides?.roiAnnualPowerDegradationFromYear3OnwardPercent ?? 0.5,
+    roiOperationMaintenanceCostYear1: overrides?.roiOperationMaintenanceCostYear1 ?? 0,
     roiOperationMaintenancePercentYear1: overrides?.roiOperationMaintenancePercentYear1 ?? 1,
     roiOperationMaintenanceEscalationPercent: overrides?.roiOperationMaintenanceEscalationPercent ?? 3,
     roiProjectLifeYears: overrides?.roiProjectLifeYears ?? 30,
@@ -713,6 +715,7 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     roiTariffEscalationPercent: asNumber(raw.roiTariffEscalationPercent, 3),
     roiAnnualPowerDegradationAfterYear1Percent: asNumber(raw.roiAnnualPowerDegradationAfterYear1Percent, 2),
     roiAnnualPowerDegradationFromYear3OnwardPercent: asNumber(raw.roiAnnualPowerDegradationFromYear3OnwardPercent, 0.5),
+    roiOperationMaintenanceCostYear1: asNumber(raw.roiOperationMaintenanceCostYear1, 0),
     roiOperationMaintenancePercentYear1: asNumber(raw.roiOperationMaintenancePercentYear1, 1),
     roiOperationMaintenanceEscalationPercent: asNumber(raw.roiOperationMaintenanceEscalationPercent, 3),
     roiProjectLifeYears: asNumber(raw.roiProjectLifeYears, 30),

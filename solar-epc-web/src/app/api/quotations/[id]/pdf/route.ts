@@ -736,7 +736,7 @@ export async function GET(
       tariffEscalationPercent: Number(documentData.roiTariffEscalationPercent || 0),
       annualPowerDegradationAfterYear1Percent: Number(documentData.roiAnnualPowerDegradationAfterYear1Percent || 0),
       annualPowerDegradationFromYear3OnwardPercent: Number(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent || 0),
-      operationMaintenancePercentYear1: Number(documentData.roiOperationMaintenancePercentYear1 || 0),
+      operationMaintenanceCostYear1: Number(documentData.roiOperationMaintenanceCostYear1 || 0),
       operationMaintenanceEscalationPercent: Number(documentData.roiOperationMaintenanceEscalationPercent || 0),
       projectionYears: Number(documentData.roiProjectLifeYears || 0),
     });
@@ -1502,9 +1502,9 @@ export async function GET(
       ],
       [
         "O&M Cost (Year 1)",
-        "% / INR",
-        `${documentData.roiOperationMaintenancePercentYear1.toFixed(2)} | ${formatCurrency(roiOperationMaintenanceCostYear1)}`,
-        "Year 1 maintenance cost",
+        "INR",
+        formatCurrency(roiOperationMaintenanceCostYear1),
+        "Direct Year 1 maintenance cost base",
       ],
       ["O&M Cost Escalation", "%", documentData.roiOperationMaintenanceEscalationPercent.toFixed(2), "Inflation in O&M"],
       ["Project Life", "Years", documentData.roiProjectLifeYears.toFixed(0), "Standard plant life used for ROI projection"],

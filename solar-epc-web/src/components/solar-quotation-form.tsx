@@ -435,7 +435,7 @@ export function SolarQuotationForm({
     tariffEscalationPercent: Number(documentData.roiTariffEscalationPercent || 0),
     annualPowerDegradationAfterYear1Percent: Number(documentData.roiAnnualPowerDegradationAfterYear1Percent || 0),
     annualPowerDegradationFromYear3OnwardPercent: Number(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent || 0),
-    operationMaintenancePercentYear1: Number(documentData.roiOperationMaintenancePercentYear1 || 0),
+    operationMaintenanceCostYear1: Number(documentData.roiOperationMaintenanceCostYear1 || 0),
     operationMaintenanceEscalationPercent: Number(documentData.roiOperationMaintenanceEscalationPercent || 0),
     projectionYears: Number(documentData.roiProjectLifeYears || 0),
   });
@@ -1688,21 +1688,18 @@ export function SolarQuotationForm({
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-medium text-slate-900">O&amp;M Cost (Year 1)</td>
-                    <td className="px-3 py-2 text-slate-700">% / INR</td>
+                    <td className="px-3 py-2 text-slate-700">INR</td>
                     <td className="px-3 py-2">
                       <input
                         type="number"
                         min="0"
                         step="0.01"
-                        value={documentData.roiOperationMaintenancePercentYear1}
-                        onChange={(event) => setDocumentField("roiOperationMaintenancePercentYear1", Number(event.target.value || 0))}
+                        value={documentData.roiOperationMaintenanceCostYear1 > 0 ? documentData.roiOperationMaintenanceCostYear1 : ""}
+                        onChange={(event) => setDocumentField("roiOperationMaintenanceCostYear1", Number(event.target.value || 0))}
                         className={userInputClassName}
                       />
-                      <div className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                        {formatCurrency(roiOperationMaintenanceCostYear1)}
-                      </div>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">Year 1 maintenance cost as % of installation cost</td>
+                    <td className="px-3 py-2 text-slate-600">Direct annual O&amp;M cost used as the base for yearly escalation.</td>
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-medium text-slate-900">O&amp;M Cost Escalation</td>
@@ -1770,7 +1767,7 @@ export function SolarQuotationForm({
             <div className={calculatedCardClassName}>
               <div className="text-xs font-medium uppercase tracking-wide text-amber-700">O&amp;M Cost Year 1</div>
               <div className="text-2xl font-bold text-amber-900">{formatCurrency(roiOperationMaintenanceCostYear1)}</div>
-              <div className="mt-1 text-[11px] text-amber-700">{formatDecimal(documentData.roiOperationMaintenancePercentYear1)}% of installation cost</div>
+              <div className="mt-1 text-[11px] text-amber-700">Base annual O&amp;M cost before escalation</div>
             </div>
           </div>
 
