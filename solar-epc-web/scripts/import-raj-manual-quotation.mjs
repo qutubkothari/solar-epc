@@ -124,6 +124,158 @@ const requiredDocuments = [
   "Authorisation letter",
 ];
 
+const billOfQuantityRows = [
+  {
+    srNo: "1",
+    itemName: "SOLAR MODULE",
+    make: "PAHAL / RAYZON / VIKRAM",
+    description:
+      "TOPCon (Tunnel Oxide Passivated Contact) bi-facial PV modules are next-generation high-efficiency solar panels that generate power from both front and rear surfaces. These modules utilize advanced n-type cell technology, offering higher efficiency, better low-light performance, and lower degradation rates compared to traditional PERC modules. With bifacial gain ranging from 5% to 25% depending on site conditions, TOPCon modules deliver superior energy output and long-term reliability ideal for commercial, industrial, and utility-scale installations.",
+    unit: "Nos",
+    quantity: "53",
+  },
+  {
+    srNo: "2",
+    itemName: "INVERTER",
+    make: "SUNGROW",
+    description:
+      "IP66 protection and C5 anti-corrosion. DC Type I+II SPD, AC Type II SPD. Support AFCI 2.0 function. Key component diagnosis and protection. Smart IV curve diagnosis. Grid fault record function, easy for remote O&M. DC 15A current input, compatible with over 500W+ PV module. Dynamic shading optimization mode. Built-in PID recovery function.",
+    unit: "Nos",
+    quantity: "1",
+  },
+  {
+    srNo: "3",
+    itemName: "MODULE MOUNTING STRUCTURE",
+    make: "HINDUSTAR",
+    description:
+      "The Solar Mono Rail Structure is a streamlined, single-rail mounting system designed for quick and secure installation of solar PV modules. Made from high-strength aluminum or galvanized steel, it offers lightweight construction, corrosion resistance, and structural stability. Ideal for rooftop and ground-mounted systems, mono rail structures reduce installation time and material usage while ensuring optimal panel alignment and wind resistance.",
+    unit: "KW",
+    quantity: "31",
+  },
+  {
+    srNo: "4",
+    itemName: "MAIN AC DISTRIBUTION BOX",
+    make: "MCB - SCHNEIDER / LK (L&T), MCCB - SCHNEIDER / LK (L&T), CONTACTOR - SCHNEIDER / LK (L&T), NVR - STANDARD, SPD - FINDER, ENCLOSER - (ABS used till 50-60 kW)",
+    description:
+      "The AC Distribution Box (ACDB) is designed to safely distribute the AC power from the solar inverter to the load or utility grid. It includes MCB and MCCB for overload and short-circuit protection, contactor for automated load switching, SPD for protection against electrical surges, and NVR for protection against phase loss and safe re-energization. This ACDB ensures reliable operation, enhanced safety, and compliance with standard electrical protection norms in solar power systems.",
+    unit: "NOS",
+    quantity: "1",
+  },
+  {
+    srNo: "5",
+    itemName: "DC DISTRIBUTION BOX",
+    make: "DC MCB - SCHNEIDER / LK (L&T), SPD - FINDER",
+    description:
+      "The DC Distribution Box (DCDB) is designed to protect and control the DC output from solar PV modules. It is equipped with DC MCB for protection against overcurrent and short circuits, and SPD to protect against voltage surges and lightning-induced spikes. This robust and weatherproof DCDB ensures the safe and reliable operation of the solar power system, enhancing overall system durability.",
+    unit: "NOS",
+    quantity: "1",
+  },
+  {
+    srNo: "6",
+    itemName: "ESE LIGHTING ARRESTOR",
+    make: "Conventional Lightning Arrestor",
+    description: "Provides conical protection MOC. Copper with required spikes for building and chimneys protection.",
+    unit: "NOS",
+    quantity: "1",
+  },
+  {
+    srNo: "7",
+    itemName: "EARTHING ROAD",
+    make: "ERTH - 50 MM X 3 MTR G.I EARTHING ELECTRODE (PIPE IN STRIP) - HEAVY",
+    description:
+      "Hot dip galvanized pipe with corrosion protection, designed for fast fault current dissipation. Pipe inner space filled with high conductive material with top to bottom strip. Moisture booster chemical bags provided for low earth resistance. Low maintenance on site.",
+    unit: "NOS",
+    quantity: "4",
+  },
+  {
+    srNo: "8",
+    itemName: "DC CABLE",
+    make: "APAR",
+    description:
+      "Supply and laying of DC 1 Core x 6.0 sqmm copper flexible cable (Apar / Polycab / RR Kabel / Havells make), XLPE insulated, UV and weather resistant, suitable for interconnection of solar PV modules and DC circuits. Ensures high conductivity, low voltage drop, and long-term outdoor durability.",
+    unit: "Meter",
+    quantity: "250",
+  },
+  {
+    srNo: "9",
+    itemName: "AC CABLE",
+    make: "APAR / POLYCAB / RR KABEL / HAVELLS",
+    description:
+      "Supply and laying of AC 4 Core x 25 sqmm Aluminium Armoured Cable (Apar / Polycab / RR Kabel / Havells make), XLPE insulated, PVC sheathed, suitable for LT power distribution in solar systems. Designed for underground or outdoor installations, offering excellent mechanical protection, thermal resistance, and long service life under varying load conditions.",
+    unit: "Meter",
+    quantity: "60",
+  },
+  {
+    srNo: "10",
+    itemName: "AC CABLE- 2",
+    make: "APAR / POLYCAB / RR KABEL / HAVELLS",
+    description:
+      "Supply and laying of AC 2 Core x 6.0 sqmm copper flexible cable (Apar / Polycab / RR Kabel / Havells make), PVC insulated and sheathed, suitable for AC power connections in solar systems. Provides high conductivity, thermal stability, and reliable performance under continuous load and outdoor conditions.",
+    unit: "Meter",
+    quantity: "0",
+  },
+  {
+    srNo: "11",
+    itemName: "EARTHING CABLE / STRIP",
+    make: "INDOCAB",
+    description:
+      "Supply and laying of Earth 1 Core x 4.0 sqmm Copper Cable, PVC insulated, single-core, suitable for effective grounding of solar PV structures and equipment. Provides excellent conductivity, mechanical strength, and reliable fault current dissipation for enhanced system safety.",
+    unit: "KG/METER",
+    quantity: "200",
+  },
+  {
+    srNo: "12",
+    itemName: "LA CABLE / STRIP",
+    make: "KANBERY / FLEXGUARD / GEONOM",
+    description:
+      "Supply and laying of Earth 1 Core x 16 sqmm Aluminium Flexible Cable, PVC insulated, suitable for earthing of solar structures and LT panels. Provides cost-effective grounding solution with adequate conductivity and flexibility for reliable fault current dissipation and system safety.",
+    unit: "KG/METER",
+    quantity: "60",
+  },
+  {
+    srNo: "13",
+    itemName: "CABLE TRAY",
+    make: "FRP",
+    description:
+      "Supply and installation of FRP Cable Tray, size 50mm (W) x 50mm (H) x 3mm (T), corrosion-resistant, UV-stabilized, and lightweight. Suitable for safe and durable routing of DC/AC cables in solar power installations under harsh outdoor conditions.",
+    unit: "MTR",
+    quantity: "0",
+  },
+  {
+    srNo: "14",
+    itemName: "WALK WAY",
+    make: "FRP",
+    description:
+      "Supply and installation of FRP Solar Walkway, size 272mm (W) x 3660mm (L) x 25mm (H), with mesh size 38mm x 38mm. Made from corrosion-resistant, UV-stabilized fiber-reinforced plastic, suitable for safe and durable access pathways between solar module rows on rooftops or ground-mounted structures.",
+    unit: "MTR",
+    quantity: "53",
+  },
+  {
+    srNo: "15",
+    itemName: "FOUNDATION BLOCK",
+    make: "HTSS SCOPE",
+    description: "RCC Foundation Block - 400x400x400 mm, M25 grade concrete.",
+    unit: "NOS",
+    quantity: "4",
+  },
+  {
+    srNo: "16",
+    itemName: "Fire & Safety",
+    make: "",
+    description: "Fire Extinguisher & Sign Bord Marking.",
+    unit: "Nos",
+    quantity: "As Per Required",
+  },
+  {
+    srNo: "17",
+    itemName: "INSTALLATION & COMMISSIONING",
+    make: "",
+    description: "Hi - Tech Solar Solution Scope.",
+    unit: "",
+    quantity: "",
+  },
+];
+
 const toDataUrl = async (filePath) => {
   const fileBuffer = await fs.readFile(filePath);
   const ext = path.extname(filePath).replace(".", "").toLowerCase() || "png";
@@ -254,6 +406,7 @@ const main = async () => {
     roiOperationMaintenanceEscalationPercent: 3,
     roiProjectLifeYears: 30,
     paymentStages,
+    billOfQuantityRows,
     requiredDocuments,
     bankDetails: {
       bankName: "AU SMALL FINANCE BANK",

@@ -760,6 +760,7 @@ export async function GET(
 
     const versionDocumentData = (version as typeof version & { documentData?: unknown }).documentData;
     const documentData = normalizeQuotationDocumentData(versionDocumentData);
+    const manualBoqRows = documentData.billOfQuantityRows;
 
     const lines: QuoteLine[] = version.items.map((item: VersionItemEntry) => ({
       title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
@@ -1144,189 +1145,257 @@ export async function GET(
 
     y -= 18;
 
-    const generationSectionHeight = 360;
-    if (y - generationSectionHeight < FOOTER_TOP + 16) {
-      ({ page, y } = createPage(true));
-    }
-
-    drawText(page, "System Generation & Revenue Details", MARGIN, y, 12.5, true, accent);
-    y -= 18;
-
-    const generationSummaryRows = [
-      [
-        { label: "Solar Roof Top Size", value: `${documentData.totalKw.toFixed(2)} Kw`, note: "Calculated system size" },
-        { label: "Generation / Day", value: `${indicativeGenerationPerDay.toFixed(0)} Unit`, note: "System size x rounded avg. generation" },
-        { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), note: "Sum of monthly savings" },
-      ],
-      [
-        { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, note: "Sum of monthly generation" },
-        { label: "25 Year Saving", value: formatCurrency(twentyFiveYearSaving), note: "Yearly saving x 25" },
-      ],
-    ];
-
-    generationSummaryRows.forEach((rowCards) => {
-      const gap = 10;
-      const cardWidth = (CONTENT_WIDTH - gap * (rowCards.length - 1)) / rowCards.length;
-      const cardHeight = 54;
-
-      rowCards.forEach((card, index) => {
-        const cardX = MARGIN + index * (cardWidth + gap);
-        page.drawRectangle({
-          x: cardX,
-          y: y - cardHeight,
-          width: cardWidth,
-          height: cardHeight,
-          color: white,
-          borderColor: border,
-          borderWidth: 1,
-        });
-        drawText(page, card.label, cardX + 8, y - 14, 7, true, muted);
-        drawText(page, card.value, cardX + 8, y - 28, 10, true, accent);
-        drawWrapped(page, card.note, cardX + 8, y - 40, cardWidth - 16, 6.5, false, muted, 8);
-      });
-
-      y -= cardHeight + 10;
-    });
-
-    page.drawRectangle({ x: MARGIN, y: y - 20, width: CONTENT_WIDTH, height: 20, color: secondary });
-    drawText(page, "Predicted Monthly Generation & Savings", MARGIN + 8, y - 13, 8.5, true, white);
-    y -= 24;
-
-    const chartGap = 12;
-    const chartWidth = (CONTENT_WIDTH - chartGap) / 2;
-    const chartHeight = 150;
-    drawBarChartCard(page, {
-      x: MARGIN,
-      y,
-      width: chartWidth,
-      height: chartHeight,
-      title: "Predicted Monthly Generation (kWh)",
-      data: generationRows.map((row) => ({ label: row.month, value: row.kwh })),
-      barColor: secondary,
-      valueFormatter: (value) => value.toFixed(0),
-    });
-    drawBarChartCard(page, {
-      x: MARGIN + chartWidth + chartGap,
-      y,
-      width: chartWidth,
-      height: chartHeight,
-      title: "Predicted Monthly Savings (INR)",
-      data: generationRows.map((row) => ({ label: row.month, value: row.amount })),
-      barColor: primary,
-      valueFormatter: (value) => `Rs.${value.toFixed(0)}`,
-    });
-    y -= chartHeight + 12;
-
-    const miniSummaryHeight = 40;
-    page.drawRectangle({ x: MARGIN, y: y - miniSummaryHeight, width: CONTENT_WIDTH, height: miniSummaryHeight, color: white, borderColor: border, borderWidth: 1 });
-    const miniSummaryColumns = [
-      { label: "Avg. Unit / Day", value: documentData.expectedGenerationUnitsPerKw.toFixed(2), x: MARGIN + 10 },
-      { label: "Total Days", value: "365", x: MARGIN + 145 },
-      { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, x: MARGIN + 250 },
-      { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), x: MARGIN + 405 },
-    ];
-    miniSummaryColumns.forEach((entry) => {
-      drawText(page, entry.label, entry.x, y - 13, 6.6, true, muted);
-      drawText(page, entry.value, entry.x, y - 27, 8.2, true, accent);
-    });
-    y -= miniSummaryHeight + 10;
-
-    const generationNoteLines = wrapText(documentData.generationDisclaimer, CONTENT_WIDTH - 20, 7.5);
-    const generationNoteHeight = 14 + generationNoteLines.length * 9;
-    page.drawRectangle({ x: MARGIN, y: y - generationNoteHeight, width: CONTENT_WIDTH, height: generationNoteHeight, color: white, borderColor: border, borderWidth: 1 });
-    drawText(page, "Note", MARGIN + 8, y - 12, 7.8, true, accent);
-    generationNoteLines.forEach((line, index) => drawText(page, line, MARGIN + 42, y - 12 - index * 9, 7.5, false, muted));
-    y -= generationNoteHeight + 18;
-
-    const columns: Column[] = [
-      { key: "title", label: "Item Head", x: MARGIN, width: 92 },
-      { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
-      { key: "quantity", label: "Qty", x: MARGIN + 317, width: 42, align: "right" },
-      { key: "rate", label: "Rate", x: MARGIN + 359, width: 74, align: "right" },
-      { key: "amount", label: "Amount", x: MARGIN + 433, width: 98, align: "right" },
-    ];
-
-    const drawTableHeader = (targetPage: PDFPage, topY: number) => {
-      targetPage.drawRectangle({
-        x: MARGIN,
-        y: topY - 24,
-        width: CONTENT_WIDTH,
-        height: 24,
-        color: primary,
-      });
-
-      columns.forEach((column) => {
-        if (column.align === "right") {
-          drawRightAligned(targetPage, column.label, column.x, column.width, topY - 16, 9, true, white);
-        } else {
-          drawText(targetPage, column.label, column.x + 6, topY - 16, 9, true, white);
-        }
-      });
-    };
-
-    drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-    y -= 10;
-    drawTableHeader(page, y);
-    y -= 28;
-
-    lines.forEach((line, index) => {
-      const titleLines = wrapText(line.title, 80, 8.5, true).slice(0, 4);
-      const detailLines = bulletizeDescription(line.detail, 213, 7.5);
-      const lineCount = Math.max(titleLines.length, detailLines.length, 1);
-      const rowHeight = 12 + lineCount * 10;
-
-      if (y - rowHeight < FOOTER_TOP + 16) {
+    const drawGenerationSection = () => {
+      const generationSectionHeight = 360;
+      if (y - generationSectionHeight < FOOTER_TOP + 16) {
         ({ page, y } = createPage(true));
-        drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-        y -= 10;
-        drawTableHeader(page, y);
-        y -= 28;
       }
 
-      page.drawRectangle({
-        x: MARGIN,
-        y: y - rowHeight,
-        width: CONTENT_WIDTH,
-        height: rowHeight,
-        color: index % 2 === 0 ? white : softFill,
-        borderColor: subtleLine,
-        borderWidth: 1,
-      });
+      drawText(page, "System Generation & Revenue Details", MARGIN, y, 12.5, true, accent);
+      y -= 18;
 
-      columns.slice(1).forEach((column) => {
-        page.drawLine({
-          start: { x: column.x, y: y },
-          end: { x: column.x, y: y - rowHeight },
-          thickness: 1,
-          color: subtleLine,
+      const generationSummaryRows = [
+        [
+          { label: "Solar Roof Top Size", value: `${documentData.totalKw.toFixed(2)} Kw`, note: "Calculated system size" },
+          { label: "Generation / Day", value: `${indicativeGenerationPerDay.toFixed(0)} Unit`, note: "System size x rounded avg. generation" },
+          { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), note: "Sum of monthly savings" },
+        ],
+        [
+          { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, note: "Sum of monthly generation" },
+          { label: "25 Year Saving", value: formatCurrency(twentyFiveYearSaving), note: "Yearly saving x 25" },
+        ],
+      ];
+
+      generationSummaryRows.forEach((rowCards) => {
+        const gap = 10;
+        const cardWidth = (CONTENT_WIDTH - gap * (rowCards.length - 1)) / rowCards.length;
+        const cardHeight = 54;
+
+        rowCards.forEach((card, index) => {
+          const cardX = MARGIN + index * (cardWidth + gap);
+          page.drawRectangle({
+            x: cardX,
+            y: y - cardHeight,
+            width: cardWidth,
+            height: cardHeight,
+            color: white,
+            borderColor: border,
+            borderWidth: 1,
+          });
+          drawText(page, card.label, cardX + 8, y - 14, 7, true, muted);
+          drawText(page, card.value, cardX + 8, y - 28, 10, true, accent);
+          drawWrapped(page, card.note, cardX + 8, y - 40, cardWidth - 16, 6.5, false, muted, 8);
         });
+
+        y -= cardHeight + 10;
       });
 
-      titleLines.forEach((titleLine, titleIndex) => {
-        drawText(page, titleLine, columns[0].x + 6, y - 14 - titleIndex * 10, 8.5, true, accent);
+      page.drawRectangle({ x: MARGIN, y: y - 20, width: CONTENT_WIDTH, height: 20, color: secondary });
+      drawText(page, "Predicted Monthly Generation & Savings", MARGIN + 8, y - 13, 8.5, true, white);
+      y -= 24;
+
+      const chartGap = 12;
+      const chartWidth = (CONTENT_WIDTH - chartGap) / 2;
+      const chartHeight = 150;
+      drawBarChartCard(page, {
+        x: MARGIN,
+        y,
+        width: chartWidth,
+        height: chartHeight,
+        title: "Predicted Monthly Generation (kWh)",
+        data: generationRows.map((row) => ({ label: row.month, value: row.kwh })),
+        barColor: secondary,
+        valueFormatter: (value) => value.toFixed(0),
+      });
+      drawBarChartCard(page, {
+        x: MARGIN + chartWidth + chartGap,
+        y,
+        width: chartWidth,
+        height: chartHeight,
+        title: "Predicted Monthly Savings (INR)",
+        data: generationRows.map((row) => ({ label: row.month, value: row.amount })),
+        barColor: primary,
+        valueFormatter: (value) => `Rs.${value.toFixed(0)}`,
+      });
+      y -= chartHeight + 12;
+
+      const miniSummaryHeight = 40;
+      page.drawRectangle({ x: MARGIN, y: y - miniSummaryHeight, width: CONTENT_WIDTH, height: miniSummaryHeight, color: white, borderColor: border, borderWidth: 1 });
+      const miniSummaryColumns = [
+        { label: "Avg. Unit / Day", value: documentData.expectedGenerationUnitsPerKw.toFixed(2), x: MARGIN + 10 },
+        { label: "Total Days", value: "365", x: MARGIN + 145 },
+        { label: "1st Year Generation", value: `${annualGenerationKwh.toFixed(0)} kWh`, x: MARGIN + 250 },
+        { label: "Yearly Saving", value: formatCurrency(annualGenerationSavings), x: MARGIN + 405 },
+      ];
+      miniSummaryColumns.forEach((entry) => {
+        drawText(page, entry.label, entry.x, y - 13, 6.6, true, muted);
+        drawText(page, entry.value, entry.x, y - 27, 8.2, true, accent);
+      });
+      y -= miniSummaryHeight + 10;
+
+      const generationNoteLines = wrapText(documentData.generationDisclaimer, CONTENT_WIDTH - 20, 7.5);
+      const generationNoteHeight = 14 + generationNoteLines.length * 9;
+      page.drawRectangle({ x: MARGIN, y: y - generationNoteHeight, width: CONTENT_WIDTH, height: generationNoteHeight, color: white, borderColor: border, borderWidth: 1 });
+      drawText(page, "Note", MARGIN + 8, y - 12, 7.8, true, accent);
+      generationNoteLines.forEach((line, index) => drawText(page, line, MARGIN + 42, y - 12 - index * 9, 7.5, false, muted));
+      y -= generationNoteHeight + 18;
+    };
+
+    if (manualBoqRows.length > 0) {
+      const boqColumns = [
+        { label: "Sr No", x: MARGIN, width: 38 },
+        { label: "Item Name", x: MARGIN + 38, width: 110 },
+        { label: "Make", x: MARGIN + 148, width: 105 },
+        { label: "Description", x: MARGIN + 253, width: 196 },
+        { label: "Unit", x: MARGIN + 449, width: 38 },
+        { label: "Quantity", x: MARGIN + 487, width: 44 },
+      ];
+
+      const drawManualBoqHeader = (targetPage: PDFPage, topY: number) => {
+        targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: primary });
+        boqColumns.forEach((column) => {
+          drawText(targetPage, column.label, column.x + 5, topY - 16, 8.2, true, white);
+        });
+      };
+
+      drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+      y -= 10;
+      drawManualBoqHeader(page, y);
+      y -= 28;
+
+      manualBoqRows.forEach((row, index) => {
+        const srLines = wrapText(row.srNo, boqColumns[0].width - 10, 7.2, true);
+        const itemLines = wrapText(row.itemName, boqColumns[1].width - 10, 8, true);
+        const makeLines = wrapText(row.make || "-", boqColumns[2].width - 10, 7.6);
+        const descriptionLines = wrapText(row.description, boqColumns[3].width - 10, 7.4);
+        const unitLines = wrapText(row.unit || "-", boqColumns[4].width - 10, 7.5, true);
+        const quantityLines = wrapText(row.quantity || "-", boqColumns[5].width - 10, 7.5, true);
+        const lineCount = Math.max(srLines.length, itemLines.length, makeLines.length, descriptionLines.length, unitLines.length, quantityLines.length, 1);
+        const rowHeight = 12 + lineCount * 9;
+
+        if (y - rowHeight < FOOTER_TOP + 16) {
+          ({ page, y } = createPage(true));
+          drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+          y -= 10;
+          drawManualBoqHeader(page, y);
+          y -= 28;
+        }
+
+        page.drawRectangle({
+          x: MARGIN,
+          y: y - rowHeight,
+          width: CONTENT_WIDTH,
+          height: rowHeight,
+          color: index % 2 === 0 ? white : softFill,
+          borderColor: subtleLine,
+          borderWidth: 1,
+        });
+        boqColumns.slice(1).forEach((column) => {
+          page.drawLine({ start: { x: column.x, y }, end: { x: column.x, y: y - rowHeight }, thickness: 1, color: subtleLine });
+        });
+
+        srLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[0].x + 5, y - 13 - lineIndex * 9, 7.2, true, accent));
+        itemLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[1].x + 5, y - 13 - lineIndex * 9, 8, true, accent));
+        makeLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[2].x + 5, y - 13 - lineIndex * 9, 7.6, false, accent));
+        descriptionLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[3].x + 5, y - 13 - lineIndex * 9, 7.4, false, muted));
+        unitLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[4].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
+        quantityLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[5].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
+
+        y -= rowHeight;
       });
 
-      detailLines.forEach((detailLine, detailIndex) => {
-        drawText(page, detailLine, columns[1].x + 6, y - 14 - detailIndex * 10, 7.5, false, muted);
+      y -= 18;
+    } else {
+      const columns: Column[] = [
+        { key: "title", label: "Item Head", x: MARGIN, width: 92 },
+        { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
+        { key: "quantity", label: "Qty", x: MARGIN + 317, width: 42, align: "right" },
+        { key: "rate", label: "Rate", x: MARGIN + 359, width: 74, align: "right" },
+        { key: "amount", label: "Amount", x: MARGIN + 433, width: 98, align: "right" },
+      ];
+
+      const drawTableHeader = (targetPage: PDFPage, topY: number) => {
+        targetPage.drawRectangle({
+          x: MARGIN,
+          y: topY - 24,
+          width: CONTENT_WIDTH,
+          height: 24,
+          color: primary,
+        });
+
+        columns.forEach((column) => {
+          if (column.align === "right") {
+            drawRightAligned(targetPage, column.label, column.x, column.width, topY - 16, 9, true, white);
+          } else {
+            drawText(targetPage, column.label, column.x + 6, topY - 16, 9, true, white);
+          }
+        });
+      };
+
+      drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+      y -= 10;
+      drawTableHeader(page, y);
+      y -= 28;
+
+      lines.forEach((line, index) => {
+        const titleLines = wrapText(line.title, 80, 8.5, true).slice(0, 4);
+        const detailLines = bulletizeDescription(line.detail, 213, 7.5);
+        const lineCount = Math.max(titleLines.length, detailLines.length, 1);
+        const rowHeight = 12 + lineCount * 10;
+
+        if (y - rowHeight < FOOTER_TOP + 16) {
+          ({ page, y } = createPage(true));
+          drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+          y -= 10;
+          drawTableHeader(page, y);
+          y -= 28;
+        }
+
+        page.drawRectangle({
+          x: MARGIN,
+          y: y - rowHeight,
+          width: CONTENT_WIDTH,
+          height: rowHeight,
+          color: index % 2 === 0 ? white : softFill,
+          borderColor: subtleLine,
+          borderWidth: 1,
+        });
+
+        columns.slice(1).forEach((column) => {
+          page.drawLine({
+            start: { x: column.x, y: y },
+            end: { x: column.x, y: y - rowHeight },
+            thickness: 1,
+            color: subtleLine,
+          });
+        });
+
+        titleLines.forEach((titleLine, titleIndex) => {
+          drawText(page, titleLine, columns[0].x + 6, y - 14 - titleIndex * 10, 8.5, true, accent);
+        });
+
+        detailLines.forEach((detailLine, detailIndex) => {
+          drawText(page, detailLine, columns[1].x + 6, y - 14 - detailIndex * 10, 7.5, false, muted);
+        });
+
+        drawRightAligned(
+          page,
+          line.quantity.toLocaleString("en-IN", { maximumFractionDigits: 2 }),
+          columns[2].x,
+          columns[2].width,
+          y - 14,
+          8,
+          false,
+          accent
+        );
+        drawRightAligned(page, formatCurrency(line.rate), columns[3].x, columns[3].width, y - 14, 8, false, accent);
+        drawRightAligned(page, formatCurrency(line.amount), columns[4].x, columns[4].width, y - 14, 8.5, true, accent);
+
+        y -= rowHeight;
       });
 
-      drawRightAligned(
-        page,
-        line.quantity.toLocaleString("en-IN", { maximumFractionDigits: 2 }),
-        columns[2].x,
-        columns[2].width,
-        y - 14,
-        8,
-        false,
-        accent
-      );
-      drawRightAligned(page, formatCurrency(line.rate), columns[3].x, columns[3].width, y - 14, 8, false, accent);
-      drawRightAligned(page, formatCurrency(line.amount), columns[4].x, columns[4].width, y - 14, 8.5, true, accent);
-
-      y -= rowHeight;
-    });
-
-    y -= 18;
+      y -= 18;
+    }
 
     const scopeColumns = [
       { label: "Sr", x: MARGIN, width: 42 },
@@ -1913,6 +1982,8 @@ export async function GET(
       docsCardHeight
     );
     y -= Math.max(bankCardHeight, docsCardHeight) + 18;
+
+    drawGenerationSection();
 
     additionalWriteups.forEach((writeup: QuotationWriteupEntry) => {
       drawWriteupSection(writeup.title, writeup.content);

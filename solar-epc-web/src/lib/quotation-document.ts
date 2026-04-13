@@ -34,6 +34,15 @@ export type InstallationProcedureStep = {
   timePeriod: string;
 };
 
+export type BillOfQuantityRow = {
+  srNo: string;
+  itemName: string;
+  make: string;
+  description: string;
+  unit: string;
+  quantity: string;
+};
+
 export type QuotationDocumentData = {
   consumerType: string;
   consumerNumber: string;
@@ -78,6 +87,7 @@ export type QuotationDocumentData = {
   roiProjectLifeYears: number;
   paymentStages: PaymentStage[];
   scopeOfWorkRows: ScopeOfWorkRow[];
+  billOfQuantityRows: BillOfQuantityRow[];
   requiredDocuments: string[];
   bankDetails: BankDetails;
 };
@@ -614,6 +624,7 @@ export const createDefaultQuotationDocumentData = (
     roiProjectLifeYears: overrides?.roiProjectLifeYears ?? 30,
     paymentStages: (overrides?.paymentStages ?? DEFAULT_PAYMENT_STAGES).map((entry) => ({ ...entry })),
     scopeOfWorkRows: (overrides?.scopeOfWorkRows ?? DEFAULT_SCOPE_OF_WORK_ROWS).map((entry) => ({ ...entry })),
+    billOfQuantityRows: (overrides?.billOfQuantityRows ?? []).map((entry) => ({ ...entry })),
     requiredDocuments: [...(overrides?.requiredDocuments ?? DEFAULT_REQUIRED_DOCUMENTS)],
     bankDetails: { ...(overrides?.bankDetails ?? DEFAULT_BANK_DETAILS) },
   };
@@ -670,6 +681,20 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
           remarks: asString(entry.remarks),
         }))
         .filter((entry) => entry.srNo || entry.workItem || entry.responsibility || entry.remarks)
+    : undefined;
+
+  const billOfQuantityRows = Array.isArray(raw.billOfQuantityRows)
+    ? raw.billOfQuantityRows
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+        .map((entry) => ({
+          srNo: asString(entry.srNo),
+          itemName: asString(entry.itemName),
+          make: asString(entry.make),
+          description: asString(entry.description),
+          unit: asString(entry.unit),
+          quantity: asString(entry.quantity),
+        }))
+        .filter((entry) => entry.srNo || entry.itemName || entry.make || entry.description || entry.unit || entry.quantity)
     : undefined;
 
   const requiredDocuments = Array.isArray(raw.requiredDocuments)
@@ -730,6 +755,7 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     roiProjectLifeYears: asNumber(raw.roiProjectLifeYears, 30),
     paymentStages,
     scopeOfWorkRows,
+    billOfQuantityRows,
     requiredDocuments,
     bankDetails: bankRaw
       ? {
