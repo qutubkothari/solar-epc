@@ -1154,6 +1154,21 @@ export async function GET(
       });
     };
 
+    const measureTechnicalRowHeight = (row: (typeof technicalRows)[number]) => {
+      const parameterLines = wrapText(row[0], technicalColumns[0].width - 12, 8, true);
+      const descriptionLines = wrapText(row[1], technicalColumns[1].width - 12, 8);
+      const remarkLines = wrapText(row[2] || "-", technicalColumns[2].width - 12, 8);
+      const lineCount = Math.max(parameterLines.length, descriptionLines.length, remarkLines.length, 1);
+
+      return 12 + lineCount * 10;
+    };
+
+    const firstTechnicalRowHeight = technicalRows.length ? measureTechnicalRowHeight(technicalRows[0]) : 0;
+    const technicalSectionIntroHeight = 10 + 28 + firstTechnicalRowHeight;
+    if (y - technicalSectionIntroHeight < FOOTER_TOP + 16) {
+      ({ page, y } = createPage(true));
+    }
+
     drawText(page, "Technical Proposal", MARGIN, y, 12.5, true, accent);
     y -= 10;
     drawTechnicalHeader(page, y);
@@ -1163,8 +1178,7 @@ export async function GET(
       const parameterLines = wrapText(row[0], technicalColumns[0].width - 12, 8, true);
       const descriptionLines = wrapText(row[1], technicalColumns[1].width - 12, 8);
       const remarkLines = wrapText(row[2] || "-", technicalColumns[2].width - 12, 8);
-      const lineCount = Math.max(parameterLines.length, descriptionLines.length, remarkLines.length, 1);
-      const rowHeight = 12 + lineCount * 10;
+      const rowHeight = measureTechnicalRowHeight(row);
 
       if (y - rowHeight < FOOTER_TOP + 16) {
         ({ page, y } = createPage(true));
