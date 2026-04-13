@@ -1220,6 +1220,49 @@ export async function GET(
       y -= generationNoteHeight + 18;
     };
 
+    const drawPaymentStagesSection = () => {
+      const paymentRows = documentData.paymentStages;
+      const paymentTableHeight = 36 + paymentRows.length * 26;
+      if (y - paymentTableHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+      }
+
+      drawText(page, "Payment Stages", MARGIN, y, 12.5, true, accent);
+      y -= 10;
+      page.drawRectangle({ x: MARGIN, y: y - 24, width: CONTENT_WIDTH, height: 24, color: primary });
+      drawText(page, "Stage", MARGIN + 6, y - 16, 8.5, true, white);
+      drawText(page, "Milestone / Remarks", MARGIN + 170, y - 16, 8.5, true, white);
+      drawRightAligned(page, "%", MARGIN + 440, 30, y - 16, 8.5, true, white);
+      drawRightAligned(page, "Amount", MARGIN + 476, 55, y - 16, 8.5, true, white);
+      y -= 28;
+
+      paymentRows.forEach((stage, index) => {
+        const milestone = `${stage.milestone} ${stage.remarks}`.trim();
+        const lines = wrapText(milestone, 258, 7.5);
+        const rowHeight = 12 + Math.max(lines.length, 1) * 10;
+
+        page.drawRectangle({
+          x: MARGIN,
+          y: y - rowHeight,
+          width: CONTENT_WIDTH,
+          height: rowHeight,
+          color: index % 2 === 0 ? white : softFill,
+          borderColor: subtleLine,
+          borderWidth: 1,
+        });
+        page.drawLine({ start: { x: MARGIN + 160, y }, end: { x: MARGIN + 160, y: y - rowHeight }, thickness: 1, color: subtleLine });
+        page.drawLine({ start: { x: MARGIN + 430, y }, end: { x: MARGIN + 430, y: y - rowHeight }, thickness: 1, color: subtleLine });
+        page.drawLine({ start: { x: MARGIN + 468, y }, end: { x: MARGIN + 468, y: y - rowHeight }, thickness: 1, color: subtleLine });
+        drawText(page, stage.label, MARGIN + 6, y - 14, 7.8, true, accent);
+        lines.forEach((line, lineIndex) => drawText(page, line, MARGIN + 170, y - 14 - lineIndex * 10, 7.5, false, muted));
+        drawRightAligned(page, `${stage.percentage}%`, MARGIN + 432, 28, y - 14, 7.8, true, accent);
+        drawRightAligned(page, formatCurrency(systemInstallationCost * (stage.percentage / 100)), MARGIN + 474, 55, y - 14, 7.8, true, accent);
+        y -= rowHeight;
+      });
+
+      y -= 18;
+    };
+
     const boqColumns = [
       { label: "Sr No", x: MARGIN, width: 38 },
       { label: "Item Name", x: MARGIN + 38, width: 110 },
@@ -1440,6 +1483,10 @@ export async function GET(
       summaryY -= Math.max(labelLines.length, 1) * 10 + 4;
     });
     y -= summaryHeight + 16;
+
+    drawPaymentStagesSection();
+
+    drawGenerationSection();
 
     const installationColumns = [
       { label: "Steps", x: MARGIN, width: 58 },
@@ -1762,47 +1809,6 @@ export async function GET(
     });
     y -= roiChartHeight + 18;
 
-    const paymentRows = documentData.paymentStages;
-    const paymentTableHeight = 36 + paymentRows.length * 26;
-    if (y - paymentTableHeight < FOOTER_TOP + 16) {
-      ({ page, y } = createPage(true));
-    }
-
-    drawText(page, "Payment Stages", MARGIN, y, 12.5, true, accent);
-    y -= 10;
-    page.drawRectangle({ x: MARGIN, y: y - 24, width: CONTENT_WIDTH, height: 24, color: primary });
-    drawText(page, "Stage", MARGIN + 6, y - 16, 8.5, true, white);
-    drawText(page, "Milestone / Remarks", MARGIN + 170, y - 16, 8.5, true, white);
-    drawRightAligned(page, "%", MARGIN + 440, 30, y - 16, 8.5, true, white);
-    drawRightAligned(page, "Amount", MARGIN + 476, 55, y - 16, 8.5, true, white);
-    y -= 28;
-
-    paymentRows.forEach((stage, index) => {
-      const milestone = `${stage.milestone} ${stage.remarks}`.trim();
-      const lines = wrapText(milestone, 258, 7.5);
-      const rowHeight = 12 + Math.max(lines.length, 1) * 10;
-
-      page.drawRectangle({
-        x: MARGIN,
-        y: y - rowHeight,
-        width: CONTENT_WIDTH,
-        height: rowHeight,
-        color: index % 2 === 0 ? white : softFill,
-        borderColor: subtleLine,
-        borderWidth: 1,
-      });
-      page.drawLine({ start: { x: MARGIN + 160, y }, end: { x: MARGIN + 160, y: y - rowHeight }, thickness: 1, color: subtleLine });
-      page.drawLine({ start: { x: MARGIN + 430, y }, end: { x: MARGIN + 430, y: y - rowHeight }, thickness: 1, color: subtleLine });
-      page.drawLine({ start: { x: MARGIN + 468, y }, end: { x: MARGIN + 468, y: y - rowHeight }, thickness: 1, color: subtleLine });
-      drawText(page, stage.label, MARGIN + 6, y - 14, 7.8, true, accent);
-      lines.forEach((line, lineIndex) => drawText(page, line, MARGIN + 170, y - 14 - lineIndex * 10, 7.5, false, muted));
-      drawRightAligned(page, `${stage.percentage}%`, MARGIN + 432, 28, y - 14, 7.8, true, accent);
-      drawRightAligned(page, formatCurrency(systemInstallationCost * (stage.percentage / 100)), MARGIN + 474, 55, y - 14, 7.8, true, accent);
-      y -= rowHeight;
-    });
-
-    y -= 18;
-
     const terms = [
       "Price validity: 15 days from the quotation issue date unless revised in writing.",
       "Payment terms: 70% against material dispatch and 30% against successful installation and handover.",
@@ -1875,8 +1881,6 @@ export async function GET(
       docsCardHeight
     );
     y -= Math.max(bankCardHeight, docsCardHeight) + 18;
-
-    drawGenerationSection();
 
     remainingWriteups.forEach((writeup: QuotationWriteupEntry) => {
       drawWriteupSection(writeup.title, writeup.content);
