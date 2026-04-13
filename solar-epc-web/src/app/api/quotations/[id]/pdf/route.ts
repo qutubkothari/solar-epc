@@ -918,29 +918,6 @@ export async function GET(
       isSection: row.responsibility === "Section",
     }));
 
-    const companyRows = [
-      companySettings?.companyName || "Hi-Tech Solar",
-      companySettings?.contactAddress || "",
-      companySettings?.taxId ? `GSTIN: ${companySettings.taxId}` : "",
-    ]
-      .map((value) => sanitizeText(value))
-      .filter(Boolean);
-
-    const clientRows = [
-      quotation.client.name,
-      quotation.client.contactName ? `Contact: ${quotation.client.contactName}` : "",
-      quotation.client.email ? `Email: ${quotation.client.email}` : "",
-      quotation.client.phone || quotation.client.mobile
-        ? `Phone: ${quotation.client.phone || quotation.client.mobile}`
-        : "",
-      quotation.client.address || quotation.client.billingAddress
-        ? `Address: ${quotation.client.address || quotation.client.billingAddress}`
-        : "",
-      quotation.client.taxId ? `GSTIN: ${quotation.client.taxId}` : "",
-    ]
-      .map((value) => sanitizeText(value))
-      .filter(Boolean);
-
     let { page, y } = createPage(false);
 
     const metaLeftWidth = 240;
@@ -1035,54 +1012,7 @@ export async function GET(
       metaCursorY -= rightRowHeights[index];
     });
 
-    y -= metaHeight + 14;
-
-    const cardGap = 12;
-    const cardWidth = (CONTENT_WIDTH - cardGap) / 2;
-    const companyLineCount = companyRows.reduce((count, row) => count + wrapText(row, cardWidth - 20, 8).length, 0);
-    const clientLineCount = clientRows.reduce((count, row) => count + wrapText(row, cardWidth - 20, 8).length, 0);
-    const cardHeight = Math.max(76, 28 + Math.max(companyLineCount, clientLineCount) * 11);
-
-    const drawInfoCard = (title: string, rows: string[], x: number) => {
-      page.drawRectangle({
-        x,
-        y: y - cardHeight,
-        width: cardWidth,
-        height: cardHeight,
-        color: white,
-        borderColor: border,
-        borderWidth: 1,
-      });
-      page.drawRectangle({
-        x,
-        y: y - 24,
-        width: cardWidth,
-        height: 24,
-        color: softFill,
-      });
-      drawText(page, title, x + 10, y - 16, 9, true, secondary);
-
-      let cursorY = y - 38;
-      rows.forEach((row, index) => {
-        const isHeading = index === 0;
-        const consumed = drawWrapped(
-          page,
-          row,
-          x + 10,
-          cursorY,
-          cardWidth - 20,
-          isHeading ? 9 : 8,
-          isHeading,
-          isHeading ? accent : muted,
-          11
-        );
-        cursorY -= consumed + 1;
-      });
-    };
-
-    drawInfoCard("From", companyRows, MARGIN);
-    drawInfoCard("Bill To", clientRows, MARGIN + cardWidth + cardGap);
-    y -= cardHeight + 18;
+    y -= metaHeight + 20;
 
     const executiveSummaryWriteup = quotationWriteups.find((entry: QuotationWriteupEntry) => entry.key === "executive-summary");
     const additionalWriteups = quotationWriteups.filter((entry: QuotationWriteupEntry) => entry.key !== "executive-summary");
@@ -1092,13 +1022,13 @@ export async function GET(
     );
 
     const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.5);
-    const executiveSummaryHeight = 38 + summaryLines.length * 11;
+    const executiveSummaryHeight = 42 + summaryLines.length * 11;
     if (y - executiveSummaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
 
     drawText(page, executiveSummaryWriteup?.title || "Executive Summary", MARGIN, y, 12.5, true, accent);
-    y -= 16;
+    y -= 18;
     page.drawRectangle({
       x: MARGIN,
       y: y - (executiveSummaryHeight - 12),
