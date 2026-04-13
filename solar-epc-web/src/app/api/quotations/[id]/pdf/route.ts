@@ -845,39 +845,6 @@ export async function GET(
     const roiLifetimeNetSavings = roiProjection.lifetimeNetSavings;
     const roiEstimatedPaybackYears = roiProjection.estimatedPaybackYears;
 
-    const descriptionOfServices = [
-      "Engineering: Detailed site survey, feasibility analysis, and complete electrical and structural design.",
-      "Procurement: Solar PV modules, inverters, structures, cables, connectors, switchgear, and protection systems compliant with BIS and IEC standards.",
-      "Construction & Installation: Civil works, structure installation, module mounting, cabling, earthing, lightning protection, and grid synchronization.",
-      "Testing & Commissioning: Pre-commissioning checks, energization, performance validation, and authority coordination.",
-      "Training & Support: Basic operator training, handover support, and post-installation technical assistance.",
-      "Documentation & Approvals: Assistance for approvals, as-built records, warranty papers, and handover documentation.",
-    ];
-
-    const drawDescriptionOfServicesSection = () => {
-      const serviceLines = descriptionOfServices.flatMap((entry) => bulletizeDescription(entry, CONTENT_WIDTH - 22, 8.2));
-      const servicesHeight = 34 + serviceLines.length * 11;
-      if (y - servicesHeight < FOOTER_TOP + 16) {
-        ({ page, y } = createPage(true));
-      }
-
-      drawText(page, "Description of Services", MARGIN, y, 12.5, true, accent);
-      y -= 16;
-      page.drawRectangle({
-        x: MARGIN,
-        y: y - (servicesHeight - 18),
-        width: CONTENT_WIDTH,
-        height: servicesHeight - 18,
-        color: white,
-        borderColor: border,
-        borderWidth: 1,
-      });
-      serviceLines.forEach((line, index) => {
-        drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.2, false, muted);
-      });
-      y -= servicesHeight + 10;
-    };
-
     const technicalRows = [
       ["System Size", `${documentData.totalKw.toFixed(2)} Kwp`, ""],
       ["System Type", documentData.systemType, inverterDisplay?.itemType || ""],
@@ -1040,11 +1007,17 @@ export async function GET(
     y -= metaHeight + 20;
 
     const executiveSummaryWriteup = quotationWriteups.find((entry: QuotationWriteupEntry) => entry.key === "executive-summary");
+    const descriptionOfServicesWriteup = quotationWriteups.find(
+      (entry: QuotationWriteupEntry) => entry.key === "description-of-services"
+    );
     const technicalConsiderationsWriteup = quotationWriteups.find(
       (entry: QuotationWriteupEntry) => entry.key === "technical-considerations"
     );
     const remainingWriteups = quotationWriteups.filter(
-      (entry: QuotationWriteupEntry) => entry.key !== "executive-summary" && entry.key !== "technical-considerations"
+      (entry: QuotationWriteupEntry) =>
+        entry.key !== "executive-summary" &&
+        entry.key !== "description-of-services" &&
+        entry.key !== "technical-considerations"
     );
     const executiveSummary = sanitizeText(
       executiveSummaryWriteup?.content ||
@@ -1072,6 +1045,10 @@ export async function GET(
       drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.5, false, muted);
     });
     y -= executiveSummaryHeight + 10;
+
+    if (descriptionOfServicesWriteup) {
+      drawWriteupSection(descriptionOfServicesWriteup.title, descriptionOfServicesWriteup.content);
+    }
 
     const technicalColumns = [
       { label: "Parameter", x: MARGIN, width: 150 },
@@ -1997,8 +1974,6 @@ export async function GET(
     y -= Math.max(bankCardHeight, docsCardHeight) + 18;
 
     drawGenerationSection();
-
-    drawDescriptionOfServicesSection();
 
     remainingWriteups.forEach((writeup: QuotationWriteupEntry) => {
       drawWriteupSection(writeup.title, writeup.content);
