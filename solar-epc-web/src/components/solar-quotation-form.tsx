@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
@@ -82,6 +82,7 @@ type SolarQuotationFormProps = {
   initialDocumentData?: QuotationDocumentData;
   initialBoqRows?: BoqDraftRow[];
   clientName?: string;
+  clientContactName?: string;
   inquiryTitle?: string;
 };
 
@@ -155,6 +156,7 @@ export function SolarQuotationForm({
   initialDocumentData,
   initialBoqRows,
   clientName,
+  clientContactName,
   inquiryTitle,
 }: SolarQuotationFormProps) {
   const isEditing = Boolean(quotationId && editVersionId);
@@ -166,6 +168,7 @@ export function SolarQuotationForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [activeTab, setActiveTab] = useState<QuotationFormTab>("overview");
+  const lastAutoFilledCustomerContactRef = useRef("");
   const [formData, setFormData] = useState({
     clientId: defaultClientId || "",
     inquiryId: defaultInquiryId || "",
@@ -211,6 +214,7 @@ export function SolarQuotationForm({
     label: client.name,
   }));
   const selectedClient = clients.find((entry) => entry.id === formData.clientId);
+  const selectedClientContactName = selectedClient?.contactName?.trim() || clientContactName?.trim() || "";
 
   const inquiryOptions = inquiries
     .filter((inquiry) => !formData.clientId || inquiry.clientId === formData.clientId)
@@ -265,22 +269,33 @@ export function SolarQuotationForm({
   }, [formData.title, inquiryTitle]);
 
   useEffect(() => {
-    const clientContactName = selectedClient?.contactName?.trim();
-    if (!clientContactName) {
+    if (!selectedClientContactName) {
       return;
     }
 
     setDocumentData((prev) => {
-      if (prev.customerContactPerson.trim()) {
+      const currentCustomerContact = prev.customerContactPerson.trim();
+
+      if (
+        currentCustomerContact &&
+        currentCustomerContact !== lastAutoFilledCustomerContactRef.current
+      ) {
         return prev;
       }
 
+      if (currentCustomerContact === selectedClientContactName) {
+        lastAutoFilledCustomerContactRef.current = selectedClientContactName;
+        return prev;
+      }
+
+      lastAutoFilledCustomerContactRef.current = selectedClientContactName;
+
       return {
         ...prev,
-        customerContactPerson: clientContactName,
+        customerContactPerson: selectedClientContactName,
       };
     });
-  }, [selectedClient?.contactName]);
+  }, [formData.clientId, selectedClientContactName]);
 
   const safeModuleWattage = Math.max(documentData.moduleWattage || 0, 0);
   const numberOfModules = Math.max(Number(documentData.numberOfModules || 0), 0);
@@ -467,7 +482,7 @@ export function SolarQuotationForm({
   const roiYear1NetSavings = roiProjection.year1NetSavings;
   const roiEstimatedPaybackYears = roiProjection.estimatedPaybackYears;
   const roiLifetimeNetSavings = roiProjection.lifetimeNetSavings;
-  const resolvedCustomerContactPerson = documentData.customerContactPerson.trim() || selectedClient?.contactName?.trim() || "";
+  const resolvedCustomerContactPerson = documentData.customerContactPerson.trim() || selectedClientContactName;
   const missingOverviewFields = OVERVIEW_REQUIRED_FIELDS.filter(({ key }) => {
     if (key === "customerContactPerson") {
       return !resolvedCustomerContactPerson;
@@ -1292,7 +1307,7 @@ export function SolarQuotationForm({
                 type="text"
                 value={documentData.customerContactPerson}
                 onChange={(event) => setDocumentField("customerContactPerson", event.target.value)}
-                placeholder={selectedClient?.contactName ? `Saved client contact: ${selectedClient.contactName}` : "Customer contact person"}
+                placeholder={selectedClientContactName ? `Saved client contact: ${selectedClientContactName}` : "Customer contact person"}
                 className={`${userInputClassName} ${missingOverviewFields.some((field) => field.key === "customerContactPerson") ? "ring-2 ring-red-300" : ""}`}
               />
             </div>
