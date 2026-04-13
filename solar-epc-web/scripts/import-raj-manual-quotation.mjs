@@ -124,7 +124,7 @@ const requiredDocuments = [
   "Authorisation letter",
 ];
 
-const toDataUrl = async (filePath: string) => {
+const toDataUrl = async (filePath) => {
   const fileBuffer = await fs.readFile(filePath);
   const ext = path.extname(filePath).replace(".", "").toLowerCase() || "png";
   return `data:image/${ext};base64,${fileBuffer.toString("base64")}`;
