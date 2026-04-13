@@ -15,8 +15,8 @@ const MARGIN = 32;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const FOOTER_TOP = 42;
 const FOOTER_Y = 22;
-const FIRST_PAGE_HEADER_HEIGHT = 136;
-const CONTINUATION_HEADER_HEIGHT = 100;
+const FIRST_PAGE_HEADER_HEIGHT = 146;
+const CONTINUATION_HEADER_HEIGHT = 108;
 
 type QuoteLine = {
   title: string;
@@ -218,6 +218,27 @@ export async function GET(
         font: bold ? boldFont : regularFont,
         color,
       });
+    };
+
+    const fitTextSize = (
+      text: string,
+      maxWidth: number,
+      preferredSize: number,
+      minimumSize: number,
+      bold = false
+    ) => {
+      const safe = sanitizeText(text);
+      if (!safe) {
+        return preferredSize;
+      }
+
+      const font = bold ? boldFont : regularFont;
+      let size = preferredSize;
+      while (size > minimumSize && measureWidth(safe, size, font) > maxWidth) {
+        size -= 0.5;
+      }
+
+      return size;
     };
 
     const drawRightAligned = (
@@ -637,11 +658,14 @@ export async function GET(
       pages.push(page);
       const headerHeight = isContinuation ? CONTINUATION_HEADER_HEIGHT : FIRST_PAGE_HEADER_HEIGHT;
       const subHeaderHeight = 24;
-      const logoSize = isContinuation ? 34 : 48;
-      const logoY = PAGE_HEIGHT - (isContinuation ? 72 : 96);
-      const titleY = PAGE_HEIGHT - (isContinuation ? 44 : 56);
-      const subtitleY = PAGE_HEIGHT - (isContinuation ? 57 : 72);
-      const contactY = PAGE_HEIGHT - (isContinuation ? 68 : 88);
+      const logoMaxWidth = isContinuation ? 36 : 44;
+      const logoMaxHeight = isContinuation ? 36 : 44;
+      const logoTopInset = isContinuation ? 14 : 18;
+      const textStartX = MARGIN + (isContinuation ? 48 : 60);
+      const textBlockWidth = PAGE_WIDTH - textStartX - MARGIN;
+      const titleY = PAGE_HEIGHT - (isContinuation ? 34 : 48);
+      const subtitleY = PAGE_HEIGHT - (isContinuation ? 49 : 66);
+      const contactY = PAGE_HEIGHT - (isContinuation ? 64 : 84);
       const subHeaderY = PAGE_HEIGHT - headerHeight;
 
       page.drawRectangle({
@@ -674,20 +698,40 @@ export async function GET(
 
       if (embeddedLogo) {
         const scaled = embeddedLogo.scale(1);
-        const ratio = Math.min(logoSize / scaled.width, logoSize / scaled.height);
+        const ratio = Math.min(logoMaxWidth / scaled.width, logoMaxHeight / scaled.height);
+        const logoWidth = scaled.width * ratio;
+        const logoHeight = scaled.height * ratio;
         page.drawImage(embeddedLogo, {
           x: MARGIN,
-          y: logoY,
-          width: scaled.width * ratio,
-          height: scaled.height * ratio,
+          y: PAGE_HEIGHT - logoTopInset - logoHeight,
+          width: logoWidth,
+          height: logoHeight,
         });
       } else {
         drawFallbackLogo(page, isContinuation);
       }
 
-      drawText(page, companySettings?.companyName || "Hi-Tech Solar", MARGIN + 56, titleY, isContinuation ? 16 : 20, true, white);
+      const companyName = companySettings?.companyName || "Hi-Tech Solar";
+      const companyNameSize = fitTextSize(
+        companyName,
+        textBlockWidth,
+        isContinuation ? 16 : 20,
+        isContinuation ? 13 : 16,
+        true
+      );
+      drawText(page, companyName, textStartX, titleY, companyNameSize, true, white);
       if (companySettings?.companyTagline) {
-        drawText(page, companySettings.companyTagline, MARGIN + 56, subtitleY, isContinuation ? 7.5 : 9, false, rgb(0.89, 0.92, 0.97));
+        drawWrapped(
+          page,
+          companySettings.companyTagline,
+          textStartX,
+          subtitleY,
+          textBlockWidth,
+          isContinuation ? 7 : 8,
+          false,
+          rgb(0.89, 0.92, 0.97),
+          isContinuation ? 8 : 9
+        );
       }
 
       const contactBits = [companySettings?.contactPhone, companySettings?.contactEmail, companySettings?.website]
@@ -695,7 +739,7 @@ export async function GET(
         .filter(Boolean)
         .join(" | ");
       if (contactBits && !isContinuation) {
-        drawText(page, contactBits, MARGIN + 56, contactY, 8, false, rgb(0.88, 0.91, 0.95));
+        drawWrapped(page, contactBits, textStartX, contactY, textBlockWidth, 7, false, rgb(0.88, 0.91, 0.95), 8);
       }
 
       drawText(page, "Quotation", MARGIN, subHeaderY + 8, 9, true, accent);
