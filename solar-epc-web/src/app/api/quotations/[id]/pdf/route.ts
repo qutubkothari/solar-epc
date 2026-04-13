@@ -18,20 +18,13 @@ const FOOTER_Y = 22;
 const FIRST_PAGE_HEADER_HEIGHT = 146;
 const CONTINUATION_HEADER_HEIGHT = 108;
 
-type QuoteLine = {
-  title: string;
-  detail: string;
-  quantity: number;
-  rate: number;
-  amount: number;
-};
-
-type Column = {
-  key: "title" | "detail" | "quantity" | "rate" | "amount";
-  label: string;
-  x: number;
-  width: number;
-  align?: "left" | "right";
+type BoqDisplayRow = {
+  srNo: string;
+  itemName: string;
+  make: string;
+  description: string;
+  unit: string;
+  quantity: string;
 };
 
 export async function GET(
@@ -762,13 +755,15 @@ export async function GET(
     const documentData = normalizeQuotationDocumentData(versionDocumentData);
     const manualBoqRows = documentData.billOfQuantityRows;
 
-    const lines: QuoteLine[] = version.items.map((item: VersionItemEntry) => ({
-      title: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
-      detail: sanitizeText(item.item.description || item.description || item.item.name || ""),
-      quantity: Number(item.quantity || 0),
-      rate: Number(item.rate || 0),
-      amount: Number(item.lineTotal || 0),
+    const generatedBoqRows: BoqDisplayRow[] = version.items.map((item: VersionItemEntry, index) => ({
+      srNo: String(index + 1),
+      itemName: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
+      make: sanitizeText(item.item.brand || "-") || "-",
+      description: sanitizeText(item.item.description || item.description || item.item.name || "-"),
+      unit: sanitizeText(item.item.uom || "-") || "-",
+      quantity: Number(item.quantity || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 }),
     }));
+    const boqRows: BoqDisplayRow[] = manualBoqRows.length > 0 ? manualBoqRows : generatedBoqRows;
 
     const findVersionItem = (head: string, includesText?: string) =>
       version.items.find((entry: VersionItemEntry) => {
@@ -1225,161 +1220,69 @@ export async function GET(
       y -= generationNoteHeight + 18;
     };
 
-    if (manualBoqRows.length > 0) {
-      const boqColumns = [
-        { label: "Sr No", x: MARGIN, width: 38 },
-        { label: "Item Name", x: MARGIN + 38, width: 110 },
-        { label: "Make", x: MARGIN + 148, width: 105 },
-        { label: "Description", x: MARGIN + 253, width: 196 },
-        { label: "Unit", x: MARGIN + 449, width: 38 },
-        { label: "Quantity", x: MARGIN + 487, width: 44 },
-      ];
+    const boqColumns = [
+      { label: "Sr No", x: MARGIN, width: 38 },
+      { label: "Item Name", x: MARGIN + 38, width: 110 },
+      { label: "Make", x: MARGIN + 148, width: 105 },
+      { label: "Description", x: MARGIN + 253, width: 196 },
+      { label: "Unit", x: MARGIN + 449, width: 38 },
+      { label: "Quantity", x: MARGIN + 487, width: 44 },
+    ];
 
-      const drawManualBoqHeader = (targetPage: PDFPage, topY: number) => {
-        targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: primary });
-        boqColumns.forEach((column) => {
-          drawText(targetPage, column.label, column.x + 5, topY - 16, 8.2, true, white);
-        });
-      };
+    const drawBoqHeader = (targetPage: PDFPage, topY: number) => {
+      targetPage.drawRectangle({ x: MARGIN, y: topY - 24, width: CONTENT_WIDTH, height: 24, color: primary });
+      boqColumns.forEach((column) => {
+        drawText(targetPage, column.label, column.x + 5, topY - 16, 8.2, true, white);
+      });
+    };
 
-      drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-      y -= 10;
-      drawManualBoqHeader(page, y);
-      y -= 28;
+    drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+    y -= 10;
+    drawBoqHeader(page, y);
+    y -= 28;
 
-      manualBoqRows.forEach((row, index) => {
-        const srLines = wrapText(row.srNo, boqColumns[0].width - 10, 7.2, true);
-        const itemLines = wrapText(row.itemName, boqColumns[1].width - 10, 8, true);
-        const makeLines = wrapText(row.make || "-", boqColumns[2].width - 10, 7.6);
-        const descriptionLines = wrapText(row.description, boqColumns[3].width - 10, 7.4);
-        const unitLines = wrapText(row.unit || "-", boqColumns[4].width - 10, 7.5, true);
-        const quantityLines = wrapText(row.quantity || "-", boqColumns[5].width - 10, 7.5, true);
-        const lineCount = Math.max(srLines.length, itemLines.length, makeLines.length, descriptionLines.length, unitLines.length, quantityLines.length, 1);
-        const rowHeight = 12 + lineCount * 9;
+    boqRows.forEach((row, index) => {
+      const srLines = wrapText(row.srNo, boqColumns[0].width - 10, 7.2, true);
+      const itemLines = wrapText(row.itemName, boqColumns[1].width - 10, 8, true);
+      const makeLines = wrapText(row.make || "-", boqColumns[2].width - 10, 7.6);
+      const descriptionLines = wrapText(row.description, boqColumns[3].width - 10, 7.4);
+      const unitLines = wrapText(row.unit || "-", boqColumns[4].width - 10, 7.5, true);
+      const quantityLines = wrapText(row.quantity || "-", boqColumns[5].width - 10, 7.5, true);
+      const lineCount = Math.max(srLines.length, itemLines.length, makeLines.length, descriptionLines.length, unitLines.length, quantityLines.length, 1);
+      const rowHeight = 12 + lineCount * 9;
 
-        if (y - rowHeight < FOOTER_TOP + 16) {
-          ({ page, y } = createPage(true));
-          drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-          y -= 10;
-          drawManualBoqHeader(page, y);
-          y -= 28;
-        }
+      if (y - rowHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+        drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
+        y -= 10;
+        drawBoqHeader(page, y);
+        y -= 28;
+      }
 
-        page.drawRectangle({
-          x: MARGIN,
-          y: y - rowHeight,
-          width: CONTENT_WIDTH,
-          height: rowHeight,
-          color: index % 2 === 0 ? white : softFill,
-          borderColor: subtleLine,
-          borderWidth: 1,
-        });
-        boqColumns.slice(1).forEach((column) => {
-          page.drawLine({ start: { x: column.x, y }, end: { x: column.x, y: y - rowHeight }, thickness: 1, color: subtleLine });
-        });
-
-        srLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[0].x + 5, y - 13 - lineIndex * 9, 7.2, true, accent));
-        itemLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[1].x + 5, y - 13 - lineIndex * 9, 8, true, accent));
-        makeLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[2].x + 5, y - 13 - lineIndex * 9, 7.6, false, accent));
-        descriptionLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[3].x + 5, y - 13 - lineIndex * 9, 7.4, false, muted));
-        unitLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[4].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
-        quantityLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[5].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
-
-        y -= rowHeight;
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - rowHeight,
+        width: CONTENT_WIDTH,
+        height: rowHeight,
+        color: index % 2 === 0 ? white : softFill,
+        borderColor: subtleLine,
+        borderWidth: 1,
+      });
+      boqColumns.slice(1).forEach((column) => {
+        page.drawLine({ start: { x: column.x, y }, end: { x: column.x, y: y - rowHeight }, thickness: 1, color: subtleLine });
       });
 
-      y -= 18;
-    } else {
-      const columns: Column[] = [
-        { key: "title", label: "Item Head", x: MARGIN, width: 92 },
-        { key: "detail", label: "Description", x: MARGIN + 92, width: 225 },
-        { key: "quantity", label: "Qty", x: MARGIN + 317, width: 42, align: "right" },
-        { key: "rate", label: "Rate", x: MARGIN + 359, width: 74, align: "right" },
-        { key: "amount", label: "Amount", x: MARGIN + 433, width: 98, align: "right" },
-      ];
+      srLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[0].x + 5, y - 13 - lineIndex * 9, 7.2, true, accent));
+      itemLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[1].x + 5, y - 13 - lineIndex * 9, 8, true, accent));
+      makeLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[2].x + 5, y - 13 - lineIndex * 9, 7.6, false, accent));
+      descriptionLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[3].x + 5, y - 13 - lineIndex * 9, 7.4, false, muted));
+      unitLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[4].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
+      quantityLines.forEach((line, lineIndex) => drawText(page, line, boqColumns[5].x + 5, y - 13 - lineIndex * 9, 7.5, true, accent));
 
-      const drawTableHeader = (targetPage: PDFPage, topY: number) => {
-        targetPage.drawRectangle({
-          x: MARGIN,
-          y: topY - 24,
-          width: CONTENT_WIDTH,
-          height: 24,
-          color: primary,
-        });
+      y -= rowHeight;
+    });
 
-        columns.forEach((column) => {
-          if (column.align === "right") {
-            drawRightAligned(targetPage, column.label, column.x, column.width, topY - 16, 9, true, white);
-          } else {
-            drawText(targetPage, column.label, column.x + 6, topY - 16, 9, true, white);
-          }
-        });
-      };
-
-      drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-      y -= 10;
-      drawTableHeader(page, y);
-      y -= 28;
-
-      lines.forEach((line, index) => {
-        const titleLines = wrapText(line.title, 80, 8.5, true).slice(0, 4);
-        const detailLines = bulletizeDescription(line.detail, 213, 7.5);
-        const lineCount = Math.max(titleLines.length, detailLines.length, 1);
-        const rowHeight = 12 + lineCount * 10;
-
-        if (y - rowHeight < FOOTER_TOP + 16) {
-          ({ page, y } = createPage(true));
-          drawText(page, "A Billing of Quantities", MARGIN, y, 12.5, true, accent);
-          y -= 10;
-          drawTableHeader(page, y);
-          y -= 28;
-        }
-
-        page.drawRectangle({
-          x: MARGIN,
-          y: y - rowHeight,
-          width: CONTENT_WIDTH,
-          height: rowHeight,
-          color: index % 2 === 0 ? white : softFill,
-          borderColor: subtleLine,
-          borderWidth: 1,
-        });
-
-        columns.slice(1).forEach((column) => {
-          page.drawLine({
-            start: { x: column.x, y: y },
-            end: { x: column.x, y: y - rowHeight },
-            thickness: 1,
-            color: subtleLine,
-          });
-        });
-
-        titleLines.forEach((titleLine, titleIndex) => {
-          drawText(page, titleLine, columns[0].x + 6, y - 14 - titleIndex * 10, 8.5, true, accent);
-        });
-
-        detailLines.forEach((detailLine, detailIndex) => {
-          drawText(page, detailLine, columns[1].x + 6, y - 14 - detailIndex * 10, 7.5, false, muted);
-        });
-
-        drawRightAligned(
-          page,
-          line.quantity.toLocaleString("en-IN", { maximumFractionDigits: 2 }),
-          columns[2].x,
-          columns[2].width,
-          y - 14,
-          8,
-          false,
-          accent
-        );
-        drawRightAligned(page, formatCurrency(line.rate), columns[3].x, columns[3].width, y - 14, 8, false, accent);
-        drawRightAligned(page, formatCurrency(line.amount), columns[4].x, columns[4].width, y - 14, 8.5, true, accent);
-
-        y -= rowHeight;
-      });
-
-      y -= 18;
-    }
+    y -= 18;
 
     const scopeColumns = [
       { label: "Sr", x: MARGIN, width: 42 },
