@@ -854,6 +854,30 @@ export async function GET(
       "Documentation & Approvals: Assistance for approvals, as-built records, warranty papers, and handover documentation.",
     ];
 
+    const drawDescriptionOfServicesSection = () => {
+      const serviceLines = descriptionOfServices.flatMap((entry) => bulletizeDescription(entry, CONTENT_WIDTH - 22, 8.2));
+      const servicesHeight = 34 + serviceLines.length * 11;
+      if (y - servicesHeight < FOOTER_TOP + 16) {
+        ({ page, y } = createPage(true));
+      }
+
+      drawText(page, "Description of Services", MARGIN, y, 12.5, true, accent);
+      y -= 16;
+      page.drawRectangle({
+        x: MARGIN,
+        y: y - (servicesHeight - 18),
+        width: CONTENT_WIDTH,
+        height: servicesHeight - 18,
+        color: white,
+        borderColor: border,
+        borderWidth: 1,
+      });
+      serviceLines.forEach((line, index) => {
+        drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.2, false, muted);
+      });
+      y -= servicesHeight + 10;
+    };
+
     const technicalRows = [
       ["System Size", `${documentData.totalKw.toFixed(2)} Kwp`, ""],
       ["System Type", documentData.systemType, inverterDisplay?.itemType || ""],
@@ -1016,7 +1040,12 @@ export async function GET(
     y -= metaHeight + 20;
 
     const executiveSummaryWriteup = quotationWriteups.find((entry: QuotationWriteupEntry) => entry.key === "executive-summary");
-    const additionalWriteups = quotationWriteups.filter((entry: QuotationWriteupEntry) => entry.key !== "executive-summary");
+    const technicalConsiderationsWriteup = quotationWriteups.find(
+      (entry: QuotationWriteupEntry) => entry.key === "technical-considerations"
+    );
+    const remainingWriteups = quotationWriteups.filter(
+      (entry: QuotationWriteupEntry) => entry.key !== "executive-summary" && entry.key !== "technical-considerations"
+    );
     const executiveSummary = sanitizeText(
       executiveSummaryWriteup?.content ||
         `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
@@ -1043,28 +1072,6 @@ export async function GET(
       drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.5, false, muted);
     });
     y -= executiveSummaryHeight + 10;
-
-    const serviceLines = descriptionOfServices.flatMap((entry) => bulletizeDescription(entry, CONTENT_WIDTH - 22, 8.2));
-    const servicesHeight = 34 + serviceLines.length * 11;
-    if (y - servicesHeight < FOOTER_TOP + 16) {
-      ({ page, y } = createPage(true));
-    }
-
-    drawText(page, "Description of Services", MARGIN, y, 12.5, true, accent);
-    y -= 16;
-    page.drawRectangle({
-      x: MARGIN,
-      y: y - (servicesHeight - 18),
-      width: CONTENT_WIDTH,
-      height: servicesHeight - 18,
-      color: white,
-      borderColor: border,
-      borderWidth: 1,
-    });
-    serviceLines.forEach((line, index) => {
-      drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.2, false, muted);
-    });
-    y -= servicesHeight + 10;
 
     const technicalColumns = [
       { label: "Parameter", x: MARGIN, width: 150 },
@@ -1492,6 +1499,12 @@ export async function GET(
       remarkLines.forEach((line, lineIndex) => drawText(page, line, scopeColumns[3].x + 6, y - 14 - lineIndex * 10, 7.5, false, muted));
       y -= rowHeight;
     });
+
+    y -= 18;
+
+    if (technicalConsiderationsWriteup) {
+      drawWriteupSection(technicalConsiderationsWriteup.title, technicalConsiderationsWriteup.content);
+    }
 
     const summaryWidth = 250;
     const summaryHeight = 168;
@@ -1985,7 +1998,9 @@ export async function GET(
 
     drawGenerationSection();
 
-    additionalWriteups.forEach((writeup: QuotationWriteupEntry) => {
+    drawDescriptionOfServicesSection();
+
+    remainingWriteups.forEach((writeup: QuotationWriteupEntry) => {
       drawWriteupSection(writeup.title, writeup.content);
     });
 
