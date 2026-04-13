@@ -943,9 +943,38 @@ export async function GET(
 
     let { page, y } = createPage(false);
 
-    const metaHeight = 110;
     const metaLeftWidth = 240;
     const metaRightWidth = CONTENT_WIDTH - metaLeftWidth;
+    const metaPaddingTop = 16;
+    const metaPaddingBottom = 14;
+    const metaLabelX = MARGIN + metaLeftWidth + 14;
+    const metaValueX = MARGIN + metaLeftWidth + 78;
+    const metaValueWidth = metaRightWidth - 84;
+    const projectMetaRows = [
+      ["Client", quotation.client.name],
+      ["Prepared For", documentData.preparedFor || quotation.title],
+      ["Customer Contact", documentData.customerContactPerson || quotation.client.contactName || "-"],
+      ["Consumer Type", documentData.consumerType],
+      ["Consumer No.", documentData.consumerNumber || "-"],
+      ["Prepared By", documentData.preparedBy],
+      ["Issued", formatDate(version.createdAt)],
+      ["Valid Till", formatDate(validUntil)],
+    ] as const;
+    const leftTitleHeight = 14;
+    const leftSubtitleHeight = wrapText(`${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, metaLeftWidth - 24, 13, true).length * 15;
+    const leftQuoteHeight = wrapText(quotation.title, metaLeftWidth - 24, 8.5).length * 10.5;
+    const leftOfferHeight = version.brand
+      ? Math.max(10, wrapText(version.brand, metaLeftWidth - 60, 8.5, true).length * 10) + 12
+      : 0;
+    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + leftOfferHeight + 10;
+
+    const rightRowHeights = projectMetaRows.map(([, value]) => {
+      const lineCount = wrapText(value, metaValueWidth, 8.2).length;
+      return Math.max(9.5, lineCount * 9.5) + 2;
+    });
+    const rightContentHeight = rightRowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0);
+    const metaHeight = Math.max(110, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
+
     page.drawRectangle({
       x: MARGIN,
       y: y - metaHeight,
@@ -976,30 +1005,35 @@ export async function GET(
       color: border,
     });
 
-    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, y - 22, 14, true, accent);
-    drawText(page, `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, MARGIN + 12, y - 42, 13, true, secondary);
-    drawText(page, quotation.title, MARGIN + 12, y - 60, 8.5, false, muted);
-    const metaLabelX = MARGIN + metaLeftWidth + 14;
-    const metaValueX = MARGIN + metaLeftWidth + 78;
-    const projectMetaRows = [
-      ["Client", quotation.client.name],
-      ["Prepared For", documentData.preparedFor || quotation.title],
-      ["Customer Contact", documentData.customerContactPerson || quotation.client.contactName || "-"],
-      ["Consumer Type", documentData.consumerType],
-      ["Consumer No.", documentData.consumerNumber || "-"],
-      ["Prepared By", documentData.preparedBy],
-      ["Issued", formatDate(version.createdAt)],
-      ["Valid Till", formatDate(validUntil)],
-    ];
-    projectMetaRows.forEach(([label, value], index) => {
-      const rowY = y - 18 - index * 11;
-      drawText(page, label, metaLabelX, rowY, 8.2, true, muted);
-      drawWrapped(page, value, metaValueX, rowY, metaRightWidth - 84, 8.2, false, accent, 9.5);
-    });
+    let leftCursorY = y - metaPaddingTop - 4;
+    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, leftCursorY, 14, true, accent);
+    leftCursorY -= 20;
+    const consumedSubtitle = drawWrapped(
+      page,
+      `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`,
+      MARGIN + 12,
+      leftCursorY,
+      metaLeftWidth - 24,
+      13,
+      true,
+      secondary,
+      15
+    );
+    leftCursorY -= consumedSubtitle + 3;
+    const consumedQuote = drawWrapped(page, quotation.title, MARGIN + 12, leftCursorY, metaLeftWidth - 24, 8.5, false, muted, 10.5);
+    leftCursorY -= consumedQuote + 6;
     if (version.brand) {
-      drawText(page, "Offer", MARGIN + 12, y - 79, 8.5, true, muted);
-      drawWrapped(page, version.brand, MARGIN + 48, y - 79, metaLeftWidth - 60, 8.5, true, accent, 10);
+      drawText(page, "Offer", MARGIN + 12, leftCursorY, 8.5, true, muted);
+      drawWrapped(page, version.brand, MARGIN + 48, leftCursorY, metaLeftWidth - 60, 8.5, true, accent, 10);
     }
+
+    let metaCursorY = y - metaPaddingTop - 2;
+    projectMetaRows.forEach(([label, value], index) => {
+      const rowY = metaCursorY;
+      drawText(page, label, metaLabelX, rowY, 8.2, true, muted);
+      drawWrapped(page, value, metaValueX, rowY, metaValueWidth, 8.2, false, accent, 9.5);
+      metaCursorY -= rightRowHeights[index];
+    });
 
     y -= metaHeight + 14;
 
