@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
+import { SortableTableHeader } from "@/components/sortable-table-header";
 import { usePagination } from "@/hooks/use-pagination";
+import { useSortableData } from "@/hooks/use-sortable-data";
 import { InquiryForm } from "@/components/inquiry-form";
 import { MediaForm } from "@/components/media-form";
 import { ModalShell } from "@/components/modal-shell";
@@ -19,6 +21,8 @@ type Inquiry = {
     name: string;
   };
 };
+
+type InquirySortKey = "title" | "client" | "siteAddress" | "status";
 
 export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -44,6 +48,15 @@ export default function InquiriesPage() {
     fetchInquiries();
   }, []);
 
+  const { sortedItems, sortConfig, requestSort } = useSortableData<Inquiry, InquirySortKey>(inquiries, {
+    accessors: {
+      title: (inquiry) => inquiry.title,
+      client: (inquiry) => inquiry.client.name,
+      siteAddress: (inquiry) => inquiry.siteAddress || "",
+      status: (inquiry) => inquiry.status,
+    },
+  });
+
   const {
     currentPage,
     setCurrentPage,
@@ -53,7 +66,7 @@ export default function InquiriesPage() {
     startItem,
     endItem,
     paginatedItems: paginatedInquiries,
-  } = usePagination(inquiries, {
+  } = usePagination(sortedItems, {
     pageSize: 10,
     resetKey: inquiries.length,
   });
@@ -139,10 +152,10 @@ export default function InquiriesPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
                 <tr>
-                  <th className="px-4 py-3">Inquiry Title</th>
-                  <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Site</th>
-                  <th className="px-4 py-3">Status</th>
+                  <SortableTableHeader label="Inquiry Title" sortKey="title" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as InquirySortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Client" sortKey="client" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as InquirySortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Site" sortKey="siteAddress" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as InquirySortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Status" sortKey="status" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as InquirySortKey)} className="px-4 py-3" />
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>

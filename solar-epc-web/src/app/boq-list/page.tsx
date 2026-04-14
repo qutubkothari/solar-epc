@@ -4,8 +4,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { LayoutGrid, Rows3 } from "lucide-react";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
+import { SortableTableHeader } from "@/components/sortable-table-header";
 import { formatCurrency } from "@/lib/format";
 import { usePagination } from "@/hooks/use-pagination";
+import { useSortableData } from "@/hooks/use-sortable-data";
 import { ItemForm } from "@/components/item-form";
 import { ModalShell } from "@/components/modal-shell";
 import {
@@ -24,6 +26,8 @@ type BoqListItem = SolarBoqItem & {
   selectionUnit: string;
   isMapped: boolean;
 };
+
+type BoqSortKey = "sequence" | "itemHead" | "itemType" | "ratingOrCapacity" | "brand" | "unitPrice" | "taxPercent" | "selectionUnit";
 
 export default function BoqListPage() {
   const [items, setItems] = useState<SolarBoqItem[]>([]);
@@ -105,6 +109,20 @@ export default function BoqListPage() {
     });
   }, [boqItems, searchTerm, boqHeadFilter]);
 
+  const { sortedItems, sortConfig, requestSort } = useSortableData<BoqListItem, BoqSortKey>(filteredItems, {
+    initialSort: { key: "sequence", direction: "asc" },
+    accessors: {
+      sequence: (item) => item.sequence,
+      itemHead: (item) => item.itemHead,
+      itemType: (item) => item.itemType,
+      ratingOrCapacity: (item) => item.ratingOrCapacity,
+      brand: (item) => item.brand || "",
+      unitPrice: (item) => Number(item.unitPrice || 0),
+      taxPercent: (item) => Number(item.taxPercent || 0),
+      selectionUnit: (item) => item.selectionUnit,
+    },
+  });
+
   const {
     currentPage,
     setCurrentPage,
@@ -114,7 +132,7 @@ export default function BoqListPage() {
     startItem,
     endItem,
     paginatedItems,
-  } = usePagination(filteredItems, {
+  } = usePagination(sortedItems, {
     pageSize: 10,
     resetKey: `${searchTerm}|${boqHeadFilter}|${items.length}`,
   });
@@ -367,14 +385,14 @@ export default function BoqListPage() {
               <table className="min-w-full divide-y divide-solar-border text-sm">
                 <thead className="bg-solar-sand text-left text-xs font-semibold uppercase tracking-wide text-solar-muted">
                   <tr>
-                    <th className="px-4 py-3">Seq</th>
-                    <th className="px-4 py-3">BOQ Head</th>
-                    <th className="px-4 py-3">Item Type</th>
-                    <th className="px-4 py-3">Rating / Capacity</th>
-                    <th className="px-4 py-3">Brand</th>
-                    <th className="px-4 py-3">Unit Price</th>
-                    <th className="px-4 py-3">Tax</th>
-                    <th className="px-4 py-3">Quotation Unit</th>
+                    <SortableTableHeader label="Seq" sortKey="sequence" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="BOQ Head" sortKey="itemHead" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Item Type" sortKey="itemType" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Rating / Capacity" sortKey="ratingOrCapacity" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Brand" sortKey="brand" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Unit Price" sortKey="unitPrice" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Tax" sortKey="taxPercent" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
+                    <SortableTableHeader label="Quotation Unit" sortKey="selectionUnit" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as BoqSortKey)} className="px-4 py-3" />
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>

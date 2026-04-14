@@ -3,9 +3,11 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
+import { SortableTableHeader } from "@/components/sortable-table-header";
 import { SolarQuotationForm } from "@/components/solar-quotation-form";
 import { ModalShell } from "@/components/modal-shell";
 import { usePagination } from "@/hooks/use-pagination";
+import { useSortableData } from "@/hooks/use-sortable-data";
 import { formatCurrency } from "@/lib/format";
 import { normalizeQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
 import { resolveBoqItemHead } from "@/lib/solar-boq";
@@ -57,6 +59,8 @@ type Quotation = {
   } | null;
   versions: QuotationVersion[];
 };
+
+type QuotationSortKey = "title" | "client" | "versions" | "total" | "status";
 
 export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
@@ -119,6 +123,16 @@ export default function QuotationsPage() {
     });
   }, [quotes, searchQuery]);
 
+  const { sortedItems, sortConfig, requestSort } = useSortableData<Quotation, QuotationSortKey>(filteredQuotes, {
+    accessors: {
+      title: (quote) => quote.title,
+      client: (quote) => quote.client.name,
+      versions: (quote) => quote.versions.length,
+      total: (quote) => Number(quote.versions[0]?.grandTotal || 0),
+      status: (quote) => quote.status,
+    },
+  });
+
   const {
     currentPage,
     setCurrentPage,
@@ -128,7 +142,7 @@ export default function QuotationsPage() {
     startItem,
     endItem,
     paginatedItems: paginatedQuotes,
-  } = usePagination(filteredQuotes, {
+  } = usePagination(sortedItems, {
     pageSize: 10,
     resetKey: `${searchQuery}|${quotes.length}`,
   });
@@ -244,11 +258,11 @@ export default function QuotationsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
               <tr>
-                <th className="px-4 py-3">Quote ID</th>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Versions</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Status</th>
+                <SortableTableHeader label="Quote ID" sortKey="title" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as QuotationSortKey)} className="px-4 py-3" />
+                <SortableTableHeader label="Client" sortKey="client" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as QuotationSortKey)} className="px-4 py-3" />
+                <SortableTableHeader label="Versions" sortKey="versions" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as QuotationSortKey)} className="px-4 py-3" />
+                <SortableTableHeader label="Total" sortKey="total" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as QuotationSortKey)} className="px-4 py-3" />
+                <SortableTableHeader label="Status" sortKey="status" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as QuotationSortKey)} className="px-4 py-3" />
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>

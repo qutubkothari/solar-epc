@@ -5,7 +5,9 @@ import { SectionHeader } from "@/components/section-header";
 import { ClientForm } from "@/components/client-form";
 import { ModalShell } from "@/components/modal-shell";
 import { PaginationControls } from "@/components/pagination-controls";
+import { SortableTableHeader } from "@/components/sortable-table-header";
 import { usePagination } from "@/hooks/use-pagination";
+import { useSortableData } from "@/hooks/use-sortable-data";
 import Link from "next/link";
 
 type Client = {
@@ -48,6 +50,8 @@ const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-teal-100 text-teal-800",
   Lost: "bg-red-100 text-red-800",
 };
+
+type ClientSortKey = "name" | "contact" | "phone" | "status" | "followup";
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -120,6 +124,16 @@ export default function ClientsPage() {
     return result;
   }, [clients, query, statusFilter, followupFilter]);
 
+  const { sortedItems, sortConfig, requestSort } = useSortableData<Client, ClientSortKey>(filteredClients, {
+    accessors: {
+      name: (client) => client.name,
+      contact: (client) => client.contactName || client.email || "",
+      phone: (client) => client.mobile || client.phone || "",
+      status: (client) => client.status || "Lead",
+      followup: (client) => (client.nextFollowupDate ? new Date(client.nextFollowupDate).getTime() : Number.MAX_SAFE_INTEGER),
+    },
+  });
+
   const {
     currentPage,
     setCurrentPage,
@@ -129,7 +143,7 @@ export default function ClientsPage() {
     startItem,
     endItem,
     paginatedItems: paginatedClients,
-  } = usePagination(filteredClients, {
+  } = usePagination(sortedItems, {
     pageSize: 10,
     resetKey: `${query}|${statusFilter}|${followupFilter}|${clients.length}`,
   });
@@ -213,11 +227,11 @@ export default function ClientsPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
                 <tr>
-                  <th className="px-4 py-3">Company</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Follow-up</th>
+                  <SortableTableHeader label="Company" sortKey="name" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ClientSortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Contact" sortKey="contact" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ClientSortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Phone" sortKey="phone" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ClientSortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Status" sortKey="status" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ClientSortKey)} className="px-4 py-3" />
+                  <SortableTableHeader label="Follow-up" sortKey="followup" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ClientSortKey)} className="px-4 py-3" />
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>

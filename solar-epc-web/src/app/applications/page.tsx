@@ -6,6 +6,8 @@ import { SectionHeader } from "@/components/section-header";
 import { ApplicationForm } from "@/components/application-form";
 import { ModalShell } from "@/components/modal-shell";
 import { usePagination } from "@/hooks/use-pagination";
+import { SortableTableHeader } from "@/components/sortable-table-header";
+import { useSortableData } from "@/hooks/use-sortable-data";
 
 type ApplicationData = {
   id: string;
@@ -55,6 +57,8 @@ type Template = {
   title: string;
 };
 
+type ApplicationSortKey = "project" | "applicant" | "system" | "createdAt";
+
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationData[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -96,6 +100,15 @@ export default function ApplicationsPage() {
     fetchData();
   }, []);
 
+  const { sortedItems, sortConfig, requestSort } = useSortableData<ApplicationData, ApplicationSortKey>(applications, {
+    accessors: {
+      project: (application) => application.inquiry?.title || "Unassigned",
+      applicant: (application) => application.data.applicantName || "",
+      system: (application) => Number(application.data.systemCapacity || 0),
+      createdAt: (application) => new Date(application.createdAt).getTime(),
+    },
+  });
+
   const {
     currentPage,
     setCurrentPage,
@@ -105,7 +118,7 @@ export default function ApplicationsPage() {
     startItem,
     endItem,
     paginatedItems: paginatedApplications,
-  } = usePagination(applications, {
+  } = usePagination(sortedItems, {
     pageSize: 10,
     resetKey: applications.length,
   });
@@ -326,7 +339,15 @@ export default function ApplicationsPage() {
           <>
             <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-solar-border text-left text-solar-muted"><th className="pb-2 font-semibold">Project</th><th className="pb-2 font-semibold">Applicant</th><th className="pb-2 font-semibold">System</th><th className="pb-2 font-semibold">Created</th><th className="pb-2 font-semibold">Actions</th></tr></thead>
+              <thead>
+                <tr className="border-b border-solar-border text-left text-solar-muted">
+                  <SortableTableHeader label="Project" sortKey="project" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ApplicationSortKey)} className="pb-2 font-semibold" />
+                  <SortableTableHeader label="Applicant" sortKey="applicant" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ApplicationSortKey)} className="pb-2 font-semibold" />
+                  <SortableTableHeader label="System" sortKey="system" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ApplicationSortKey)} className="pb-2 font-semibold" />
+                  <SortableTableHeader label="Created" sortKey="createdAt" activeSortKey={sortConfig?.key} direction={sortConfig?.direction} onSort={(key) => requestSort(key as ApplicationSortKey)} className="pb-2 font-semibold" />
+                  <th className="pb-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
               <tbody>
                 {paginatedApplications.map((app) => (
                   <tr key={app.id} className="border-b border-solar-border/50">
