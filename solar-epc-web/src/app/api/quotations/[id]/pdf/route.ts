@@ -254,6 +254,25 @@ export async function GET(
       drawText(page, safe, x + width - textWidth - 6, y, size, bold, color);
     };
 
+    const drawCentered = (
+      page: PDFPage,
+      text: string,
+      centerX: number,
+      y: number,
+      size = 10,
+      bold = false,
+      color = accent
+    ) => {
+      const safe = sanitizeText(text);
+      if (!safe) {
+        return;
+      }
+
+      const font = bold ? boldFont : regularFont;
+      const textWidth = measureWidth(safe, size, font);
+      drawText(page, safe, centerX - textWidth / 2, y, size, bold, color);
+    };
+
     const drawWrapped = (
       page: PDFPage,
       text: string,
@@ -558,6 +577,14 @@ export async function GET(
         year: "numeric",
       }).format(new Date(value));
 
+    const formatManualDate = (value: Date | string) => {
+      const date = new Date(value);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = String(date.getFullYear());
+      return `${day}-${month}-${year}`;
+    };
+
     const resolveLogo = async () => {
       const source = companySettings?.companyLogo;
       if (!source) {
@@ -649,6 +676,11 @@ export async function GET(
     const createPage = (isContinuation = false) => {
       const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       pages.push(page);
+
+      if (!isContinuation) {
+        return { page, y: PAGE_HEIGHT - 44 };
+      }
+
       const headerHeight = isContinuation ? CONTINUATION_HEADER_HEIGHT : FIRST_PAGE_HEADER_HEIGHT;
       const subHeaderHeight = 24;
       const logoMaxWidth = isContinuation ? 36 : 44;
@@ -936,106 +968,192 @@ export async function GET(
 
     let { page, y } = createPage(false);
 
-    const metaLeftWidth = 232;
-    const metaRightWidth = CONTENT_WIDTH - metaLeftWidth;
-    const metaPaddingTop = 10;
-    const metaPaddingBottom = 10;
-    const metaLabelX = MARGIN + metaLeftWidth + 10;
-    const metaValueX = MARGIN + metaLeftWidth + 78;
-    const metaValueWidth = metaRightWidth - 86;
-    const htssContactLines = [
-      `Mr. Ilyas Kaydawala - ${companySettings?.contactPhone || "+91-8140535380"}`,
-      "Mr. Ammar Kotawala - +91-8128491230",
-      "Mr. Husain Kotawala - +91-7069822153",
-      companySettings?.contactEmail || "hitechsolarsolu@gmail.com",
-    ]
-      .map((value) => sanitizeText(value))
-      .filter(Boolean);
-    const projectMetaRows = [
-      { label: "Client", value: sanitizeText(quotation.client.name) },
-      { label: "Prepared For", value: sanitizeText(documentData.preparedFor || quotation.title) },
-      { label: "Customer Contact", value: sanitizeText(documentData.customerContactPerson || quotation.client.contactName || "-") },
-      { label: "Consumer Type", value: sanitizeText(documentData.consumerType) },
-      { label: "Consumer No.", value: sanitizeText(documentData.consumerNumber || "-") },
-      { label: "Prepared By", value: sanitizeText(documentData.preparedBy) },
-      { label: "Issued", value: sanitizeText(formatDate(version.createdAt)) },
-      { label: "Valid Till", value: sanitizeText(formatDate(validUntil)) },
-      { label: "HTSS Contact", value: htssContactLines.join("\n") },
-    ];
+    const firstPageCenterX = PAGE_WIDTH / 2;
+    const firstPageInk = rgb(0.13, 0.17, 0.22);
+    const firstPageSlate = rgb(0.29, 0.36, 0.44);
+    const firstPageWash = rgb(0.97, 0.98, 0.99);
+    const firstPageChipFill = rgb(0.94, 0.96, 0.99);
+    const firstPageAccent = secondary;
     const proposalTitle = "Detailed Techno-Commercial Proposal";
     const systemTitle = `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`;
     const proposalRef = sanitizeText(quotation.title);
-    const leftTitleHeight = wrapText(proposalTitle, metaLeftWidth - 20, 11.2, true).length * 12.5;
-    const leftSubtitleHeight = wrapText(systemTitle, metaLeftWidth - 20, 10.4, true).length * 12.2;
-    const leftQuoteHeight = wrapText(proposalRef, metaLeftWidth - 20, 7.6).length * 9.2;
-    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + 24;
-
-    const rightRowHeights = projectMetaRows.map((row) => {
-      const lineCount = row.value
-        .split("\n")
-        .reduce((sum, chunk) => sum + wrapText(chunk, metaValueWidth, 7.2).length, 0);
-      return Math.max(13, lineCount * 8.1 + 4);
-    });
-    const rightContentHeight = rightRowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0);
-    const metaHeight = Math.max(122, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
-    const metaBottom = y - metaHeight;
-
-    page.drawRectangle({
-      x: MARGIN,
-      y: metaBottom,
-      width: CONTENT_WIDTH,
-      height: metaHeight,
-      color: white,
-      borderColor: border,
-      borderWidth: 1,
-    });
-    page.drawRectangle({
-      x: MARGIN,
-      y: metaBottom,
-      width: metaLeftWidth,
-      height: metaHeight,
-      color: rgb(0.97, 0.98, 0.99),
-    });
-    page.drawLine({
-      start: { x: MARGIN + metaLeftWidth, y },
-      end: { x: MARGIN + metaLeftWidth, y: metaBottom },
-      thickness: 1,
-      color: border,
-    });
-
-    let rightGridY = y;
-    rightRowHeights.forEach((rowHeight, index) => {
-      rightGridY -= rowHeight;
-      if (index < rightRowHeights.length - 1) {
-        page.drawLine({
-          start: { x: MARGIN + metaLeftWidth, y: rightGridY },
-          end: { x: PAGE_WIDTH - MARGIN, y: rightGridY },
-          thickness: 0.8,
-          color: subtleLine,
+    const issueDateLabel = formatManualDate(version.createdAt);
+    const validityText = `${documentData.validityDays} Days from date of issue`;
+    const coverCompanyName = sanitizeText(companySettings?.companyName || "Hi-Tech Solar Solution");
+    const coverTagline = sanitizeText(companySettings?.companyTagline || "Solar EPC partner for reliable rooftop energy systems");
+    const contactDeskRows = [
+      `${sanitizeText(documentData.preparedBy || "Er. Ilyas Kaydawala")} | ${sanitizeText(companySettings?.contactPhone || "+91-8140535380")}`,
+      "Mr. Ammar Kotawala | +91-8128491230",
+      "Mr. Husain Kotawala | +91-7069822153",
+    ];
+    const overviewCards = [
+      { label: "Client", value: sanitizeText(quotation.client.name) },
+      { label: "System Size", value: `${documentData.totalKw.toFixed(2)} Kwp` },
+      { label: "Validity", value: `${documentData.validityDays} Days` },
+    ];
+    const clientRows = [
+      { label: "Client Name", value: sanitizeText(quotation.client.name) },
+      { label: "Prepared For", value: sanitizeText(documentData.preparedFor || quotation.client.name || quotation.title) },
+      { label: "Customer Contact", value: sanitizeText(documentData.customerContactPerson || quotation.client.contactName || "-") },
+      { label: "Consumer Type", value: sanitizeText(documentData.consumerType || "-") },
+      { label: "Consumer Number", value: sanitizeText(documentData.consumerNumber || "-") },
+    ];
+    const proposalRows = [
+      { label: "Prepared By", value: sanitizeText(documentData.preparedBy || "Er. Ilyas Kaydawala") },
+      { label: "Date of Issue", value: issueDateLabel },
+      { label: "Valid Till", value: validityText },
+      { label: "Proposal Ref.", value: proposalRef },
+      { label: "Project Scope", value: "Design, supply, installation, testing and commissioning" },
+    ];
+    const drawCoverRows = (
+      rows: Array<{ label: string; value: string }>,
+      options: { x: number; y: number; width: number; labelWidth: number }
+    ) => {
+      const { x, y: startY, width, labelWidth } = options;
+      let rowY = startY;
+      rows.forEach((row, index) => {
+        const valueWidth = width - labelWidth - 18;
+        const valueLines = wrapText(row.value, valueWidth, 7.4);
+        const rowHeight = Math.max(18, valueLines.length * 8.4 + 4);
+        if (index > 0) {
+          page.drawLine({
+            start: { x, y: rowY + 4 },
+            end: { x: x + width, y: rowY + 4 },
+            thickness: 0.6,
+            color: subtleLine,
+          });
+        }
+        drawText(page, row.label, x, rowY - 8, 7.2, true, firstPageSlate);
+        drawText(page, ":", x + labelWidth - 8, rowY - 8, 7.2, true, firstPageSlate);
+        valueLines.forEach((line, lineIndex) => {
+          drawText(page, line, x + labelWidth, rowY - 8 - lineIndex * 8.4, 7.4, false, firstPageInk);
         });
-      }
-    });
-
-    let leftCursorY = y - 14;
-    drawWrapped(page, proposalTitle, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 11.2, true, accent, 12.5);
-    leftCursorY -= leftTitleHeight + 6;
-    drawWrapped(page, systemTitle, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 10.4, true, secondary, 12.2);
-    leftCursorY -= leftSubtitleHeight + 8;
-    drawWrapped(page, proposalRef, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 7.6, false, muted, 9.2);
-
-    let metaCursorY = y - 10;
-    projectMetaRows.forEach((row, index) => {
-      const rowY = metaCursorY;
-      drawText(page, row.label, metaLabelX, rowY, 7.2, true, muted);
-      let valueY = rowY;
-      row.value.split("\n").forEach((chunk) => {
-        const consumed = drawWrapped(page, chunk, metaValueX, valueY, metaValueWidth, 7.2, false, accent, 8.1);
-        valueY -= consumed;
+        rowY -= rowHeight;
       });
-      metaCursorY -= rightRowHeights[index];
+    };
+
+    page.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: white });
+    page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 92, width: PAGE_WIDTH, height: 92, color: firstPageWash });
+    page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 10, width: PAGE_WIDTH, height: 10, color: primary });
+    page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 20, width: PAGE_WIDTH, height: 4, color: secondary });
+    page.drawRectangle({ x: 26, y: 86, width: PAGE_WIDTH - 52, height: 2, color: border });
+
+    if (embeddedLogo) {
+      const scaled = embeddedLogo.scale(1);
+      const ratio = Math.min(74 / scaled.width, 74 / scaled.height);
+      const logoWidth = scaled.width * ratio;
+      const logoHeight = scaled.height * ratio;
+      page.drawImage(embeddedLogo, {
+        x: firstPageCenterX - logoWidth / 2,
+        y: PAGE_HEIGHT - 176 - logoHeight / 2,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    } else {
+      drawFallbackLogo(page, false);
+    }
+
+    const companyNameSize = fitTextSize(coverCompanyName, 320, 21, 16, true);
+    drawCentered(page, coverCompanyName, firstPageCenterX, PAGE_HEIGHT - 232, companyNameSize, true, accent);
+    drawCentered(page, coverTagline, firstPageCenterX, PAGE_HEIGHT - 252, 8.2, false, muted);
+
+    const chipWidth = 132;
+    const chipX = firstPageCenterX - chipWidth / 2;
+    const chipY = PAGE_HEIGHT - 286;
+    page.drawRectangle({ x: chipX, y: chipY, width: chipWidth, height: 18, color: firstPageChipFill, borderColor: border, borderWidth: 1 });
+    drawCentered(page, "SOLAR EPC PROPOSAL", firstPageCenterX, chipY + 5, 6.8, true, accent);
+
+    drawCentered(page, proposalTitle, firstPageCenterX, PAGE_HEIGHT - 316, 15.6, true, firstPageInk);
+    drawCentered(page, systemTitle, firstPageCenterX, PAGE_HEIGHT - 340, 12.2, true, firstPageAccent);
+
+    const overviewTopY = PAGE_HEIGHT - 370;
+    const overviewGap = 10;
+    const overviewWidth = 122;
+    const overviewHeight = 42;
+    overviewCards.forEach((card, index) => {
+      const x = firstPageCenterX - ((overviewWidth * 3 + overviewGap * 2) / 2) + index * (overviewWidth + overviewGap);
+      page.drawRectangle({ x, y: overviewTopY - overviewHeight, width: overviewWidth, height: overviewHeight, color: white, borderColor: border, borderWidth: 1 });
+      drawText(page, card.label, x + 8, overviewTopY - 13, 6.8, true, firstPageSlate);
+      const fittedSize = fitTextSize(card.value, overviewWidth - 16, 9.2, 7.2, true);
+      drawWrapped(page, card.value, x + 8, overviewTopY - 27, overviewWidth - 16, fittedSize, true, firstPageInk, fittedSize + 1.5);
     });
 
-    y -= metaHeight + 20;
+    const sectionTopY = PAGE_HEIGHT - 434;
+    const sectionGap = 14;
+    const sectionWidth = (CONTENT_WIDTH - sectionGap) / 2;
+    const sectionHeight = 150;
+    const sectionX = MARGIN;
+    const rightSectionX = MARGIN + sectionWidth + sectionGap;
+    const sectionHeaderHeight = 20;
+
+    [
+      { x: sectionX, title: "Client Information", rows: clientRows },
+      { x: rightSectionX, title: "Proposal Controls", rows: proposalRows },
+    ].forEach((section) => {
+      page.drawRectangle({ x: section.x, y: sectionTopY - sectionHeight, width: sectionWidth, height: sectionHeight, color: white, borderColor: border, borderWidth: 1 });
+      page.drawRectangle({ x: section.x, y: sectionTopY - sectionHeaderHeight, width: sectionWidth, height: sectionHeaderHeight, color: paleFill });
+      drawText(page, section.title, section.x + 10, sectionTopY - 13, 7.8, true, accent);
+      drawCoverRows(section.rows, {
+        x: section.x + 10,
+        y: sectionTopY - 30,
+        width: sectionWidth - 20,
+        labelWidth: 74,
+      });
+    });
+
+    const contactCardTopY = PAGE_HEIGHT - 602;
+    const contactCardHeight = 92;
+    page.drawRectangle({ x: MARGIN, y: contactCardTopY - contactCardHeight, width: CONTENT_WIDTH, height: contactCardHeight, color: white, borderColor: border, borderWidth: 1 });
+    page.drawRectangle({ x: MARGIN, y: contactCardTopY - 20, width: CONTENT_WIDTH, height: 20, color: paleFill });
+    drawText(page, "Project Coordination Desk", MARGIN + 10, contactCardTopY - 13, 7.8, true, accent);
+
+    let contactRowY = contactCardTopY - 34;
+    contactDeskRows.forEach((row) => {
+      const [name, phone] = row.split("|").map((value) => sanitizeText(value));
+      drawText(page, name, MARGIN + 10, contactRowY, 7.4, true, firstPageInk);
+      drawText(page, phone, MARGIN + 250, contactRowY, 7.4, false, firstPageSlate);
+      contactRowY -= 16;
+    });
+    drawText(
+      page,
+      `Email: ${sanitizeText(companySettings?.contactEmail || "hitechsolarsolu@gmail.com")}`,
+      MARGIN + 10,
+      contactCardTopY - 82,
+      7.1,
+      false,
+      firstPageSlate
+    );
+    drawRightAligned(
+      page,
+      sanitizeText(companySettings?.website || ""),
+      PAGE_WIDTH - MARGIN - 160,
+      160,
+      contactCardTopY - 82,
+      7.1,
+      false,
+      firstPageSlate
+    );
+
+    const noteTopY = PAGE_HEIGHT - 718;
+    page.drawRectangle({ x: MARGIN, y: noteTopY - 38, width: CONTENT_WIDTH, height: 38, color: firstPageWash, borderColor: border, borderWidth: 1 });
+    drawText(page, "Submission Note", MARGIN + 10, noteTopY - 12, 6.8, true, accent);
+    drawWrapped(
+      page,
+      `This proposal has been prepared for evaluation of a ${documentData.totalKw.toFixed(2)} Kwp rooftop solar system and includes the EPC scope, technical configuration, commercial summary, generation estimate, and implementation support details.`,
+      MARGIN + 96,
+      noteTopY - 12,
+      CONTENT_WIDTH - 106,
+      6.9,
+      false,
+      muted,
+      8.4
+    );
+
+    drawText(page, sanitizeText(companySettings?.contactPhone || "+91-8140535380"), MARGIN, 62, 7.4, true, firstPageInk);
+    drawCentered(page, sanitizeText(companySettings?.contactEmail || "hitechsolarsolu@gmail.com"), firstPageCenterX, 62, 7.2, false, firstPageSlate);
+    drawRightAligned(page, validityText, PAGE_WIDTH - MARGIN - 146, 146, 62, 7.2, true, firstPageInk);
+
+    ({ page, y } = createPage(true));
 
     const executiveSummaryWriteup = quotationWriteups.find((entry: QuotationWriteupEntry) => entry.key === "executive-summary");
     const descriptionOfServicesWriteup = quotationWriteups.find(

@@ -250,18 +250,18 @@ test.describe.serial("Full app UI coverage", () => {
     created.deleteInquiryId = undefined;
   });
 
-  test("items page view + edit + delete", async ({ page }) => {
-    await page.goto("/items");
-    await expect(page.getByRole("heading", { level: 2, name: "Item Master" })).toBeVisible();
+  test("boq list page view + edit + delete", async ({ page }) => {
+    await page.goto("/boq-list");
+    await expect(page.getByRole("heading", { level: 2, name: "BOQ List" })).toBeVisible();
     await expect(page.getByText(names.item)).toBeVisible();
 
     const itemCard = page.getByText(names.item).locator("..");
     await itemCard.getByRole("button", { name: "View" }).click();
-    await expect(page.getByRole("heading", { level: 2, name: "Item Details" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "BOQ Item Details" })).toBeVisible();
     await page.getByRole("button", { name: "Close" }).click();
 
     await itemCard.getByRole("button", { name: "Edit" }).click();
-    await expect(page.getByRole("heading", { level: 2, name: "Edit Item" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Edit BOQ Item" })).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
 
     const deleteItemCard = page.getByText(names.deleteItem).locator("..");

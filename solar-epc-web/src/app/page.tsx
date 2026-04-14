@@ -65,11 +65,11 @@ export default function Home() {
             <p className="text-xs text-solar-muted mt-1">Generate solar quotes</p>
           </Link>
           <Link
-            href="/technical-proposal"
+            href="/boq-list"
             className="rounded-xl border border-solar-border bg-solar-sand p-6 hover:bg-solar-sky transition-colors"
           >
-            <p className="text-sm font-semibold text-solar-ink">Technical Proposal</p>
-            <p className="text-xs text-solar-muted mt-1">Detailed project proposals</p>
+            <p className="text-sm font-semibold text-solar-ink">Open BOQ List</p>
+            <p className="text-xs text-solar-muted mt-1">Review quotation-ready BOQ items</p>
           </Link>
         </div>
       </div>

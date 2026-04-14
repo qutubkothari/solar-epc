@@ -67,8 +67,8 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
 
   return (
     <ModalShell
-      title={itemId ? "Edit Item" : "Add New Item"}
-      subtitle="Define product pricing, margins, and tax rules."
+      title={itemId ? "Edit BOQ Item" : "Add BOQ Item"}
+      subtitle="Define quotation-ready product pricing, margins, and tax rules."
       onClose={onClose}
       size="xl"
     >
@@ -81,7 +81,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="mt-1 w-full rounded-xl border border-solar-border bg-solar-sand px-3 py-2 text-sm outline-none"
-              placeholder="e.g., 550W Mono Panel"
+              placeholder="e.g., 550Wp TOPCon Module"
             />
           </div>
 
@@ -184,7 +184,7 @@ export function ItemForm({ onClose, onSuccess, itemId, initialData }: ItemFormPr
               disabled={loading}
               className="flex-1 rounded-xl bg-solar-amber py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? "Saving..." : itemId ? "Save Item" : "Create Item"}
+              {loading ? "Saving..." : itemId ? "Save BOQ Item" : "Create BOQ Item"}
             </button>
           </div>
       </form>

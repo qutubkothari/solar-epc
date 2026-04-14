@@ -15,10 +15,10 @@ test.describe("Smoke navigation", () => {
     ).toBeVisible();
   });
 
-  test("items page loads", async ({ page }) => {
-    await page.goto("/items");
+  test("boq list page loads", async ({ page }) => {
+    await page.goto("/boq-list");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Item Master" })
+      page.getByRole("heading", { level: 2, name: "BOQ List" })
     ).toBeVisible();
   });
 
