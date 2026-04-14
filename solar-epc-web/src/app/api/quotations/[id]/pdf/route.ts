@@ -1949,11 +1949,17 @@ export async function GET(
 
     const pdfBytes = await pdfDoc.save();
 
+    const generatedAtToken = new Date().toISOString().replace(/[:.]/g, "-");
+
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename=${quotation.title.replace(/\s+/g, "-")}.pdf`,
+        "Content-Disposition": `inline; filename=${quotation.title.replace(/\s+/g, "-")}-${generatedAtToken}.pdf`,
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+        "Surrogate-Control": "no-store",
       },
     });
   } catch (error) {
