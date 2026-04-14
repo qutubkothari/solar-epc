@@ -1046,13 +1046,24 @@ export async function GET(
         entry.key !== "description-of-services" &&
         entry.key !== "technical-considerations"
     );
-    const executiveSummary = sanitizeText(
+    const executiveSummaryContent = (
       executiveSummaryWriteup?.content ||
-        `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
-    );
-
-    const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.7);
-    const executiveSummaryHeight = 46 + summaryLines.length * 13.2;
+      `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
+    )
+      .replace(/\r/g, "")
+      .trim();
+    const executiveSummaryParagraphs = executiveSummaryContent
+      .split(/\n\s*\n+/)
+      .map((paragraph) => sanitizeText(paragraph))
+      .filter(Boolean);
+    const summaryLineHeight = 13.2;
+    const summaryParagraphGap = 9;
+    const executiveSummaryHeight =
+      46 +
+      executiveSummaryParagraphs.reduce((total, paragraph, index) => {
+        const paragraphHeight = wrapText(paragraph, CONTENT_WIDTH - 20, 8.7).length * summaryLineHeight;
+        return total + paragraphHeight + (index < executiveSummaryParagraphs.length - 1 ? summaryParagraphGap : 0);
+      }, 0);
     if (y - executiveSummaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
@@ -1068,7 +1079,14 @@ export async function GET(
       borderColor: border,
       borderWidth: 1,
     });
-    drawWrapped(page, executiveSummary, MARGIN + 10, y - 16, CONTENT_WIDTH - 20, 8.7, false, muted, 13.2);
+    let executiveSummaryCursorY = y - 16;
+    executiveSummaryParagraphs.forEach((paragraph, index) => {
+      const consumed = drawWrapped(page, paragraph, MARGIN + 10, executiveSummaryCursorY, CONTENT_WIDTH - 20, 8.7, false, muted, summaryLineHeight);
+      executiveSummaryCursorY -= consumed;
+      if (index < executiveSummaryParagraphs.length - 1) {
+        executiveSummaryCursorY -= summaryParagraphGap;
+      }
+    });
     y -= executiveSummaryHeight + 10;
 
     if (descriptionOfServicesWriteup) {
