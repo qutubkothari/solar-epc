@@ -936,49 +936,53 @@ export async function GET(
 
     let { page, y } = createPage(false);
 
-    const metaLeftWidth = 240;
+    const metaLeftWidth = 232;
     const metaRightWidth = CONTENT_WIDTH - metaLeftWidth;
-    const metaPaddingTop = 16;
-    const metaPaddingBottom = 14;
-    const metaLabelX = MARGIN + metaLeftWidth + 14;
+    const metaPaddingTop = 10;
+    const metaPaddingBottom = 10;
+    const metaLabelX = MARGIN + metaLeftWidth + 10;
     const metaValueX = MARGIN + metaLeftWidth + 78;
-    const metaValueWidth = metaRightWidth - 84;
-    const htssContactSummary = sanitizeText(
-      [
-        `Mr. Ilyas Kaydawala - ${companySettings?.contactPhone || "+91-8140535380"}`,
-        "Mr. Ammar Kotawala - +91-8128491230",
-        "Mr. Husain Kotawala - +91-7069822153",
-        companySettings?.contactEmail ? `Email - ${companySettings.contactEmail}` : "",
-      ]
-        .filter(Boolean)
-        .join(" | ")
-    );
+    const metaValueWidth = metaRightWidth - 86;
+    const htssContactLines = [
+      `Mr. Ilyas Kaydawala - ${companySettings?.contactPhone || "+91-8140535380"}`,
+      "Mr. Ammar Kotawala - +91-8128491230",
+      "Mr. Husain Kotawala - +91-7069822153",
+      companySettings?.contactEmail || "hitechsolarsolu@gmail.com",
+    ]
+      .map((value) => sanitizeText(value))
+      .filter(Boolean);
     const projectMetaRows = [
-      ["Client", quotation.client.name],
-      ["Prepared For", documentData.preparedFor || quotation.title],
-      ["Customer Contact", documentData.customerContactPerson || quotation.client.contactName || "-"],
-      ["Consumer Type", documentData.consumerType],
-      ["Consumer No.", documentData.consumerNumber || "-"],
-      ["Prepared By", documentData.preparedBy],
-      ["Issued", formatDate(version.createdAt)],
-      ["Valid Till", formatDate(validUntil)],
-      ["HTSS Contact", htssContactSummary],
-    ] as const;
-    const leftTitleHeight = 18;
-    const leftSubtitleHeight = wrapText(`${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, metaLeftWidth - 24, 11.5, true).length * 13.5;
-    const leftQuoteHeight = wrapText(quotation.title, metaLeftWidth - 24, 8.2).length * 10;
-    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + 16;
+      { label: "Client", value: sanitizeText(quotation.client.name) },
+      { label: "Prepared For", value: sanitizeText(documentData.preparedFor || quotation.title) },
+      { label: "Customer Contact", value: sanitizeText(documentData.customerContactPerson || quotation.client.contactName || "-") },
+      { label: "Consumer Type", value: sanitizeText(documentData.consumerType) },
+      { label: "Consumer No.", value: sanitizeText(documentData.consumerNumber || "-") },
+      { label: "Prepared By", value: sanitizeText(documentData.preparedBy) },
+      { label: "Issued", value: sanitizeText(formatDate(version.createdAt)) },
+      { label: "Valid Till", value: sanitizeText(formatDate(validUntil)) },
+      { label: "HTSS Contact", value: htssContactLines.join("\n") },
+    ];
+    const proposalTitle = "Detailed Techno-Commercial Proposal";
+    const systemTitle = `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`;
+    const proposalRef = sanitizeText(quotation.title);
+    const leftTitleHeight = wrapText(proposalTitle, metaLeftWidth - 20, 11.2, true).length * 12.5;
+    const leftSubtitleHeight = wrapText(systemTitle, metaLeftWidth - 20, 10.4, true).length * 12.2;
+    const leftQuoteHeight = wrapText(proposalRef, metaLeftWidth - 20, 7.6).length * 9.2;
+    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + 24;
 
-    const rightRowHeights = projectMetaRows.map(([, value]) => {
-      const lineCount = wrapText(value, metaValueWidth, 8.2).length;
-      return Math.max(9.5, lineCount * 9.5) + 2;
+    const rightRowHeights = projectMetaRows.map((row) => {
+      const lineCount = row.value
+        .split("\n")
+        .reduce((sum, chunk) => sum + wrapText(chunk, metaValueWidth, 7.2).length, 0);
+      return Math.max(13, lineCount * 8.1 + 4);
     });
     const rightContentHeight = rightRowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0);
-    const metaHeight = Math.max(126, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
+    const metaHeight = Math.max(122, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
+    const metaBottom = y - metaHeight;
 
     page.drawRectangle({
       x: MARGIN,
-      y: y - metaHeight,
+      y: metaBottom,
       width: CONTENT_WIDTH,
       height: metaHeight,
       color: white,
@@ -987,47 +991,47 @@ export async function GET(
     });
     page.drawRectangle({
       x: MARGIN,
-      y: y - metaHeight,
+      y: metaBottom,
       width: metaLeftWidth,
       height: metaHeight,
-      color: paleFill,
-    });
-    page.drawRectangle({
-      x: MARGIN + metaLeftWidth,
-      y: y - metaHeight,
-      width: metaRightWidth,
-      height: metaHeight,
-      color: white,
+      color: rgb(0.97, 0.98, 0.99),
     });
     page.drawLine({
       start: { x: MARGIN + metaLeftWidth, y },
-      end: { x: MARGIN + metaLeftWidth, y: y - metaHeight },
+      end: { x: MARGIN + metaLeftWidth, y: metaBottom },
       thickness: 1,
       color: border,
     });
 
-    let leftCursorY = y - metaPaddingTop - 4;
-    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, leftCursorY, 12.5, true, accent);
-    leftCursorY -= 22;
-    const consumedSubtitle = drawWrapped(
-      page,
-      `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`,
-      MARGIN + 12,
-      leftCursorY,
-      metaLeftWidth - 24,
-      11.5,
-      true,
-      secondary,
-      13.5
-    );
-    leftCursorY -= consumedSubtitle + 6;
-    drawWrapped(page, quotation.title, MARGIN + 12, leftCursorY, metaLeftWidth - 24, 8.2, false, muted, 10);
+    let rightGridY = y;
+    rightRowHeights.forEach((rowHeight, index) => {
+      rightGridY -= rowHeight;
+      if (index < rightRowHeights.length - 1) {
+        page.drawLine({
+          start: { x: MARGIN + metaLeftWidth, y: rightGridY },
+          end: { x: PAGE_WIDTH - MARGIN, y: rightGridY },
+          thickness: 0.8,
+          color: subtleLine,
+        });
+      }
+    });
 
-    let metaCursorY = y - metaPaddingTop - 2;
-    projectMetaRows.forEach(([label, value], index) => {
+    let leftCursorY = y - 14;
+    drawWrapped(page, proposalTitle, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 11.2, true, accent, 12.5);
+    leftCursorY -= leftTitleHeight + 6;
+    drawWrapped(page, systemTitle, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 10.4, true, secondary, 12.2);
+    leftCursorY -= leftSubtitleHeight + 8;
+    drawWrapped(page, proposalRef, MARGIN + 10, leftCursorY, metaLeftWidth - 20, 7.6, false, muted, 9.2);
+
+    let metaCursorY = y - 10;
+    projectMetaRows.forEach((row, index) => {
       const rowY = metaCursorY;
-      drawText(page, label, metaLabelX, rowY, 8.2, true, muted);
-      drawWrapped(page, value, metaValueX, rowY, metaValueWidth, 8.2, false, accent, 9.5);
+      drawText(page, row.label, metaLabelX, rowY, 7.2, true, muted);
+      let valueY = rowY;
+      row.value.split("\n").forEach((chunk) => {
+        const consumed = drawWrapped(page, chunk, metaValueX, valueY, metaValueWidth, 7.2, false, accent, 8.1);
+        valueY -= consumed;
+      });
       metaCursorY -= rightRowHeights[index];
     });
 
