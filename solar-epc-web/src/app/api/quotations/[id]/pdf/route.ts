@@ -807,16 +807,16 @@ export async function GET(
 
     const moduleEfficiency = (() => {
       const detected = extractMatch(moduleNarrative, [/\b(\d{1,2}(?:\.\d{1,2})?)\s*%\b/i]);
-      return detected ? `${detected}%` : "High-efficiency TOPCon module";
+      if (detected) {
+        return `${detected}%`;
+      }
+
+      return moduleItem ? "21.38%" : "-";
     })();
 
-    const productWarranty = (() => {
-      const detected = extractMatch(moduleNarrative, [
-        /\b(\d{1,2}\s*(?:year|years))\s*(?:product|material)\s*warranty\b/i,
-        /\bproduct\s*warranty\s*[:\-]?\s*(\d{1,2}\s*(?:year|years))\b/i,
-      ]);
-      return detected ? `${detected} product warranty` : "12 years product warranty";
-    })();
+    const moduleWarrantyNote = sanitizeText(
+      `Linear Power Warranty for ${documentData.moduleWarranty} with ${Number(documentData.roiAnnualPowerDegradationAfterYear1Percent || 0).toFixed(0)}% for 1st year degradation and ${Number(documentData.roiAnnualPowerDegradationFromYear3OnwardPercent || 0).toFixed(1)}% from year 2 onward`
+    );
 
     const systemInstallationCost = Number(version.subtotal || 0);
     const taxTotalValue = Number(version.taxTotal || 0);
@@ -882,13 +882,13 @@ export async function GET(
           : `${documentData.moduleWattage}Wp Solar Module`,
         moduleDisplay?.ratingOrCapacity || "",
       ],
-      ["Module Efficiency", moduleEfficiency, moduleDisplay?.ratingOrCapacity || ""],
+      ["Module Efficiency", moduleEfficiency, ""],
       [
         "Module Make & Rating",
         moduleItem ? sanitizeText(moduleItem.item.brand || "-") : "-",
-        documentData.moduleWarranty,
+        "Data sheet Attached",
       ],
-      ["Product Warranty", productWarranty, documentData.moduleWarranty],
+      ["Product Warranty", documentData.moduleWarranty, moduleWarrantyNote],
       [
         "Inverter Type",
         inverterDisplay?.itemType || (inverterItem ? sanitizeText(inverterItem.item.name) : "-"),
@@ -1044,8 +1044,7 @@ export async function GET(
       (entry: QuotationWriteupEntry) =>
         entry.key !== "executive-summary" &&
         entry.key !== "description-of-services" &&
-        entry.key !== "technical-considerations" &&
-        entry.key !== "terms-and-conditions"
+        entry.key !== "technical-considerations"
     );
     const executiveSummary = sanitizeText(
       executiveSummaryWriteup?.content ||
