@@ -790,6 +790,33 @@ export async function GET(
     const moduleDisplay = moduleItem ? getBoqDisplayParts(asSolarBoqItem(moduleItem.item)) : null;
     const inverterDisplay = inverterItem ? getBoqDisplayParts(asSolarBoqItem(inverterItem.item)) : null;
     const structureDisplay = structureItem ? getBoqDisplayParts(asSolarBoqItem(structureItem.item)) : null;
+    const moduleNarrative = sanitizeText(
+      [moduleItem?.item.name, moduleItem?.item.description, moduleItem?.description].filter(Boolean).join(" ")
+    );
+
+    const extractMatch = (text: string, patterns: RegExp[]) => {
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match?.[1]) {
+          return sanitizeText(match[1]);
+        }
+      }
+
+      return "";
+    };
+
+    const moduleEfficiency = (() => {
+      const detected = extractMatch(moduleNarrative, [/\b(\d{1,2}(?:\.\d{1,2})?)\s*%\b/i]);
+      return detected ? `${detected}%` : "High-efficiency TOPCon module";
+    })();
+
+    const productWarranty = (() => {
+      const detected = extractMatch(moduleNarrative, [
+        /\b(\d{1,2}\s*(?:year|years))\s*(?:product|material)\s*warranty\b/i,
+        /\bproduct\s*warranty\s*[:\-]?\s*(\d{1,2}\s*(?:year|years))\b/i,
+      ]);
+      return detected ? `${detected} product warranty` : "12 years product warranty";
+    })();
 
     const systemInstallationCost = Number(version.subtotal || 0);
     const taxTotalValue = Number(version.taxTotal || 0);
@@ -855,11 +882,13 @@ export async function GET(
           : `${documentData.moduleWattage}Wp Solar Module`,
         moduleDisplay?.ratingOrCapacity || "",
       ],
+      ["Module Efficiency", moduleEfficiency, moduleDisplay?.ratingOrCapacity || ""],
       [
         "Module Make & Rating",
         moduleItem ? sanitizeText(moduleItem.item.brand || "-") : "-",
         documentData.moduleWarranty,
       ],
+      ["Product Warranty", productWarranty, documentData.moduleWarranty],
       [
         "Inverter Type",
         inverterDisplay?.itemType || (inverterItem ? sanitizeText(inverterItem.item.name) : "-"),
@@ -914,6 +943,16 @@ export async function GET(
     const metaLabelX = MARGIN + metaLeftWidth + 14;
     const metaValueX = MARGIN + metaLeftWidth + 78;
     const metaValueWidth = metaRightWidth - 84;
+    const htssContactSummary = sanitizeText(
+      [
+        `Mr. Ilyas Kaydawala - ${companySettings?.contactPhone || "+91-8140535380"}`,
+        "Mr. Ammar Kotawala - +91-8128491230",
+        "Mr. Husain Kotawala - +91-7069822153",
+        companySettings?.contactEmail ? `Email - ${companySettings.contactEmail}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ")
+    );
     const projectMetaRows = [
       ["Client", quotation.client.name],
       ["Prepared For", documentData.preparedFor || quotation.title],
@@ -923,21 +962,19 @@ export async function GET(
       ["Prepared By", documentData.preparedBy],
       ["Issued", formatDate(version.createdAt)],
       ["Valid Till", formatDate(validUntil)],
+      ["HTSS Contact", htssContactSummary],
     ] as const;
-    const leftTitleHeight = 14;
-    const leftSubtitleHeight = wrapText(`${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, metaLeftWidth - 24, 13, true).length * 15;
-    const leftQuoteHeight = wrapText(quotation.title, metaLeftWidth - 24, 8.5).length * 10.5;
-    const leftOfferHeight = version.brand
-      ? Math.max(10, wrapText(version.brand, metaLeftWidth - 60, 8.5, true).length * 10) + 12
-      : 0;
-    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + leftOfferHeight + 10;
+    const leftTitleHeight = 18;
+    const leftSubtitleHeight = wrapText(`${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`, metaLeftWidth - 24, 11.5, true).length * 13.5;
+    const leftQuoteHeight = wrapText(quotation.title, metaLeftWidth - 24, 8.2).length * 10;
+    const leftContentHeight = leftTitleHeight + leftSubtitleHeight + leftQuoteHeight + 16;
 
     const rightRowHeights = projectMetaRows.map(([, value]) => {
       const lineCount = wrapText(value, metaValueWidth, 8.2).length;
       return Math.max(9.5, lineCount * 9.5) + 2;
     });
     const rightContentHeight = rightRowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0);
-    const metaHeight = Math.max(110, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
+    const metaHeight = Math.max(126, metaPaddingTop + Math.max(leftContentHeight, rightContentHeight) + metaPaddingBottom);
 
     page.drawRectangle({
       x: MARGIN,
@@ -970,26 +1007,21 @@ export async function GET(
     });
 
     let leftCursorY = y - metaPaddingTop - 4;
-    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, leftCursorY, 14, true, accent);
-    leftCursorY -= 20;
+    drawText(page, "Detailed Techno-Commercial Proposal", MARGIN + 12, leftCursorY, 12.5, true, accent);
+    leftCursorY -= 22;
     const consumedSubtitle = drawWrapped(
       page,
       `${documentData.totalKw.toFixed(2)} Kwp Roof Top Solar System`,
       MARGIN + 12,
       leftCursorY,
       metaLeftWidth - 24,
-      13,
+      11.5,
       true,
       secondary,
-      15
+      13.5
     );
-    leftCursorY -= consumedSubtitle + 3;
-    const consumedQuote = drawWrapped(page, quotation.title, MARGIN + 12, leftCursorY, metaLeftWidth - 24, 8.5, false, muted, 10.5);
-    leftCursorY -= consumedQuote + 6;
-    if (version.brand) {
-      drawText(page, "Offer", MARGIN + 12, leftCursorY, 8.5, true, muted);
-      drawWrapped(page, version.brand, MARGIN + 48, leftCursorY, metaLeftWidth - 60, 8.5, true, accent, 10);
-    }
+    leftCursorY -= consumedSubtitle + 6;
+    drawWrapped(page, quotation.title, MARGIN + 12, leftCursorY, metaLeftWidth - 24, 8.2, false, muted, 10);
 
     let metaCursorY = y - metaPaddingTop - 2;
     projectMetaRows.forEach(([label, value], index) => {
@@ -1012,15 +1044,16 @@ export async function GET(
       (entry: QuotationWriteupEntry) =>
         entry.key !== "executive-summary" &&
         entry.key !== "description-of-services" &&
-        entry.key !== "technical-considerations"
+        entry.key !== "technical-considerations" &&
+        entry.key !== "terms-and-conditions"
     );
     const executiveSummary = sanitizeText(
       executiveSummaryWriteup?.content ||
         `We are pleased to present our proposal for the installation of a ${documentData.totalKw.toFixed(2)} kWp solar power plant${documentData.preparedFor ? ` for ${documentData.preparedFor}` : ""}. This solution is designed to reduce electricity costs, lower carbon emissions, and provide long-term energy reliability through a complete EPC scope covering design, procurement, installation, commissioning, and post-installation support.`
     );
 
-    const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.5);
-    const executiveSummaryHeight = 42 + summaryLines.length * 11;
+    const summaryLines = wrapText(executiveSummary, CONTENT_WIDTH - 20, 8.7);
+    const executiveSummaryHeight = 46 + summaryLines.length * 13.2;
     if (y - executiveSummaryHeight < FOOTER_TOP + 16) {
       ({ page, y } = createPage(true));
     }
@@ -1036,9 +1069,7 @@ export async function GET(
       borderColor: border,
       borderWidth: 1,
     });
-    summaryLines.forEach((line, index) => {
-      drawText(page, line, MARGIN + 10, y - 14 - index * 11, 8.5, false, muted);
-    });
+    drawWrapped(page, executiveSummary, MARGIN + 10, y - 16, CONTENT_WIDTH - 20, 8.7, false, muted, 13.2);
     y -= executiveSummaryHeight + 10;
 
     if (descriptionOfServicesWriteup) {
@@ -1263,6 +1294,48 @@ export async function GET(
       y -= 18;
     };
 
+    const drawBankAndDocumentsSection = () => {
+      const bankCardHeight = 124;
+      const docsCardHeight = 124;
+      if (y - Math.max(bankCardHeight, docsCardHeight) < FOOTER_TOP + 12) {
+        ({ page, y } = createPage(true));
+      }
+
+      const sectionGap = 12;
+      const sectionWidth = (CONTENT_WIDTH - sectionGap) / 2;
+      const bankRows = [
+        `Bank Name: ${documentData.bankDetails.bankName}`,
+        `A/C Name: ${documentData.bankDetails.accountName}`,
+        `A/C Number: ${documentData.bankDetails.accountNumber}`,
+        `A/C Type: ${documentData.bankDetails.accountType}`,
+        `IFSC Code: ${documentData.bankDetails.ifscCode}`,
+        `Branch: ${documentData.bankDetails.branch}`,
+      ];
+
+      const drawBoxSection = (title: string, rows: string[], x: number, height: number) => {
+        page.drawRectangle({ x, y: y - height, width: sectionWidth, height, color: white, borderColor: border, borderWidth: 1 });
+        page.drawRectangle({ x, y: y - 24, width: sectionWidth, height: 24, color: paleFill });
+        drawText(page, title, x + 10, y - 16, 9.5, true, accent);
+        let rowY = y - 38;
+        rows.forEach((row) => {
+          const wrapped = wrapText(row, sectionWidth - 20, 8);
+          wrapped.forEach((line) => {
+            drawText(page, line, x + 10, rowY, 8, false, muted);
+            rowY -= 10;
+          });
+        });
+      };
+
+      drawBoxSection("Bank Details", bankRows, MARGIN, bankCardHeight);
+      drawBoxSection(
+        "Required Documents",
+        documentData.requiredDocuments.map((row) => `- ${row}`),
+        MARGIN + sectionWidth + sectionGap,
+        docsCardHeight
+      );
+      y -= Math.max(bankCardHeight, docsCardHeight) + 18;
+    };
+
     const boqColumns = [
       { label: "Sr No", x: MARGIN, width: 38 },
       { label: "Item Name", x: MARGIN + 38, width: 110 },
@@ -1485,6 +1558,8 @@ export async function GET(
     y -= summaryHeight + 16;
 
     drawPaymentStagesSection();
+
+    drawBankAndDocumentsSection();
 
     drawGenerationSection();
 
@@ -1808,79 +1883,6 @@ export async function GET(
       lineLegend: "Cumulative Savings",
     });
     y -= roiChartHeight + 18;
-
-    const terms = [
-      "Price validity: 15 days from the quotation issue date unless revised in writing.",
-      "Payment terms: 70% against material dispatch and 30% against successful installation and handover.",
-      "Execution timelines depend on site readiness, approvals, and material availability.",
-      "Any civil, electrical, or statutory scope outside the listed BOQ will be billed separately after approval.",
-      "Taxes are included as shown above and final billing will follow the applicable GST at invoicing.",
-    ];
-
-    const termLines = terms.flatMap((term) => bulletizeDescription(term, CONTENT_WIDTH - 22, 8.5));
-    const termsHeight = 34 + termLines.length * 11;
-    if (y - termsHeight < FOOTER_TOP + 12) {
-      ({ page, y } = createPage(true));
-    }
-
-    drawText(page, "Terms and Conditions", MARGIN, y, 12.5, true, accent);
-    y -= 16;
-    page.drawRectangle({
-      x: MARGIN,
-      y: y - (termsHeight - 18),
-      width: CONTENT_WIDTH,
-      height: termsHeight - 18,
-      color: white,
-      borderColor: border,
-      borderWidth: 1,
-    });
-
-    let termsY = y - 14;
-    termLines.forEach((line) => {
-      drawText(page, line, MARGIN + 10, termsY, 8.5, false, muted);
-      termsY -= 11;
-    });
-    y -= termsHeight;
-
-    const bankCardHeight = 124;
-    const docsCardHeight = 124;
-    if (y - Math.max(bankCardHeight, docsCardHeight) < FOOTER_TOP + 12) {
-      ({ page, y } = createPage(true));
-    }
-
-    const sectionGap = 12;
-    const sectionWidth = (CONTENT_WIDTH - sectionGap) / 2;
-    const bankRows = [
-      `Bank Name: ${documentData.bankDetails.bankName}`,
-      `A/C Name: ${documentData.bankDetails.accountName}`,
-      `A/C Number: ${documentData.bankDetails.accountNumber}`,
-      `A/C Type: ${documentData.bankDetails.accountType}`,
-      `IFSC Code: ${documentData.bankDetails.ifscCode}`,
-      `Branch: ${documentData.bankDetails.branch}`,
-    ];
-
-    const drawBoxSection = (title: string, rows: string[], x: number, height: number) => {
-      page.drawRectangle({ x, y: y - height, width: sectionWidth, height, color: white, borderColor: border, borderWidth: 1 });
-      page.drawRectangle({ x, y: y - 24, width: sectionWidth, height: 24, color: paleFill });
-      drawText(page, title, x + 10, y - 16, 9.5, true, accent);
-      let rowY = y - 38;
-      rows.forEach((row) => {
-        const wrapped = wrapText(row, sectionWidth - 20, 8);
-        wrapped.forEach((line) => {
-          drawText(page, line, x + 10, rowY, 8, false, muted);
-          rowY -= 10;
-        });
-      });
-    };
-
-    drawBoxSection("Bank Details", bankRows, MARGIN, bankCardHeight);
-    drawBoxSection(
-      "Required Documents",
-      documentData.requiredDocuments.map((row) => `- ${row}`),
-      MARGIN + sectionWidth + sectionGap,
-      docsCardHeight
-    );
-    y -= Math.max(bankCardHeight, docsCardHeight) + 18;
 
     remainingWriteups.forEach((writeup: QuotationWriteupEntry) => {
       drawWriteupSection(writeup.title, writeup.content);
