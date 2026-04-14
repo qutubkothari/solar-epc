@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
+import { usePagination } from "@/hooks/use-pagination";
 import { InquiryForm } from "@/components/inquiry-form";
 import { MediaForm } from "@/components/media-form";
 import { ModalShell } from "@/components/modal-shell";
@@ -41,6 +43,20 @@ export default function InquiriesPage() {
   useEffect(() => {
     fetchInquiries();
   }, []);
+
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedInquiries,
+  } = usePagination(inquiries, {
+    pageSize: 10,
+    resetKey: inquiries.length,
+  });
 
   const handleExport = () => {
     const headers = ["Title", "Client", "Site", "Status"];
@@ -118,7 +134,8 @@ export default function InquiriesPage() {
             No inquiries yet. Create your first inquiry to get started.
           </div>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-xl border border-solar-border">
+          <>
+            <div className="mt-6 overflow-hidden rounded-xl border border-solar-border">
             <table className="w-full text-left text-sm">
               <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
                 <tr>
@@ -130,7 +147,7 @@ export default function InquiriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {inquiries.map((inquiry) => (
+                {paginatedInquiries.map((inquiry) => (
                   <tr key={inquiry.id} className="border-t border-solar-border">
                     <td className="px-4 py-3 font-medium text-solar-ink">
                       {inquiry.title}
@@ -168,7 +185,18 @@ export default function InquiriesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="inquiries"
+            />
+          </>
         )}
       </div>
 

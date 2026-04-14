@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
+import { usePagination } from "@/hooks/use-pagination";
 
 type TokenRecord = {
   id: string;
@@ -135,6 +137,20 @@ export default function TokenAccessPage({
     fetchData();
   }, [tokenParam]);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedDocs,
+  } = usePagination(docs, {
+    pageSize: 10,
+    resetKey: `${tokenParam || ""}|${docs.length}`,
+  });
+
   if (loading) {
     return <div className="p-10 text-center text-sm text-solar-muted">Loading...</div>;
   }
@@ -200,25 +216,37 @@ export default function TokenAccessPage({
           {docs.length === 0 ? (
             <div className="text-center py-8 text-sm text-solar-muted">No documents available yet.</div>
           ) : (
-            docs.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-solar-ink">{doc.name}</p>
-                  <p className="text-xs text-solar-muted">{doc.type || 'Document'}</p>
-                </div>
-                <a
-                  href={doc.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink hover:bg-solar-sky transition-colors"
+            <>
+              {paginatedDocs.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
                 >
-                  {tokenRecord.allowDownload ? "Download" : "View"}
-                </a>
-              </div>
-            ))
+                  <div>
+                    <p className="text-sm font-semibold text-solar-ink">{doc.name}</p>
+                    <p className="text-xs text-solar-muted">{doc.type || 'Document'}</p>
+                  </div>
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-xl border border-solar-border bg-white px-3 py-2 text-xs font-semibold text-solar-ink hover:bg-solar-sky transition-colors"
+                  >
+                    {tokenRecord.allowDownload ? "Download" : "View"}
+                  </a>
+                </div>
+              ))}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                startItem={startItem}
+                endItem={endItem}
+                onPageChange={setCurrentPage}
+                itemLabel="documents"
+              />
+            </>
           )}
         </div>
         

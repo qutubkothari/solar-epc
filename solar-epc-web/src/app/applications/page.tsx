@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { ApplicationForm } from "@/components/application-form";
 import { ModalShell } from "@/components/modal-shell";
+import { usePagination } from "@/hooks/use-pagination";
 
 type ApplicationData = {
   id: string;
@@ -93,6 +95,20 @@ export default function ApplicationsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedApplications,
+  } = usePagination(applications, {
+    pageSize: 10,
+    resetKey: applications.length,
+  });
 
   const generateStatutoryDoc = async (templateType: string) => {
     if (!selectedInquiryId) return;
@@ -307,11 +323,12 @@ export default function ApplicationsPage() {
         ) : applications.length === 0 ? (
           <div className="mt-4 text-center text-sm text-solar-muted">No applications yet.</div>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <>
+            <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-solar-border text-left text-solar-muted"><th className="pb-2 font-semibold">Project</th><th className="pb-2 font-semibold">Applicant</th><th className="pb-2 font-semibold">System</th><th className="pb-2 font-semibold">Created</th><th className="pb-2 font-semibold">Actions</th></tr></thead>
               <tbody>
-                {applications.map((app) => (
+                {paginatedApplications.map((app) => (
                   <tr key={app.id} className="border-b border-solar-border/50">
                     <td className="py-3">
                       <div>{app.inquiry?.title || "Unassigned"}</div>
@@ -348,7 +365,18 @@ export default function ApplicationsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="applications"
+            />
+          </>
         )}
       </div>
 

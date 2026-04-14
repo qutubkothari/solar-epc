@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { DocumentForm } from "@/components/document-form";
+import { usePagination } from "@/hooks/use-pagination";
 import { formatDate } from "@/lib/format";
 
 type CompletionDoc = {
@@ -54,6 +56,20 @@ export default function DocumentsPage() {
     fetchDocs();
   }, []);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedPacks,
+  } = usePagination(packs, {
+    pageSize: 10,
+    resetKey: packs.length,
+  });
+
   const handleDeleteDoc = async (id: string) => {
     const confirmDelete = window.confirm("Delete this completion document?");
     if (!confirmDelete) return;
@@ -89,7 +105,7 @@ export default function DocumentsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {packs.map((pack) => (
+            {paginatedPacks.map((pack) => (
               (() => {
                 const projectMeta = getProjectMeta(pack.inquiryId);
                 return (
@@ -135,6 +151,16 @@ export default function DocumentsPage() {
                 );
               })()
             ))}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="documents"
+            />
           </div>
         )}
       </div>

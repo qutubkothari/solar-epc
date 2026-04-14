@@ -1,10 +1,12 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { ExecutionForm } from "@/components/execution-form";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { ModalShell } from "@/components/modal-shell";
+import { usePagination } from "@/hooks/use-pagination";
 
 type Asset = {
   id: string;
@@ -55,6 +57,20 @@ export default function ExecutionPage() {
       .then((data) => setProjects(data || []))
       .catch(() => setProjects([]));
   }, []);
+
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedAssets,
+  } = usePagination(assets, {
+    pageSize: 10,
+    resetKey: assets.length,
+  });
 
   const selectedProject = projects.find((project) => project.inquiryId === quickInquiryId);
 
@@ -196,7 +212,7 @@ export default function ExecutionPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-3">
-              {assets.map((asset) => (
+              {paginatedAssets.map((asset) => (
                 <div
                   key={asset.id}
                   className="flex items-center justify-between rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
@@ -234,6 +250,16 @@ export default function ExecutionPage() {
                   </div>
                 </div>
               ))}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                startItem={startItem}
+                endItem={endItem}
+                onPageChange={setCurrentPage}
+                itemLabel="serial captures"
+              />
             </div>
           )}
         </div>

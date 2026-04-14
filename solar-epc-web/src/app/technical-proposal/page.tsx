@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { TechnicalProposalForm } from "@/components/technical-proposal-form";
 import { ProposalCharts } from "@/components/proposal-charts";
+import { usePagination } from "@/hooks/use-pagination";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 type Client = {
@@ -101,6 +103,20 @@ export default function TechnicalProposalPage() {
     fetchProposals();
   }, []);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedProposals,
+  } = usePagination(proposals, {
+    pageSize: 10,
+    resetKey: proposals.length,
+  });
+
   const handleView = (proposal: TechnicalProposal) => {
     setSelectedProposal(proposal);
     setViewMode("detail");
@@ -139,7 +155,7 @@ export default function TechnicalProposalPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {proposals.map((proposal) => (
+          {paginatedProposals.map((proposal) => (
             <div
               key={proposal.id}
               className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar hover:shadow-lg transition-shadow"
@@ -198,6 +214,16 @@ export default function TechnicalProposalPage() {
               </div>
             </div>
           ))}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            startItem={startItem}
+            endItem={endItem}
+            onPageChange={setCurrentPage}
+            itemLabel="proposals"
+          />
         </div>
       )}
     </div>

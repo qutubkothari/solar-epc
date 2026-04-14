@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { LayoutGrid, Rows3 } from "lucide-react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { formatCurrency } from "@/lib/format";
+import { usePagination } from "@/hooks/use-pagination";
 import { ItemForm } from "@/components/item-form";
 import { ModalShell } from "@/components/modal-shell";
 import {
@@ -103,10 +105,24 @@ export default function BoqListPage() {
     });
   }, [boqItems, searchTerm, boqHeadFilter]);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems,
+  } = usePagination(filteredItems, {
+    pageSize: 10,
+    resetKey: `${searchTerm}|${boqHeadFilter}|${items.length}`,
+  });
+
   const groupedItems = useMemo(() => {
     const groups = new Map<string, { itemHead: string; sequence: number; isMapped: boolean; items: BoqListItem[] }>();
 
-    filteredItems.forEach((item) => {
+    paginatedItems.forEach((item) => {
       const existing = groups.get(item.itemHead);
       if (existing) {
         existing.items.push(item);
@@ -124,7 +140,7 @@ export default function BoqListPage() {
     return Array.from(groups.values()).sort(
       (left, right) => left.sequence - right.sequence || left.itemHead.localeCompare(right.itemHead)
     );
-  }, [filteredItems]);
+  }, [paginatedItems]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -363,7 +379,7 @@ export default function BoqListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-solar-border bg-white text-solar-ink">
-                  {filteredItems.map((item) => (
+                  {paginatedItems.map((item) => (
                     <tr key={item.id} className="align-top">
                       <td className="px-4 py-4 text-solar-muted">
                         {item.sequence === 999 ? "—" : String(item.sequence).padStart(2, "0")}
@@ -419,6 +435,17 @@ export default function BoqListPage() {
             </div>
           </div>
         )}
+
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          startItem={startItem}
+          endItem={endItem}
+          onPageChange={setCurrentPage}
+          itemLabel="BOQ items"
+        />
       </div>
 
       {showForm && (

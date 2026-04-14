@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { TokenForm } from "@/components/token-form";
 import { ModalShell } from "@/components/modal-shell";
+import { usePagination } from "@/hooks/use-pagination";
 import { formatDate } from "@/lib/format";
 
 type Token = {
@@ -44,6 +46,20 @@ export default function TokensPage() {
     fetchTokens();
   }, []);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedTokens,
+  } = usePagination(tokens, {
+    pageSize: 10,
+    resetKey: tokens.length,
+  });
+
   const getTokenLink = (token: string) =>
     typeof window === "undefined" ? "" : `${window.location.origin}/token/${token}`;
 
@@ -81,7 +97,7 @@ export default function TokensPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {tokens.map((token) => (
+            {paginatedTokens.map((token) => (
               <div
                 key={token.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
@@ -130,6 +146,16 @@ export default function TokensPage() {
                 </div>
               </div>
             ))}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="tokens"
+            />
           </div>
         )}
       </div>
@@ -239,6 +265,20 @@ function TokenDocumentsView({
   useEffect(() => {
     fetchDocs();
   }, [token.id]);
+
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedDocs,
+  } = usePagination(docs, {
+    pageSize: 10,
+    resetKey: docs.length,
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -360,7 +400,7 @@ function TokenDocumentsView({
             </div>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {docs.map((doc) => (
+              {paginatedDocs.map((doc) => (
                 <div
                   key={`${doc.type}-${doc.id}`}
                   className="flex items-center justify-between rounded-xl border border-solar-border bg-white p-3"
@@ -391,6 +431,16 @@ function TokenDocumentsView({
               ))}
             </div>
           )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            startItem={startItem}
+            endItem={endItem}
+            onPageChange={setCurrentPage}
+            itemLabel="documents"
+          />
         </div>
 
         {/* Close Button */}

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { ClientForm } from "@/components/client-form";
 import { ModalShell } from "@/components/modal-shell";
+import { PaginationControls } from "@/components/pagination-controls";
+import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
 
 type Client = {
@@ -118,6 +120,20 @@ export default function ClientsPage() {
     return result;
   }, [clients, query, statusFilter, followupFilter]);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedClients,
+  } = usePagination(filteredClients, {
+    pageSize: 10,
+    resetKey: `${query}|${statusFilter}|${followupFilter}|${clients.length}`,
+  });
+
   const handleDeleteClient = async (id: string) => {
     const confirmDelete = window.confirm("Delete this client?");
     if (!confirmDelete) return;
@@ -192,7 +208,8 @@ export default function ClientsPage() {
             No clients found.
           </div>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-xl border border-solar-border">
+          <>
+            <div className="mt-6 overflow-hidden rounded-xl border border-solar-border">
             <table className="w-full text-left text-sm">
               <thead className="bg-solar-sand text-xs uppercase tracking-wider text-solar-muted">
                 <tr>
@@ -205,7 +222,7 @@ export default function ClientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredClients.map((client) => {
+                {paginatedClients.map((client) => {
                   const isFollowupDue = client.nextFollowupDate && new Date(client.nextFollowupDate) <= new Date();
                   
                   return (
@@ -269,7 +286,18 @@ export default function ClientsPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="clients"
+            />
+          </>
         )}
       </div>
 

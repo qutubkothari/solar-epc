@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
+import { usePagination } from "@/hooks/use-pagination";
 import { TaskForm } from "@/components/task-form";
 import { ModalShell } from "@/components/modal-shell";
 import { formatDate } from "@/lib/format";
@@ -41,6 +43,20 @@ export default function TasksPage() {
     fetchTasks();
   }, []);
 
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedTasks,
+  } = usePagination(tasks, {
+    pageSize: 10,
+    resetKey: tasks.length,
+  });
+
   const handleDeleteTask = async (id: string) => {
     const confirmDelete = window.confirm("Delete this task?");
     if (!confirmDelete) return;
@@ -75,7 +91,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {tasks.map((task) => (
+            {paginatedTasks.map((task) => (
               <div
                 key={task.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-solar-border bg-solar-sand px-4 py-3"
@@ -111,6 +127,16 @@ export default function TasksPage() {
                 </div>
               </div>
             ))}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              startItem={startItem}
+              endItem={endItem}
+              onPageChange={setCurrentPage}
+              itemLabel="tasks"
+            />
           </div>
         )}
       </div>

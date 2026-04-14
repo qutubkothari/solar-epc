@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { PaginationControls } from "@/components/pagination-controls";
 import { SectionHeader } from "@/components/section-header";
 import { SolarQuotationForm } from "@/components/solar-quotation-form";
 import { ModalShell } from "@/components/modal-shell";
+import { usePagination } from "@/hooks/use-pagination";
 import { formatCurrency } from "@/lib/format";
 import { normalizeQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
 import { resolveBoqItemHead } from "@/lib/solar-boq";
@@ -106,17 +108,31 @@ export default function QuotationsPage() {
     }
   };
 
-  // Filter quotes by search query (client name or title)
-  const filteredQuotes = quotes.filter((quote) => {
-    if (!searchQuery) return true;
+  const filteredQuotes = useMemo(() => {
+    if (!searchQuery) return quotes;
     const search = searchQuery.toLowerCase();
-    return (
-      quote.title.toLowerCase().includes(search) ||
-      quote.client.name.toLowerCase().includes(search)
-    );
+    return quotes.filter((quote) => {
+      return (
+        quote.title.toLowerCase().includes(search) ||
+        quote.client.name.toLowerCase().includes(search)
+      );
+    });
+  }, [quotes, searchQuery]);
+
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    startItem,
+    endItem,
+    paginatedItems: paginatedQuotes,
+  } = usePagination(filteredQuotes, {
+    pageSize: 10,
+    resetKey: `${searchQuery}|${quotes.length}`,
   });
 
-  // Calculate next version for a quotation
   const getNextVersion = (quote: Quotation | null) => {
     if (!quote) return "1.0";
     const versions = quote.versions || [];
@@ -197,7 +213,7 @@ export default function QuotationsPage() {
       }),
     ];
   }, [editingVersion]);
-  
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -214,7 +230,6 @@ export default function QuotationsPage() {
       />
 
       <div className="rounded-2xl border border-solar-border bg-white p-6 shadow-solar">
-        {/* Search Bar */}
         <div className="mb-4">
           <input
             type="text"
@@ -251,12 +266,12 @@ export default function QuotationsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredQuotes.map((quote) => {
+                paginatedQuotes.map((quote) => {
                   const latestVersion = quote.versions[0];
                   const isExpanded = selectedQuoteId === quote.id;
                   return (
-                    <>
-                      <tr key={quote.id} className="border-t border-solar-border hover:bg-solar-sand/50 cursor-pointer" onClick={() => setSelectedQuoteId(isExpanded ? null : quote.id)}>
+                    <Fragment key={quote.id}>
+                      <tr className="border-t border-solar-border hover:bg-solar-sand/50 cursor-pointer" onClick={() => setSelectedQuoteId(isExpanded ? null : quote.id)}>
                         <td className="px-4 py-3 font-medium text-solar-ink">
                           <div className="flex items-center gap-2">
                             <span className="text-solar-muted">{isExpanded ? "▼" : "▶"}</span>
@@ -308,7 +323,6 @@ export default function QuotationsPage() {
                           </div>
                         </td>
                       </tr>
-                      {/* Expanded version rows */}
                       {isExpanded && quote.versions.map((version) => (
                         <tr key={version.id} className="bg-solar-sand/30">
                           <td className="px-4 py-2 pl-10 text-sm text-solar-muted">
@@ -348,13 +362,23 @@ export default function QuotationsPage() {
                           </td>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   );
                 })
               )}
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          startItem={startItem}
+          endItem={endItem}
+          onPageChange={setCurrentPage}
+          itemLabel="quotations"
+        />
       </div>
 
       {showForm && (
@@ -374,56 +398,54 @@ export default function QuotationsPage() {
           onClose={() => setCompareVersion(null)}
           size="2xl"
         >
-            <div className="space-y-4 text-sm text-solar-ink">
-              {/* Items Table */}
-              <div className="overflow-hidden rounded-xl border border-solar-border">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-solar-sand text-[11px] uppercase tracking-wider text-solar-muted">
-                    <tr>
-                      <th className="px-3 py-2">Item</th>
-                      <th className="px-3 py-2 text-right">Qty</th>
-                      <th className="px-3 py-2 text-right">Rate</th>
-                      <th className="px-3 py-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {compareVersion.items?.length ? (
-                      compareVersion.items.map((item) => (
-                        <tr key={item.id} className="border-t border-solar-border">
-                          <td className="px-3 py-2 text-solar-ink">{item.description || item.item.name}</td>
-                          <td className="px-3 py-2 text-right text-solar-muted">{Number(item.quantity)}</td>
-                          <td className="px-3 py-2 text-right text-solar-muted">{formatCurrency(Number(item.rate || 0))}</td>
-                          <td className="px-3 py-2 text-right font-medium text-solar-ink">{formatCurrency(Number(item.lineTotal))}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-3 text-center text-solar-muted">No items</td>
+          <div className="space-y-4 text-sm text-solar-ink">
+            <div className="overflow-hidden rounded-xl border border-solar-border">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-solar-sand text-[11px] uppercase tracking-wider text-solar-muted">
+                  <tr>
+                    <th className="px-3 py-2">Item</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
+                    <th className="px-3 py-2 text-right">Rate</th>
+                    <th className="px-3 py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareVersion.items?.length ? (
+                    compareVersion.items.map((item) => (
+                      <tr key={item.id} className="border-t border-solar-border">
+                        <td className="px-3 py-2 text-solar-ink">{item.description || item.item.name}</td>
+                        <td className="px-3 py-2 text-right text-solar-muted">{Number(item.quantity)}</td>
+                        <td className="px-3 py-2 text-right text-solar-muted">{formatCurrency(Number(item.rate || 0))}</td>
+                        <td className="px-3 py-2 text-right font-medium text-solar-ink">{formatCurrency(Number(item.lineTotal))}</td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-3 text-center text-solar-muted">No items</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="rounded-xl border border-solar-border bg-solar-sand p-3 space-y-2">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
               </div>
-              {/* Totals */}
-              <div className="rounded-xl border border-solar-border bg-solar-sand p-3 space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(Number(compareVersion.subtotal || 0))}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Margin</span>
-                  <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax (GST)</span>
-                  <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
-                </div>
-                <div className="flex justify-between font-semibold text-solar-forest pt-2 border-t border-solar-border">
-                  <span>Grand Total</span>
-                  <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
-                </div>
+              <div className="flex justify-between">
+                <span>Margin</span>
+                <span>{formatCurrency(Number(compareVersion.marginTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax (GST)</span>
+                <span>{formatCurrency(Number(compareVersion.taxTotal || 0))}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-solar-forest pt-2 border-t border-solar-border">
+                <span>Grand Total</span>
+                <span>{formatCurrency(Number(compareVersion.grandTotal || 0))}</span>
               </div>
             </div>
+          </div>
           <div className="mt-6 flex gap-2">
             <button
               onClick={() => setCompareVersion(null)}
@@ -435,7 +457,6 @@ export default function QuotationsPage() {
         </ModalShell>
       )}
 
-      {/* New Version Form - uses same SolarQuotationForm with pre-filled data */}
       {newVersionForQuote && (
         <SolarQuotationForm
           quotationId={newVersionForQuote.id}
