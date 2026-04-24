@@ -2888,7 +2888,7 @@ export function SolarQuotationForm({
 
           setClients((prev) => sortClientsByName([
             ...prev.filter((entry) => entry.id !== client.id),
-            client,
+            { ...client, contactName: client.contactName ?? undefined },
           ]));
           setFormData((prev) => ({
             ...prev,
