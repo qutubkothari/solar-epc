@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ClientForm } from "@/components/client-form";
 import { ModalShell } from "@/components/modal-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { formatCurrency } from "@/lib/format";
@@ -17,6 +18,7 @@ import {
   getDefaultQuantity,
   inferSelectionUnit,
   isPercentageItem,
+  matchesBoqItemType,
   SOLAR_BOQ_SEQUENCE,
   type SolarBoqItem,
 } from "@/lib/solar-boq";
@@ -34,12 +36,21 @@ type Inquiry = {
 };
 
 type BoqDraftRow = {
+  id: string;
   sequence: number;
   itemHead: string;
   itemId: string;
-  itemType?: string;
+  itemType: string;
   quantity: number;
   quantityTouched: boolean;
+  fixedItemType: string | null;
+  lockedItemType: boolean;
+};
+
+type BoqDraftRowSeed = Omit<BoqDraftRow, "id" | "fixedItemType" | "lockedItemType"> & {
+  id?: string;
+  fixedItemType?: string | null;
+  lockedItemType?: boolean;
 };
 
 type ResolvedRow = {
@@ -80,21 +91,98 @@ type SolarQuotationFormProps = {
   defaultVersion?: string;
   defaultBrand?: string;
   initialDocumentData?: QuotationDocumentData;
-  initialBoqRows?: BoqDraftRow[];
+  initialBoqRows?: BoqDraftRowSeed[];
   clientName?: string;
   clientContactName?: string;
   inquiryTitle?: string;
 };
 
-const createInitialRows = (): BoqDraftRow[] =>
-  SOLAR_BOQ_SEQUENCE.map((row) => ({
-    sequence: row.sequence,
-    itemHead: row.itemHead,
-    itemId: "",
-    itemType: "",
-    quantity: 0,
-    quantityTouched: false,
-  }));
+let boqDraftRowCounter = 0;
+
+const nextBoqDraftRowId = () => {
+  boqDraftRowCounter += 1;
+  return `boq-row-${boqDraftRowCounter}`;
+};
+
+const createBoqDraftRow = (
+  sequence: number,
+  itemHead: string,
+  seed?: Partial<BoqDraftRowSeed>
+): BoqDraftRow => ({
+  id: seed?.id || nextBoqDraftRowId(),
+  sequence,
+  itemHead,
+  itemId: seed?.itemId || "",
+  itemType: seed?.itemType || seed?.fixedItemType || "",
+  quantity: Number(seed?.quantity || 0),
+  quantityTouched: Boolean(seed?.quantityTouched),
+  fixedItemType: seed?.fixedItemType || null,
+  lockedItemType: Boolean(seed?.lockedItemType || seed?.fixedItemType),
+});
+
+const createRowsForSequence = (sequence: number): BoqDraftRow[] => {
+  const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
+  if (!config) {
+    return [];
+  }
+
+  if (config.selectionMode === "fixed" && config.fixedItemTypes && config.fixedItemTypes.length > 0) {
+    return config.fixedItemTypes.map((itemType) =>
+      createBoqDraftRow(config.sequence, config.itemHead, {
+        itemType,
+        fixedItemType: itemType,
+        lockedItemType: true,
+      })
+    );
+  }
+
+  return [
+    createBoqDraftRow(config.sequence, config.itemHead, {
+      lockedItemType: config.selectionMode === "fixed",
+    }),
+  ];
+};
+
+const normalizeInitialBoqRows = (rows?: BoqDraftRowSeed[]): BoqDraftRow[] =>
+  SOLAR_BOQ_SEQUENCE.flatMap((config) => {
+    const matchingRows = (rows || []).filter((row) => row.sequence === config.sequence);
+
+    if (matchingRows.length === 0) {
+      return createRowsForSequence(config.sequence);
+    }
+
+    const normalizedRows = matchingRows.map((row) => {
+      const fixedItemType =
+        row.fixedItemType ||
+        (config.selectionMode === "fixed"
+          ? config.fixedItemTypes?.find((itemType) => matchesBoqItemType(itemType, row.itemType || "")) || null
+          : null);
+
+      return createBoqDraftRow(config.sequence, config.itemHead, {
+        ...row,
+        fixedItemType,
+        lockedItemType: Boolean(row.lockedItemType || fixedItemType || config.selectionMode === "fixed"),
+        itemType: row.itemType || fixedItemType || "",
+      });
+    });
+
+    if (config.selectionMode !== "fixed") {
+      return normalizedRows;
+    }
+
+    const fixedItemTypes = config.fixedItemTypes || [];
+    const missingFixedRows = fixedItemTypes
+      .filter((itemType) => !normalizedRows.some((row) => matchesBoqItemType(row.fixedItemType || row.itemType, itemType)))
+      .map((itemType) =>
+        createBoqDraftRow(config.sequence, config.itemHead, {
+          itemType,
+          fixedItemType: itemType,
+          lockedItemType: true,
+        })
+      );
+
+    return [...normalizedRows, ...missingFixedRows];
+  });
 
 const userInputClassName =
   "w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-gray-900 placeholder:text-red-300 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100";
@@ -143,6 +231,23 @@ const formatDecimal = (value: number, fractionDigits = 2) =>
 
 const getItemTypeFromItem = (item?: SolarBoqItem | null) => (item ? getBoqDisplayParts(item).itemType || item.name : "");
 
+const getWarrantySummary = (description?: string | null) => {
+  const text = (description || "").replace(/\s+/g, " ").trim();
+  if (!text || !/warranty/i.test(text)) {
+    return "";
+  }
+
+  const warrantyParts = text
+    .split("|")
+    .map((part) => part.trim())
+    .filter((part) => /warranty/i.test(part));
+
+  return warrantyParts.length > 0 ? warrantyParts.join(" ; ") : text;
+};
+
+const sortClientsByName = (entries: Client[]) =>
+  [...entries].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
+
 export function SolarQuotationForm({
   onClose,
   onSuccess,
@@ -168,6 +273,7 @@ export function SolarQuotationForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [activeTab, setActiveTab] = useState<QuotationFormTab>("overview");
+  const [showClientForm, setShowClientForm] = useState(false);
   const lastAutoFilledCustomerContactRef = useRef("");
   const [formData, setFormData] = useState({
     clientId: defaultClientId || "",
@@ -187,12 +293,7 @@ export function SolarQuotationForm({
           totalKw: 0,
         })
   );
-  const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() =>
-    (initialBoqRows && initialBoqRows.length > 0 ? initialBoqRows : createInitialRows()).map((row) => ({
-      ...row,
-      itemType: row.itemType || "",
-    }))
-  );
+  const [boqRows, setBoqRows] = useState<BoqDraftRow[]>(() => normalizeInitialBoqRows(initialBoqRows));
 
   useEffect(() => {
     fetch("/api/clients")
@@ -309,6 +410,9 @@ export function SolarQuotationForm({
     setDocumentData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const getConfigForSequence = (sequence: number) =>
+    SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
+
   useEffect(() => {
     setBoqRows((prev) => {
       let changed = false;
@@ -322,7 +426,7 @@ export function SolarQuotationForm({
           return row;
         }
 
-        const itemType = getItemTypeFromItem(selectedItem);
+        const itemType = row.fixedItemType || getItemTypeFromItem(selectedItem);
         if (row.itemType === itemType) {
           return row;
         }
@@ -347,7 +451,7 @@ export function SolarQuotationForm({
         }
 
         const selectedItem = items.find((item) => item.id === row.itemId);
-        const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === row.sequence);
+        const config = getConfigForSequence(row.sequence);
         if (!selectedItem || !config) {
           return row;
         }
@@ -418,6 +522,7 @@ export function SolarQuotationForm({
         display.itemType || entry.item.name,
         display.ratingOrCapacity,
         entry.selectionUnit,
+        getWarrantySummary(entry.item.description),
       ]
         .filter(Boolean)
         .join(" | ");
@@ -444,6 +549,19 @@ export function SolarQuotationForm({
   const subtotal = resolvedRows.reduce((sum, row) => sum + row.baseTotal, 0);
   const totalGst = resolvedRows.reduce((sum, row) => sum + row.taxTotal, 0);
   const grandTotal = subtotal + totalGst;
+  const missingMandatoryBoqRows = SOLAR_BOQ_SEQUENCE.filter((config) => {
+    if (!config.mandatory) {
+      return false;
+    }
+
+    const rowsForSequence = boqRows.filter((row) => row.sequence === config.sequence);
+
+    if (config.selectionMode === "fixed") {
+      return rowsForSequence.some((row) => !row.itemId || row.quantity <= 0);
+    }
+
+    return !rowsForSequence.some((row) => row.itemId && row.quantity > 0);
+  });
   const generationRows = documentData.generationTable.map((row) => {
     const kwh = actualSystemKw * row.unitsPerDay * row.days;
     const amount = kwh * Number(documentData.electricityTariffYear1 || 0);
@@ -492,6 +610,11 @@ export function SolarQuotationForm({
   });
   const invalidOverviewFields = documentData.validityDays <= 0 ? ["Validity (Days)"] : [];
   const paymentStageTotal = documentData.paymentStages.reduce((sum, stage) => sum + Number(stage.percentage || 0), 0);
+  const paymentStageRows = documentData.paymentStages.map((stage, index) => ({
+    index,
+    stage,
+    value: grandTotal * percentToDecimal(Number(stage.percentage || 0)),
+  }));
   const incompletePaymentStages = documentData.paymentStages
     .map((stage, index) => ({
       index,
@@ -504,6 +627,7 @@ export function SolarQuotationForm({
     }))
     .filter((entry) => entry.isIncomplete);
   const hasInvalidPaymentTotal = Math.abs(paymentStageTotal - 100) > PAYMENT_TOTAL_TOLERANCE;
+  const isPaymentTotalBalanced = !hasInvalidPaymentTotal;
   const missingBankFields = BANK_DETAIL_FIELDS.filter(({ key }) => !documentData.bankDetails[key].trim());
   const incompleteScopeRows = documentData.scopeOfWorkRows
     .map((row, index) => ({
@@ -518,6 +642,7 @@ export function SolarQuotationForm({
   const totalValidationIssueCount =
     missingOverviewFields.length +
     invalidOverviewFields.length +
+    missingMandatoryBoqRows.length +
     incompletePaymentStages.length +
     incompleteScopeRows.length +
     missingBankFields.length +
@@ -527,6 +652,7 @@ export function SolarQuotationForm({
     hasInvalidPaymentTotal ||
     missingOverviewFields.length > 0 ||
     invalidOverviewFields.length > 0 ||
+    missingMandatoryBoqRows.length > 0 ||
     incompletePaymentStages.length > 0 ||
     incompleteScopeRows.length > 0 ||
     missingBankFields.length > 0 ||
@@ -548,6 +674,10 @@ export function SolarQuotationForm({
     if (missingOverviewFields.length > 0 || invalidOverviewFields.length > 0) {
       const issueLabels = [...missingOverviewFields.map((field) => field.label), ...invalidOverviewFields];
       return `Complete the overview details before saving. Missing or invalid: ${issueLabels.join(", ")}.`;
+    }
+
+    if (missingMandatoryBoqRows.length > 0) {
+      return `Complete all mandatory BOQ selections before saving. Missing: ${missingMandatoryBoqRows.map((row) => row.itemHead).join(", ")}.`;
     }
 
     if (resolvedRows.length === 0) {
@@ -579,6 +709,10 @@ export function SolarQuotationForm({
   const getTabIssueCount = (tabKey: QuotationFormTab) => {
     if (tabKey === "overview") {
       return missingOverviewFields.length + invalidOverviewFields.length;
+    }
+
+    if (tabKey === "boq") {
+      return missingMandatoryBoqRows.length;
     }
 
     if (tabKey === "payment") {
@@ -752,15 +886,16 @@ export function SolarQuotationForm({
     </div>
   );
 
-  const handleSelectItemType = (sequence: number, itemType: string) => {
-    const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
+  const handleSelectItemType = (rowId: string, itemType: string) => {
+    const targetRow = boqRows.find((row) => row.id === rowId);
+    const config = targetRow ? getConfigForSequence(targetRow.sequence) : undefined;
     const selectedItem = config
-      ? getBoqRowItems(items, config).find((item) => getItemTypeFromItem(item) === itemType)
+      ? getBoqRowItems(items, config).find((item) => matchesBoqItemType(getItemTypeFromItem(item), itemType))
       : undefined;
 
     setBoqRows((prev) =>
       prev.map((row) => {
-        if (row.sequence !== sequence) {
+        if (row.id !== rowId) {
           return row;
         }
 
@@ -784,7 +919,7 @@ export function SolarQuotationForm({
       })
     );
 
-    if (sequence === 1 && selectedItem) {
+    if (targetRow?.sequence === 1 && selectedItem) {
       const wattage = extractWattageFromItem(selectedItem);
       if (wattage) {
         setDocumentField("moduleWattage", wattage);
@@ -792,13 +927,14 @@ export function SolarQuotationForm({
     }
   };
 
-  const handleSelectRating = (sequence: number, itemId: string) => {
-    const config = SOLAR_BOQ_SEQUENCE.find((entry) => entry.sequence === sequence);
+  const handleSelectRating = (rowId: string, itemId: string) => {
+    const targetRow = boqRows.find((row) => row.id === rowId);
+    const config = targetRow ? getConfigForSequence(targetRow.sequence) : undefined;
     const selectedItem = items.find((item) => item.id === itemId);
 
     setBoqRows((prev) =>
       prev.map((row) => {
-        if (row.sequence !== sequence) {
+        if (row.id !== rowId) {
           return row;
         }
 
@@ -822,7 +958,7 @@ export function SolarQuotationForm({
       })
     );
 
-    if (sequence === 1 && selectedItem) {
+    if (targetRow?.sequence === 1 && selectedItem) {
       const wattage = extractWattageFromItem(selectedItem);
       if (wattage) {
         setDocumentField("moduleWattage", wattage);
@@ -830,11 +966,11 @@ export function SolarQuotationForm({
     }
   };
 
-  const handleQuantityChange = (sequence: number, value: string) => {
+  const handleQuantityChange = (rowId: string, value: string) => {
     const quantity = Number(value || 0);
     setBoqRows((prev) =>
       prev.map((row) =>
-        row.sequence === sequence
+        row.id === rowId
           ? {
               ...row,
               quantity,
@@ -843,6 +979,49 @@ export function SolarQuotationForm({
           : row
       )
     );
+  };
+
+  const addBoqRow = (sequence: number) => {
+    const config = getConfigForSequence(sequence);
+    if (!config || config.selectionMode !== "multiple") {
+      return;
+    }
+
+    setBoqRows((prev) => {
+      const insertAt = prev.reduce((lastIndex, row, index) => (row.sequence === sequence ? index : lastIndex), -1);
+      const nextRow = createBoqDraftRow(config.sequence, config.itemHead);
+
+      return [
+        ...prev.slice(0, insertAt + 1),
+        nextRow,
+        ...prev.slice(insertAt + 1),
+      ];
+    });
+  };
+
+  const removeBoqRow = (rowId: string) => {
+    setBoqRows((prev) => {
+      const row = prev.find((entry) => entry.id === rowId);
+      if (!row) {
+        return prev;
+      }
+
+      const config = getConfigForSequence(row.sequence);
+      if (!config || config.selectionMode !== "multiple") {
+        return prev;
+      }
+
+      const rowsForSequence = prev.filter((entry) => entry.sequence === row.sequence);
+      if (rowsForSequence.length <= 1) {
+        return prev.map((entry) =>
+          entry.id === rowId
+            ? { ...entry, itemId: "", itemType: "", quantity: 0, quantityTouched: false }
+            : entry
+        );
+      }
+
+      return prev.filter((entry) => entry.id !== rowId);
+    });
   };
 
   const updatePaymentStage = (
@@ -1019,6 +1198,11 @@ export function SolarQuotationForm({
       return;
     }
 
+    if (missingMandatoryBoqRows.length > 0) {
+      setActiveTab("boq");
+      return;
+    }
+
     if (resolvedRows.length === 0) {
       setActiveTab("boq");
       return;
@@ -1107,6 +1291,7 @@ export function SolarQuotationForm({
   };
 
   return (
+    <>
     <ModalShell
       onClose={onClose}
       title={isEditing ? `Edit Quotation ${formData.version}` : isNewVersion ? `New Version ${formData.version}` : "New Solar EPC Quotation"}
@@ -1214,13 +1399,24 @@ export function SolarQuotationForm({
                 {clientName || "Loading..."}
               </div>
             ) : (
-              <SearchableSelect
-                options={clientOptions}
-                value={formData.clientId}
-                onChange={(value) => setFormData((prev) => ({ ...prev, clientId: value }))}
-                placeholder="Select client..."
-                triggerClassName="border-red-300 bg-red-50"
-              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="min-w-0 flex-1">
+                  <SearchableSelect
+                    options={clientOptions}
+                    value={formData.clientId}
+                    onChange={(value) => setFormData((prev) => ({ ...prev, clientId: value }))}
+                    placeholder="Select client..."
+                    triggerClassName="border-red-300 bg-red-50"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowClientForm(true)}
+                  className="rounded-md border border-solar-border bg-white px-3 py-2 text-sm font-medium text-solar-ink"
+                >
+                  Add New Customer
+                </button>
+              </div>
             )}
           </div>
           <div>
@@ -1871,98 +2067,161 @@ export function SolarQuotationForm({
             <p className="text-xs text-gray-500">Fixed sequence from the workbook, with row-wise dropdowns and quantity inputs.</p>
           </div>
 
+          {missingMandatoryBoqRows.length > 0 && (
+            <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              Complete all mandatory BOQ rows before saving. Missing: {missingMandatoryBoqRows.map((row) => row.itemHead).join(", ")}.
+            </div>
+          )}
+
           <div className="max-h-[440px] overflow-auto">
-            <table className="min-w-[1080px] table-fixed divide-y divide-gray-200">
+            <table className="min-w-[1260px] table-fixed divide-y divide-gray-200">
               <thead className="sticky top-0 bg-yellow-50 text-[11px] uppercase tracking-wide text-gray-700">
                 <tr>
                   <th className="w-14 px-2 py-2 text-left">Seq.</th>
-                  <th className="w-40 px-2 py-2 text-left">Item Head</th>
+                  <th className="w-52 px-2 py-2 text-left">Item Head</th>
                   <th className="w-[280px] px-2 py-2 text-left">Item Type</th>
                   <th className="w-44 px-2 py-2 text-left">Ratings / Capacity</th>
                   <th className="w-40 px-2 py-2 text-left">Selection Unit</th>
                   <th className="w-44 px-2 py-2 text-right">Unit Rate</th>
                   <th className="w-40 px-2 py-2 text-left">User Input Number</th>
+                  <th className="w-28 px-2 py-2 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white text-sm">
                 {SOLAR_BOQ_SEQUENCE.map((config) => {
-                  const row = boqRows.find((entry) => entry.sequence === config.sequence);
+                  const rowsForConfig = boqRows.filter((entry) => entry.sequence === config.sequence);
+                  const isMissingMandatory = missingMandatoryBoqRows.some((row) => row.sequence === config.sequence);
                   const rowItems = getBoqRowItems(items, config);
-                  const itemTypeOptions = Array.from(
-                    new Map(
-                      rowItems.map((item) => {
-                        const itemType = getItemTypeFromItem(item);
-                        return [itemType.toLowerCase(), { value: itemType, label: itemType }];
-                      })
-                    ).values()
-                  );
-                  const ratingItems = rowItems.filter((item) => getItemTypeFromItem(item) === (row?.itemType || ""));
-                  const selectedItem = items.find((item) => item.id === row?.itemId);
-                  const resolved = resolvedRows.find((entry) => entry.sequence === config.sequence);
-                  const selectionUnit = selectedItem ? inferSelectionUnit(selectedItem) : "-";
 
-                  return (
-                    <tr key={config.sequence} className="align-top hover:bg-gray-50">
-                      <td className="px-2 py-3 text-gray-700">{config.sequence}</td>
-                      <td className="px-2 py-3 font-medium text-gray-900">{config.itemHead}</td>
-                      <td className="px-2 py-3">
-                        <SearchableSelect
-                          options={itemTypeOptions}
-                          value={row?.itemType || ""}
-                          onChange={(value) => handleSelectItemType(config.sequence, value)}
-                          placeholder={itemTypeOptions.length > 0 ? "Select item type..." : "No mapped items found"}
-                          searchPlaceholder="Search item types"
-                          triggerClassName="border-red-300 bg-red-50"
-                        />
-                      </td>
-                      <td className="px-2 py-3 text-gray-700">
-                        <SearchableSelect
-                          options={ratingItems.map((item) => {
-                            const display = getBoqDisplayParts(item);
-                            return {
-                              value: item.id,
-                              label: display.ratingOrCapacity || "-",
-                              subtitle: item.brand || undefined,
-                            };
-                          })}
-                          value={row?.itemId || ""}
-                          onChange={(value) => handleSelectRating(config.sequence, value)}
-                          placeholder={row?.itemType ? "Select rating..." : "Select item type first"}
-                          searchPlaceholder="Search ratings"
-                          emptyLabel={row?.itemType ? "No ratings found" : "Select item type first"}
-                          disabled={!row?.itemType}
-                          triggerClassName="border-red-300 bg-red-50"
-                        />
-                        {selectedItem?.brand && (
-                          <div className="mt-1 text-xs text-gray-500">
-                            {selectedItem.brand}
+                  return rowsForConfig.map((row, rowIndex) => {
+                    const filteredRowItems = row.fixedItemType
+                      ? rowItems.filter((item) => matchesBoqItemType(getItemTypeFromItem(item), row.fixedItemType || ""))
+                      : rowItems;
+                    const itemTypeOptions = Array.from(
+                      new Map(
+                        filteredRowItems.map((item) => {
+                          const itemType = getItemTypeFromItem(item);
+                          return [itemType.toLowerCase(), { value: itemType, label: itemType }];
+                        })
+                      ).values()
+                    );
+                    const activeItemType = row.itemType || row.fixedItemType || "";
+                    const ratingItems = filteredRowItems.filter((item) =>
+                      !activeItemType || matchesBoqItemType(getItemTypeFromItem(item), activeItemType)
+                    );
+                    const selectedItem = items.find((item) => item.id === row.itemId);
+                    const selectionUnit = selectedItem ? inferSelectionUnit(selectedItem) : "-";
+                    const warrantySummary = selectedItem ? getWarrantySummary(selectedItem.description) : "";
+
+                    return (
+                      <tr key={row.id} className={`align-top ${isMissingMandatory && !row.itemId ? "bg-red-50/70" : "hover:bg-gray-50"}`}>
+                        <td className="px-2 py-3 text-gray-700">{rowIndex === 0 ? config.sequence : ""}</td>
+                        <td className="px-2 py-3 font-medium text-gray-900">
+                          {rowIndex === 0 ? (
+                            <div className="space-y-2">
+                              <div>{config.itemHead}</div>
+                              <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                                {config.mandatory && <span className="rounded-full bg-red-100 px-2 py-1 text-red-700">Mandatory</span>}
+                                <span className="rounded-full bg-solar-sand px-2 py-1 text-solar-ink">
+                                  {config.selectionMode === "multiple" ? "Multiple" : config.selectionMode === "fixed" ? "Fixed" : "Single"}
+                                </span>
+                              </div>
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-3">
+                          {row.lockedItemType ? (
+                            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                              {row.fixedItemType || row.itemType || "Fixed row"}
+                            </div>
+                          ) : (
+                            <SearchableSelect
+                              options={itemTypeOptions}
+                              value={row.itemType}
+                              onChange={(value) => handleSelectItemType(row.id, value)}
+                              placeholder={itemTypeOptions.length > 0 ? "Select item type..." : "No mapped items found"}
+                              searchPlaceholder="Search item types"
+                              triggerClassName="border-red-300 bg-red-50"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-3 text-gray-700">
+                          <SearchableSelect
+                            options={ratingItems.map((item) => {
+                              const display = getBoqDisplayParts(item);
+                              return {
+                                value: item.id,
+                                label: display.ratingOrCapacity || item.name || "-",
+                                subtitle: [item.brand, getWarrantySummary(item.description)].filter(Boolean).join(" | ") || undefined,
+                              };
+                            })}
+                            value={row.itemId}
+                            onChange={(value) => handleSelectRating(row.id, value)}
+                            placeholder={activeItemType ? "Select rating..." : "Select item type first"}
+                            searchPlaceholder="Search ratings"
+                            emptyLabel={activeItemType ? "No ratings found" : "Select item type first"}
+                            disabled={!activeItemType}
+                            triggerClassName="border-red-300 bg-red-50"
+                          />
+                          {(selectedItem?.brand || warrantySummary) && (
+                            <div className="mt-1 space-y-1 text-xs text-gray-500">
+                              {selectedItem?.brand && <div>{selectedItem.brand}</div>}
+                              {warrantySummary && <div>{warrantySummary}</div>}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 text-gray-700">{selectionUnit}</td>
+                        <td className="px-2 py-3 text-right text-xs font-medium text-gray-900 sm:text-sm">
+                          {selectedItem
+                            ? isPercentageItem(selectedItem)
+                              ? `${Number(selectedItem.unitPrice || 0).toFixed(2)}% of subtotal`
+                              : `${formatCurrency(Number(selectedItem.unitPrice || 0))} / ${selectionUnit}`
+                            : "-"}
+                        </td>
+                        <td className="px-2 py-3">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={row.quantity}
+                            onChange={(event) => handleQuantityChange(row.id, event.target.value)}
+                            disabled={!selectedItem}
+                            className="w-28 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900 disabled:bg-gray-100"
+                          />
+                          {selectedItem && isPercentageItem(selectedItem) && (
+                            <div className="mt-1 text-xs text-amber-700">Use 1 to apply this percentage charge once.</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 text-center">
+                          <div className="flex flex-col gap-2">
+                            {config.selectionMode === "multiple" && (
+                              <button
+                                type="button"
+                                onClick={() => addBoqRow(config.sequence)}
+                                className="rounded-md border border-solar-border bg-white px-2 py-2 text-xs font-semibold text-solar-ink"
+                              >
+                                Add
+                              </button>
+                            )}
+                            {config.selectionMode === "multiple" && rowsForConfig.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeBoqRow(row.id)}
+                                className="rounded-md border border-red-200 bg-red-50 px-2 py-2 text-xs font-semibold text-red-700"
+                              >
+                                Remove
+                              </button>
+                            )}
+                            {config.selectionMode !== "multiple" && (
+                              <span className="text-xs font-semibold text-solar-muted">
+                                {config.selectionMode === "fixed" ? "Locked" : "Single"}
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-gray-700">{selectionUnit}</td>
-                      <td className="px-2 py-3 text-right text-xs font-medium text-gray-900 sm:text-sm">
-                        {selectedItem
-                          ? isPercentageItem(selectedItem)
-                            ? `${Number(resolved?.rawRate || selectedItem.unitPrice || 0).toFixed(2)}% of subtotal`
-                            : `${formatCurrency(Number(resolved?.rawRate || selectedItem.unitPrice || 0))} / ${selectionUnit}`
-                          : "-"}
-                      </td>
-                      <td className="px-2 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row?.quantity ?? 0}
-                          onChange={(event) => handleQuantityChange(config.sequence, event.target.value)}
-                          disabled={!selectedItem}
-                          className="w-28 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-right text-sm text-gray-900 disabled:bg-gray-100"
-                        />
-                        {selectedItem && isPercentageItem(selectedItem) && (
-                          <div className="mt-1 text-xs text-amber-700">Use 1 to apply this percentage charge once.</div>
-                        )}
-                      </td>
-                    </tr>
-                  );
+                        </td>
+                      </tr>
+                    );
+                  });
                 })}
               </tbody>
             </table>
@@ -1985,7 +2244,7 @@ export function SolarQuotationForm({
               <h3 className="text-lg font-semibold text-cyan-900">Payment Stages</h3>
               <p className="text-xs text-cyan-800">These stages flow into the quotation payment schedule.</p>
             </div>
-            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${paymentStageTotal === 100 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${isPaymentTotalBalanced ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
               Total {paymentStageTotal.toFixed(2)}%
             </div>
           </div>
@@ -1999,70 +2258,93 @@ export function SolarQuotationForm({
               Complete all fields for every payment stage before saving. Incomplete stages: {incompletePaymentStages.map((entry) => entry.index + 1).join(", ")}.
             </div>
           )}
-          <div className="space-y-3">
-            {documentData.paymentStages.map((stage, index) => (
-              <div
-                key={`${stage.label}-${index}`}
-                className={`rounded-lg border bg-white p-4 ${
-                  incompletePaymentStages.some((entry) => entry.index === index)
-                    ? "border-red-200"
-                    : "border-cyan-200"
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-solar-ink">Stage {index + 1}</div>
-                  {documentData.paymentStages.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removePaymentStage(index)}
-                      className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Label</label>
-                    <input
-                      type="text"
-                      value={stage.label}
-                      onChange={(event) => updatePaymentStage(index, "label", event.target.value)}
-                      className={userInputClassName}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Percentage</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={stage.percentage}
-                      onChange={(event) => updatePaymentStage(index, "percentage", event.target.value)}
-                      className={userInputClassName}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Milestone</label>
-                    <textarea
-                      value={stage.milestone}
-                      onChange={(event) => updatePaymentStage(index, "milestone", event.target.value)}
-                      rows={2}
-                      className={userInputClassName}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
-                    <textarea
-                      value={stage.remarks}
-                      onChange={(event) => updatePaymentStage(index, "remarks", event.target.value)}
-                      rows={2}
-                      className={userInputClassName}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-lg border border-cyan-200 bg-white">
+            <div className="max-h-[440px] overflow-auto">
+              <table className="min-w-[1120px] table-fixed divide-y divide-cyan-100 text-sm">
+                <thead className="sticky top-0 bg-cyan-100 text-[11px] uppercase tracking-wide text-cyan-900">
+                  <tr>
+                    <th className="w-20 px-3 py-2 text-left">Stage</th>
+                    <th className="w-64 px-3 py-2 text-left">Label</th>
+                    <th className="w-72 px-3 py-2 text-left">Milestone</th>
+                    <th className="w-32 px-3 py-2 text-right">Percentage</th>
+                    <th className="w-40 px-3 py-2 text-right">Value</th>
+                    <th className="w-72 px-3 py-2 text-left">Remarks</th>
+                    <th className="w-24 px-3 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyan-100">
+                  {paymentStageRows.map(({ index, stage, value }) => {
+                    const isIncomplete = incompletePaymentStages.some((entry) => entry.index === index);
+                    return (
+                      <tr key={`${stage.label}-${index}`} className={isIncomplete ? "bg-red-50/80" : index % 2 === 0 ? "bg-white" : "bg-cyan-50/40"}>
+                        <td className="px-3 py-3 align-top text-sm font-semibold text-solar-ink">Stage {index + 1}</td>
+                        <td className="px-3 py-3 align-top">
+                          <input
+                            type="text"
+                            value={stage.label}
+                            onChange={(event) => updatePaymentStage(index, "label", event.target.value)}
+                            className={userInputClassName}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <textarea
+                            value={stage.milestone}
+                            onChange={(event) => updatePaymentStage(index, "milestone", event.target.value)}
+                            rows={2}
+                            className={`${userInputClassName} min-h-[72px] resize-y`}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={stage.percentage}
+                            onChange={(event) => updatePaymentStage(index, "percentage", event.target.value)}
+                            className={`${userInputClassName} text-right`}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-right font-semibold text-amber-900">
+                            {formatCurrency(value)}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <textarea
+                            value={stage.remarks}
+                            onChange={(event) => updatePaymentStage(index, "remarks", event.target.value)}
+                            rows={2}
+                            className={`${userInputClassName} min-h-[72px] resize-y`}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top text-center">
+                          {documentData.paymentStages.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removePaymentStage(index)}
+                              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <span className="text-xs text-solar-muted">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-cyan-50 text-sm font-semibold text-cyan-950">
+                  <tr>
+                    <td className="px-3 py-3" colSpan={3}>Totals</td>
+                    <td className="px-3 py-3 text-right">{paymentStageTotal.toFixed(2)}%</td>
+                    <td className="px-3 py-3 text-right">{formatCurrency(paymentStageRows.reduce((sum, entry) => sum + entry.value, 0))}</td>
+                    <td className="px-3 py-3 text-left">Live value based on current quotation total</td>
+                    <td className="px-3 py-3" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
           <button
             type="button"
@@ -2131,95 +2413,96 @@ export function SolarQuotationForm({
               Complete all fields for every scope row before saving. Incomplete rows: {incompleteScopeRows.map((entry) => entry.index + 1).join(", ")}.
             </div>
           )}
-          <div className="space-y-3">
-            {documentData.scopeOfWorkRows.map((row, index) => (
-              <div
-                key={`${row.srNo}-${index}`}
-                className={`rounded-lg border bg-white p-4 ${
-                  incompleteScopeRows.some((entry) => entry.index === index)
-                    ? "border-red-200"
-                    : isScopeSectionRow(row)
-                      ? "border-indigo-300 bg-indigo-100"
-                      : "border-indigo-200"
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-indigo-950">
-                    {isScopeSectionRow(row) ? `Section ${row.srNo}` : `Scope Row ${index + 1}`}
-                  </div>
-                  {documentData.scopeOfWorkRows.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeScopeRow(index)}
-                      className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                {isScopeSectionRow(row) ? (
-                  <div className="grid gap-4 md:grid-cols-[120px_1fr]">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Section No.</label>
-                      <input
-                        type="text"
-                        value={row.srNo}
-                        onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
-                        className={userInputClassName}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Section Title</label>
-                      <input
-                        type="text"
-                        value={row.workItem}
-                        onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
-                        className={userInputClassName}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Sr. No.</label>
-                      <input
-                        type="text"
-                        value={row.srNo}
-                        onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
-                        className={userInputClassName}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Responsibility</label>
-                      <input
-                        type="text"
-                        value={row.responsibility}
-                        onChange={(event) => updateScopeRow(index, "responsibility", event.target.value)}
-                        className={userInputClassName}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Work Item / Activity</label>
-                      <textarea
-                        value={row.workItem}
-                        onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
-                        rows={2}
-                        className={userInputClassName}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Remarks</label>
-                      <textarea
-                        value={row.remarks}
-                        onChange={(event) => updateScopeRow(index, "remarks", event.target.value)}
-                        rows={2}
-                        className={userInputClassName}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-lg border border-indigo-200 bg-white">
+            <div className="max-h-[480px] overflow-auto">
+              <table className="min-w-[1120px] table-fixed divide-y divide-indigo-100 text-sm">
+                <thead className="sticky top-0 bg-indigo-100 text-[11px] uppercase tracking-wide text-indigo-950">
+                  <tr>
+                    <th className="w-28 px-3 py-2 text-left">Sr. No.</th>
+                    <th className="w-[34rem] px-3 py-2 text-left">Work Item / Section Title</th>
+                    <th className="w-56 px-3 py-2 text-left">Responsibility</th>
+                    <th className="w-[26rem] px-3 py-2 text-left">Remarks</th>
+                    <th className="w-24 px-3 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-indigo-100">
+                  {documentData.scopeOfWorkRows.map((row, index) => {
+                    const isSectionRow = isScopeSectionRow(row);
+                    const isIncomplete = incompleteScopeRows.some((entry) => entry.index === index);
+                    return (
+                      <tr key={`${row.srNo}-${index}`} className={isSectionRow ? "bg-indigo-50" : isIncomplete ? "bg-red-50/80" : index % 2 === 0 ? "bg-white" : "bg-indigo-50/30"}>
+                        <td className="px-3 py-3 align-top">
+                          <input
+                            type="text"
+                            value={row.srNo}
+                            onChange={(event) => updateScopeRow(index, "srNo", event.target.value)}
+                            className={userInputClassName}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {isSectionRow ? (
+                            <input
+                              type="text"
+                              value={row.workItem}
+                              onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
+                              className={`${userInputClassName} font-semibold text-indigo-950`}
+                            />
+                          ) : (
+                            <textarea
+                              value={row.workItem}
+                              onChange={(event) => updateScopeRow(index, "workItem", event.target.value)}
+                              rows={2}
+                              className={`${userInputClassName} min-h-[72px] resize-y`}
+                            />
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {isSectionRow ? (
+                            <div className="rounded-md border border-indigo-300 bg-indigo-100 px-3 py-2 font-semibold text-indigo-950">
+                              Section
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={row.responsibility}
+                              onChange={(event) => updateScopeRow(index, "responsibility", event.target.value)}
+                              className={userInputClassName}
+                            />
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {isSectionRow ? (
+                            <div className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+                              {row.remarks || "Section heading row"}
+                            </div>
+                          ) : (
+                            <textarea
+                              value={row.remarks}
+                              onChange={(event) => updateScopeRow(index, "remarks", event.target.value)}
+                              rows={2}
+                              className={`${userInputClassName} min-h-[72px] resize-y`}
+                            />
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top text-center">
+                          {documentData.scopeOfWorkRows.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removeScopeRow(index)}
+                              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <span className="text-xs text-solar-muted">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -2441,7 +2724,7 @@ export function SolarQuotationForm({
               </span>
             </div>
             <div className="space-y-2 text-sm text-cyan-950">
-              {documentData.paymentStages.map((stage, index) => (
+              {paymentStageRows.map(({ index, stage, value }) => (
                 <div
                   key={`${stage.label}-${index}-preview`}
                   className={`rounded-md border bg-white px-3 py-2 ${
@@ -2450,7 +2733,7 @@ export function SolarQuotationForm({
                 >
                   <div className="font-medium">{stage.label || `Stage ${index + 1}`}</div>
                   <div className="text-xs text-slate-600">{stage.milestone || "Milestone missing"}</div>
-                  <div className="mt-1 text-xs text-slate-700">{Number(stage.percentage || 0).toFixed(2)}% | {stage.remarks || "Remarks missing"}</div>
+                  <div className="mt-1 text-xs text-slate-700">{Number(stage.percentage || 0).toFixed(2)}% | {formatCurrency(value)} | {stage.remarks || "Remarks missing"}</div>
                 </div>
               ))}
             </div>
@@ -2595,5 +2878,26 @@ export function SolarQuotationForm({
         </div>
       </form>
     </ModalShell>
+    {showClientForm && (
+      <ClientForm
+        onClose={() => setShowClientForm(false)}
+        onSuccess={(client) => {
+          if (!client) {
+            return;
+          }
+
+          setClients((prev) => sortClientsByName([
+            ...prev.filter((entry) => entry.id !== client.id),
+            client,
+          ]));
+          setFormData((prev) => ({
+            ...prev,
+            clientId: client.id,
+            inquiryId: "",
+          }));
+        }}
+      />
+    )}
+    </>
   );
 }

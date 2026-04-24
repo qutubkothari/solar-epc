@@ -791,7 +791,7 @@ export async function GET(
       srNo: String(index + 1),
       itemName: sanitizeText(item.item.category || item.item.name || "BOQ Item"),
       make: sanitizeText(item.item.brand || "-") || "-",
-      description: sanitizeText(item.item.description || item.description || item.item.name || "-"),
+      description: sanitizeText(item.description || item.item.description || item.item.name || "-"),
       unit: sanitizeText(item.item.uom || "-") || "-",
       quantity: Number(item.quantity || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 }),
     }));

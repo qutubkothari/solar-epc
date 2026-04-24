@@ -17,6 +17,9 @@ export type SolarBoqRowConfig = {
   categoryAliases: string[];
   includeTerms?: string[];
   excludeTerms?: string[];
+  mandatory: boolean;
+  selectionMode: "single" | "multiple" | "fixed";
+  fixedItemTypes?: string[];
 };
 
 export type SolarBoqContext = {
@@ -36,30 +39,41 @@ export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
     itemHead: "SOLAR MODULE",
     categoryAliases: ["SOLAR MODULE", "Solar Modules"],
     includeTerms: ["module", "topcon", "bifacial", "mono facial", "mono"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 2,
     itemHead: "SOLAR INVERTER",
     categoryAliases: ["SOLAR INVERTER", "INVERTER", "Inverters"],
     includeTerms: ["inverter", "inv -", "hybrid", "on grid"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 3,
     itemHead: "SOLAR STRUCTURE",
     categoryAliases: ["SOLAR STRUCTURE", "MODULE MOUNTING STRUCTURE", "Mounting Structure"],
     includeTerms: ["structure", "rail", "mounting"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 4,
     itemHead: "SOLAR STRUCTURE Accessories",
     categoryAliases: ["SOLAR STRUCTURE ACCESSORIES", "FASTENERS", "ANCORE FASTNER", "BASE PLATE", "J BOULT"],
     includeTerms: ["fastener", "fastner", "anchor", "base plate", "j bolt", "clamp"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 5,
     itemHead: "ELECTRICAL PROTECTION Panels",
     categoryAliases: ["ELECTRICAL PROTECTION PANELS", "ACDB", "DCDB"],
     includeTerms: ["acdb", "dcdb", "panel"],
+    mandatory: true,
+    selectionMode: "fixed",
+    fixedItemTypes: ["AC DISTRIBUTION BOX", "DC DISTRIBUTION BOX"],
   },
   {
     sequence: 6,
@@ -67,6 +81,8 @@ export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
     categoryAliases: ["AC CABLE", "AC CABLE- 2", "Cables"],
     includeTerms: ["ac", "cable"],
     excludeTerms: ["dc cable"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 7,
@@ -74,36 +90,48 @@ export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
     categoryAliases: ["DC CABLE", "Cables"],
     includeTerms: ["dc cable", "dc wire", "pv cable"],
     excludeTerms: ["ac cable", "ac wire"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 8,
     itemHead: "ELECTRICAL PROTECTION ITEMS",
     categoryAliases: ["ELECTRICAL PROTECTION ITEMS", "ISOLATION"],
     includeTerms: ["isolat", "mccb", "breaker", "protection"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 9,
     itemHead: "LIGHTNING ARRESTOR ACCESSORIES",
     categoryAliases: ["LIGHTNING ARRESTOR ACCESSORIES", "LIGHTNING ARRESTOR", "LA CABLE / STRIP", "Lightning Arrestor"],
     includeTerms: ["lightning", "arrestor", "la cable"],
+    mandatory: false,
+    selectionMode: "single",
   },
   {
     sequence: 10,
     itemHead: "EARTHING SOLUTION",
     categoryAliases: ["EARTHING SOLUTION", "EARTHING ROAD", "Earthing"],
     includeTerms: ["earthing", "earth pit", "earthing road", "chemical"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 11,
     itemHead: "EARTHING CONNECTIVITY",
     categoryAliases: ["EARTHING CONNECTIVITY", "EARTHING CABLE / STRIP", "Earthing"],
     includeTerms: ["connectivity", "strip", "earthing cable", "gi strip", "cu strip"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 12,
     itemHead: "EARTHING ACCESSORIES",
     categoryAliases: ["EARTHING ACCESSORIES", "Earthing"],
     includeTerms: ["accessories", "clamp", "lug", "electrode", "earth pit"],
+    mandatory: false,
+    selectionMode: "multiple",
   },
   {
     sequence: 13,
@@ -111,48 +139,66 @@ export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
     categoryAliases: ["MODULE TO MODULE EARTHING CU.CABLE", "Cables"],
     includeTerms: ["earthing wire", "cu cable", "copper cable"],
     excludeTerms: ["ac cable", "dc cable"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 14,
     itemHead: "ELECTRICAL INSTALLATIONS",
     categoryAliases: ["ELECTRICAL INSTALLATIONS", "CONDUITE", "CABLE TRAY", "Conduits"],
     includeTerms: ["conduit", "cable tray", "installation"],
+    mandatory: true,
+    selectionMode: "multiple",
   },
   {
     sequence: 15,
     itemHead: "WALKWAY",
     categoryAliases: ["WALKWAY", "WALK WAY", "Walkway"],
     includeTerms: ["walkway"],
+    mandatory: false,
+    selectionMode: "single",
   },
   {
     sequence: 16,
     itemHead: "WALKWAY FITTINGS",
     categoryAliases: ["WALKWAY FITTINGS", "Walkway"],
     includeTerms: ["walkway fitting", "walkway", "clamp"],
+    mandatory: true,
+    selectionMode: "fixed",
+    fixedItemTypes: ["C CLAMP", "M CLAMP"],
   },
   {
     sequence: 17,
     itemHead: "PV INSTALLATIONS",
     categoryAliases: ["PV INSTALLATIONS", "Other"],
     includeTerms: ["pv installation", "installation"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 18,
     itemHead: "CIVIL WORK",
     categoryAliases: ["CIVIL WORK", "Civil Works"],
     includeTerms: ["foundation", "civil", "cable laying"],
+    mandatory: false,
+    selectionMode: "multiple",
   },
   {
     sequence: 19,
     itemHead: "MISCELLANEOUS",
     categoryAliases: ["MISCELLANEOUS", "Other"],
     includeTerms: ["misc"],
+    mandatory: true,
+    selectionMode: "single",
   },
   {
     sequence: 20,
     itemHead: "CHARGES",
     categoryAliases: ["CHARGES", "BOQ Item"],
     includeTerms: ["charge", "transport", "commissioning", "safety", "ifp"],
+    mandatory: true,
+    selectionMode: "fixed",
+    fixedItemTypes: ["TRANSPORTATION", "INSTALLATION & COMMISSIONING"],
   },
 ];
 
@@ -291,6 +337,8 @@ export const resolveBoqItemHead = (item: SolarBoqItem) => {
 };
 
 const cleanName = (value?: string | null) => (value || "").replace(/\s+/g, " ").trim();
+
+export const normalizeBoqText = (value?: string | null) => normalize(value);
 
 const normalizeRatingPart = (value: string) =>
   value
@@ -478,3 +526,6 @@ export const getDefaultQuantity = (
 export const getBoqRowItems = (items: SolarBoqItem[], row: SolarBoqRowConfig) => {
   return items.filter((item) => resolveBoqItemHead(item) === row.itemHead);
 };
+
+export const matchesBoqItemType = (itemType: string, candidate: string) =>
+  normalize(itemType) === normalize(candidate);

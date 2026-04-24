@@ -10,7 +10,7 @@ import { usePagination } from "@/hooks/use-pagination";
 import { useSortableData } from "@/hooks/use-sortable-data";
 import { formatCurrency } from "@/lib/format";
 import { normalizeQuotationDocumentData, type QuotationDocumentData } from "@/lib/quotation-document";
-import { resolveBoqItemHead } from "@/lib/solar-boq";
+import { getBoqDisplayParts, resolveBoqItemHead } from "@/lib/solar-boq";
 
 type QuotationVersion = {
   id: string;
@@ -174,9 +174,9 @@ export default function QuotationsPage() {
       return undefined;
     }
 
-    const rowsByHead = new Map(
-      editingVersion.items.map((entry) => [
-        resolveBoqItemHead({
+    return editingVersion.items
+      .map((entry) => {
+        const item = {
           id: entry.item.id,
           name: entry.item.name,
           description: entry.item.description || null,
@@ -187,45 +187,47 @@ export default function QuotationsPage() {
           uom: entry.item.uom || null,
           category: entry.item.category || null,
           pricingUnit: entry.item.pricingUnit || null,
-        }),
-        entry,
-      ])
-    );
+        };
+        const itemHead = resolveBoqItemHead(item);
+        const sequence = itemHead
+          ? [
+              "SOLAR MODULE",
+              "SOLAR INVERTER",
+              "SOLAR STRUCTURE",
+              "SOLAR STRUCTURE Accessories",
+              "ELECTRICAL PROTECTION Panels",
+              "AC CABLE",
+              "DC CABLE",
+              "ELECTRICAL PROTECTION ITEMS",
+              "LIGHTNING ARRESTOR ACCESSORIES",
+              "EARTHING SOLUTION",
+              "EARTHING CONNECTIVITY",
+              "EARTHING ACCESSORIES",
+              "MODULE TO MODULE EARTHING CU.CABLE",
+              "ELECTRICAL INSTALLATIONS",
+              "WALKWAY",
+              "WALKWAY FITTINGS",
+              "PV INSTALLATIONS",
+              "CIVIL WORK",
+              "MISCELLANEOUS",
+              "CHARGES",
+            ].indexOf(itemHead) + 1
+          : 0;
 
-    return [
-      ...Array.from({ length: 20 }, (_, index) => index + 1).map((sequence) => {
-        const itemHead = [
-          "SOLAR MODULE",
-          "SOLAR INVERTER",
-          "SOLAR STRUCTURE",
-          "SOLAR STRUCTURE Accessories",
-          "ELECTRICAL PROTECTION Panels",
-          "AC CABLE",
-          "DC CABLE",
-          "ELECTRICAL PROTECTION ITEMS",
-          "LIGHTNING ARRESTOR ACCESSORIES",
-          "EARTHING SOLUTION",
-          "EARTHING CONNECTIVITY",
-          "EARTHING ACCESSORIES",
-          "MODULE TO MODULE EARTHING CU.CABLE",
-          "ELECTRICAL INSTALLATIONS",
-          "WALKWAY",
-          "WALKWAY FITTINGS",
-          "PV INSTALLATIONS",
-          "CIVIL WORK",
-          "MISCELLANEOUS",
-          "CHARGES",
-        ][sequence - 1];
-        const matched = rowsByHead.get(itemHead);
+        if (!itemHead || sequence <= 0) {
+          return null;
+        }
+
         return {
           sequence,
           itemHead,
-          itemId: matched?.item.id || "",
-          quantity: Number(matched?.quantity || 0),
+          itemId: entry.item.id,
+          itemType: getBoqDisplayParts(item).itemType || entry.item.name,
+          quantity: Number(entry.quantity || 0),
           quantityTouched: false,
         };
-      }),
-    ];
+      })
+      .filter(Boolean);
   }, [editingVersion]);
 
   return (

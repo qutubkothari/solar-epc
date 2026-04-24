@@ -58,6 +58,7 @@ const getBoqWorkbookItems = (validHeads) => {
       const uom = clean(row[6]);
       const rate = toNumber(row[7]);
       const gstRaw = toNumber(row[8]);
+      const warranty = clean(row[9]);
 
       const itemType = rawItemType || rawRating || itemHead;
       const rating = rawItemType ? rawRating : "";
@@ -70,6 +71,7 @@ const getBoqWorkbookItems = (validHeads) => {
       const descriptionParts = [];
       if (rating) descriptionParts.push(`Rating/Capacity: ${rating}`);
       if (details) descriptionParts.push(details);
+      if (warranty) descriptionParts.push(`Warranty: ${warranty}`);
 
       return {
         itemHead,

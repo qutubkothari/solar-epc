@@ -5,7 +5,7 @@ import { ModalShell } from "@/components/modal-shell";
 
 type ClientFormProps = {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (client?: { id: string; name: string; contactName?: string | null }) => void;
   clientId?: string;
   initialData?: {
     name: string;
@@ -81,7 +81,8 @@ export function ClientForm({ onClose, onSuccess, clientId, initialData }: Client
       });
 
       if (res.ok) {
-        onSuccess();
+        const savedClient = await res.json();
+        onSuccess(savedClient);
         onClose();
       } else {
         setErrorMessage("Unable to save client. Please try again.");
