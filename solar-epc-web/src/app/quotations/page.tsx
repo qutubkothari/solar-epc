@@ -227,7 +227,7 @@ export default function QuotationsPage() {
           quantityTouched: false,
         };
       })
-      .filter(Boolean);
+      .filter((row): row is NonNullable<typeof row> => row !== null);
   }, [editingVersion]);
 
   return (
