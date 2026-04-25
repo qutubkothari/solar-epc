@@ -983,7 +983,7 @@ export function SolarQuotationForm({
 
   const addBoqRow = (sequence: number) => {
     const config = getConfigForSequence(sequence);
-    if (!config || config.selectionMode !== "multiple") {
+    if (!config || (config.selectionMode !== "multiple" && !config.allowAdditional)) {
       return;
     }
 
@@ -1007,12 +1007,14 @@ export function SolarQuotationForm({
       }
 
       const config = getConfigForSequence(row.sequence);
-      if (!config || config.selectionMode !== "multiple") {
+      const isMultiple = config?.selectionMode === "multiple";
+      const isAdditional = config?.allowAdditional === true && !row.lockedItemType;
+      if (!config || (!isMultiple && !isAdditional)) {
         return prev;
       }
 
       const rowsForSequence = prev.filter((entry) => entry.sequence === row.sequence);
-      if (rowsForSequence.length <= 1) {
+      if (isMultiple && rowsForSequence.length <= 1) {
         return prev.map((entry) =>
           entry.id === rowId
             ? { ...entry, itemId: "", itemType: "", quantity: 0, quantityTouched: false }
@@ -2162,7 +2164,6 @@ export function SolarQuotationForm({
                               return {
                                 value: item.id,
                                 label: display.ratingOrCapacity || item.name || "-",
-                                subtitle: [item.brand, getWarrantySummary(item.description)].filter(Boolean).join(" | ") || undefined,
                               };
                             })}
                             value={row.itemId}
@@ -2173,12 +2174,6 @@ export function SolarQuotationForm({
                             disabled={!activeItemType}
                             triggerClassName="border-red-300 bg-red-50"
                           />
-                          {(selectedItem?.brand || warrantySummary) && (
-                            <div className="mt-1 space-y-1 text-xs text-gray-500">
-                              {selectedItem?.brand && <div>{selectedItem.brand}</div>}
-                              {warrantySummary && <div>{warrantySummary}</div>}
-                            </div>
-                          )}
                         </td>
                         <td className="px-2 py-3 text-gray-700">{selectionUnit}</td>
                         <td className="px-2 py-3 text-right text-xs font-medium text-gray-900 sm:text-sm">
@@ -2204,7 +2199,7 @@ export function SolarQuotationForm({
                         </td>
                         <td className="px-2 py-3 text-center">
                           <div className="flex flex-col gap-2">
-                            {config.selectionMode === "multiple" && (
+                            {(config.selectionMode === "multiple" || config.allowAdditional) && (
                               <button
                                 type="button"
                                 onClick={() => addBoqRow(config.sequence)}
@@ -2213,7 +2208,7 @@ export function SolarQuotationForm({
                                 Add
                               </button>
                             )}
-                            {config.selectionMode === "multiple" && rowsForConfig.length > 1 && (
+                            {(config.selectionMode === "multiple" && rowsForConfig.length > 1) || (config.allowAdditional && !row.lockedItemType) ? (
                               <button
                                 type="button"
                                 onClick={() => removeBoqRow(row.id)}
@@ -2221,11 +2216,14 @@ export function SolarQuotationForm({
                               >
                                 Remove
                               </button>
-                            )}
-                            {config.selectionMode !== "multiple" && (
+                            ) : null}
+                            {config.selectionMode !== "multiple" && !config.allowAdditional && (
                               <span className="text-xs font-semibold text-solar-muted">
                                 {config.selectionMode === "fixed" ? "Locked" : "Single"}
                               </span>
+                            )}
+                            {row.lockedItemType && config.allowAdditional && (
+                              <span className="text-xs font-semibold text-amber-700">Fixed</span>
                             )}
                           </div>
                         </td>

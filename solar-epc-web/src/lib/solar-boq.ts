@@ -20,6 +20,7 @@ export type SolarBoqRowConfig = {
   mandatory: boolean;
   selectionMode: "single" | "multiple" | "fixed";
   fixedItemTypes?: string[];
+  allowAdditional?: boolean;
 };
 
 export type SolarBoqContext = {
@@ -199,6 +200,7 @@ export const SOLAR_BOQ_SEQUENCE: SolarBoqRowConfig[] = [
     mandatory: true,
     selectionMode: "fixed",
     fixedItemTypes: ["TRANSPORTATION", "INSTALLATION & COMMISSIONING"],
+    allowAdditional: true,
   },
 ];
 
