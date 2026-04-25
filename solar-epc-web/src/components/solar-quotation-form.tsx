@@ -2093,6 +2093,10 @@ export function SolarQuotationForm({
                   const isMissingMandatory = missingMandatoryBoqRows.some((row) => row.sequence === config.sequence);
                   const rowItems = getBoqRowItems(items, config);
 
+                  const usedItemTypes = config.selectionMode === "multiple"
+                    ? new Set(rowsForConfig.map((r) => (r.itemType || "").toLowerCase()).filter(Boolean))
+                    : new Set<string>();
+
                   return rowsForConfig.map((row, rowIndex) => {
                     const filteredRowItems = row.fixedItemType
                       ? rowItems.filter((item) => matchesBoqItemType(getItemTypeFromItem(item), row.fixedItemType || ""))
@@ -2104,7 +2108,13 @@ export function SolarQuotationForm({
                           return [itemType.toLowerCase(), { value: itemType, label: itemType }];
                         })
                       ).values()
-                    );
+                    ).filter((opt) => {
+                      // For multiple-selection sequences, exclude types already chosen in other rows
+                      if (config.selectionMode !== "multiple") return true;
+                      const currentRowType = (row.itemType || "").toLowerCase();
+                      if (opt.value.toLowerCase() === currentRowType) return true; // always show own selection
+                      return !usedItemTypes.has(opt.value.toLowerCase());
+                    });
                     const activeItemType = row.itemType || row.fixedItemType || "";
                     const ratingItems = filteredRowItems.filter((item) =>
                       !activeItemType || matchesBoqItemType(getItemTypeFromItem(item), activeItemType)
