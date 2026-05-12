@@ -55,6 +55,11 @@ export type QuotationDocumentData = {
   totalWatts: number;
   totalKw: number;
   systemType: string;
+  meterPhase?: string;
+  discom?: string;
+  plantType?: string;
+  moduleMake?: string;
+  moduleType?: string;
   requiredAreaFactorSqftPerKw: number;
   expectedGenerationUnitsPerKw: number;
   electricityTariffYear1: number;
@@ -585,6 +590,11 @@ export const createDefaultQuotationDocumentData = (
     totalWatts,
     totalKw,
     systemType: overrides?.systemType ?? "On Grid",
+    meterPhase: overrides?.meterPhase ?? "Single Phase",
+    discom: overrides?.discom ?? "MGVCL",
+    plantType: overrides?.plantType ?? "ON GRID",
+    moduleMake: overrides?.moduleMake ?? "Adani",
+    moduleType: overrides?.moduleType ?? "Bi-facial",
     requiredAreaFactorSqftPerKw: overrides?.requiredAreaFactorSqftPerKw ?? 50,
     expectedGenerationUnitsPerKw: overrides?.expectedGenerationUnitsPerKw ?? 4.59,
     electricityTariffYear1: overrides?.electricityTariffYear1 ?? 8,
@@ -717,6 +727,11 @@ export const normalizeQuotationDocumentData = (value: unknown): QuotationDocumen
     totalWatts: asNumber(raw.totalWatts, 5500),
     totalKw: asNumber(raw.totalKw, 5.5),
     systemType: asString(raw.systemType, "On Grid"),
+    meterPhase: asString(raw.meterPhase, "Single Phase"),
+    discom: asString(raw.discom, "MGVCL"),
+    plantType: asString(raw.plantType, "ON GRID"),
+    moduleMake: asString(raw.moduleMake, "Adani"),
+    moduleType: asString(raw.moduleType, "Bi-facial"),
     requiredAreaFactorSqftPerKw: asNumber(raw.requiredAreaFactorSqftPerKw, 50),
     expectedGenerationUnitsPerKw: asNumber(raw.expectedGenerationUnitsPerKw, 4.59),
     electricityTariffYear1: asNumber(raw.electricityTariffYear1, 8),
