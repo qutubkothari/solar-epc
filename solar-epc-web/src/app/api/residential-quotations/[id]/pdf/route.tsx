@@ -62,7 +62,7 @@ export async function GET(
     return new NextResponse(Buffer.from(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": \`inline; filename="Residential-Quotation-\${quotation.title.replace(/\\s+/g, "-")}.pdf"\`
+        "Content-Disposition": `inline; filename="Residential-Quotation-${quotation.title.replace(/\\s+/g, "-")}.pdf"`
       }
     });
   } catch (error) {
