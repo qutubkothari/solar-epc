@@ -45,3 +45,7 @@ export const resolveResidentialBoqItemHead = (item: SolarBoqItem) => {
   
   return "OTHER MISC.";
 };
+
+export const getResidentialBoqRowItems = (items: SolarBoqItem[], row: SolarBoqRowConfig) => {
+  return items.filter((item) => resolveResidentialBoqItemHead(item) === row.itemHead);
+};

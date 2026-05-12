@@ -22,7 +22,7 @@ import {
   
   type SolarBoqItem,
 } from "@/lib/solar-boq";
-import { RESIDENTIAL_BOQ_SEQUENCE, resolveResidentialBoqItemHead } from "@/lib/residential-boq";
+import { RESIDENTIAL_BOQ_SEQUENCE, resolveResidentialBoqItemHead, getResidentialBoqRowItems } from "@/lib/residential-boq";
 
 type Client = {
   id: string;
@@ -930,7 +930,7 @@ export function ResidentialQuotationForm({
     const targetRow = boqRows.find((row) => row.id === rowId);
     const config = targetRow ? getConfigForSequence(targetRow.sequence) : undefined;
     const selectedItem = config
-      ? getBoqRowItems(items, config).find((item) => matchesBoqItemType(getItemTypeFromItem(item), itemType))
+      ? getResidentialBoqRowItems(items, config).find((item) => matchesBoqItemType(getItemTypeFromItem(item), itemType))
       : undefined;
 
     setBoqRows((prev) =>
@@ -2133,7 +2133,7 @@ export function ResidentialQuotationForm({
                 {RESIDENTIAL_BOQ_SEQUENCE.map((config) => {
                   const rowsForConfig = boqRows.filter((entry) => entry.sequence === config.sequence);
                   const isMissingMandatory = missingMandatoryBoqRows.some((row) => row.sequence === config.sequence);
-                  const rowItems = getBoqRowItems(items, config);
+                  const rowItems = getResidentialBoqRowItems(items, config);
 
                   const usedItemTypes = config.selectionMode === "multiple"
                     ? new Set(rowsForConfig.map((r) => (r.itemType || "").toLowerCase()).filter(Boolean))
